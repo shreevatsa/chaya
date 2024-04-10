@@ -2,7 +2,7 @@
 <html>
 
 <head>
-  <title>OCR PDFs directly in your browser</title>
+  <title>OCR PDFs</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script defer type="module" src="main.js"></script>
   <style>
@@ -33,33 +33,17 @@
     .dropzone.drag-over {
       background-color: pink;
     }
-
-    .image-container img {
-      margin-bottom: 10px;
-      max-width: 50%;
-    }
-
-    textarea {
-      width: 50%;
-      margin-bottom: 20px;
-      box-sizing: border-box;
-      font-size: 20pt;
-    }
   </style>
 </head>
 
 <body>
-  <h1>OCR PDFs in your browser</h1>
-  <p>It uses <a href="https://tesseract.projectnaptha.com/">Tesseract.js</a> for OCR and <a
-      href="https://mozilla.github.io/pdf.js/">PDF.js</a> to convert PDFs into images.</p>
+  <h1>OCR PDFs</h1>
 
   <!-- File input element: not displayed, use through the dropzone. -->
   <input type="file" id="fileInput" accept=".pdf" style="display: none;" />
   <div class="dropzone" id="dropzone">
     Drag and drop a PDF file here or click to select a file
   </div>
-  <div class="image-container"></div>
-
 </body>
 
 </html>

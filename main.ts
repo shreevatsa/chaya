@@ -64,10 +64,10 @@ async function workOnPdf(file) {
     let done = 0;
     dropzone.innerText = `Processing ${numPages} page${numPages > 1 ? 's' : ''}`;
     for await (const { imageURL } of imageIterator) {
-        const ta = await displayImage(imageURL);
+        const textarea = displayImage(imageURL);
         const { text } = await ocrImage(worker, imageURL);
-        ta.value = text.trim();
-        ta.style.height = (ta.scrollHeight + 5) + 'px';
+        textarea.value = text.trim();
+        textarea.style.height = (textarea.scrollHeight + 5) + 'px';
         done += 1;
         dropzone.innerText = `Done ${done} of ${numPages}`;
     }
@@ -75,9 +75,8 @@ async function workOnPdf(file) {
     await worker.terminate();
 }
 
-const imageContainer = document.querySelector('.image-container') as HTMLDivElement;
 // Display the image and a textarea next to it.
-async function displayImage(imageURL) {
+function displayImage(imageURL) {
     const container = document.createElement('div');
     const imgElement = document.createElement('img');
     imgElement.src = imageURL;
@@ -87,7 +86,6 @@ async function displayImage(imageURL) {
     altTextarea.classList.add('textarea-alt');
     altTextarea.placeholder = 'OCRing image...';
     container.appendChild(altTextarea);
-    imageContainer.appendChild(container);
     return altTextarea;
 }
 
