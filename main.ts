@@ -15,6 +15,9 @@ const schema = new Schema({
         // The document (page) is a nonempty sequence of lines.
         doc: {
             content: "page+",
+            attrs: {
+                file: { default: null },
+            }
         },
     },
 });
@@ -53,14 +56,26 @@ async function processFile(file) {
     dropzone.innerText = 'Processing file...';
 
     console.assert(file.type === 'application/pdf');
-    await workOnPdf(file);
+    const fileUrl = URL.createObjectURL(file);
+    // await workOnPdf(fileUrl);
+    await startPm(fileUrl);
     dropzone.innerText = 'Done.';
 }
 
-async function workOnPdf(file) {
+async function startPm(fileUrl) {
+    const doc = schema.nodes.doc.createChecked(
+        {
+            file: fileUrl,
+        },
+        schema.node('page', schema.text('hello')),
+    );
+    return doc;
+}
+
+async function workOnPdf(fileUrl) {
     const worker = await Tesseract.createWorker('kan');
 
-    const { numPages, imageIterator } = await convertPDFToImages(file);
+    const { numPages, imageIterator } = await convertPDFToImages(fileUrl);
     let done = 0;
     dropzone.innerText = `Processing ${numPages} page${numPages > 1 ? 's' : ''}`;
     for await (const { imageURL } of imageIterator) {
@@ -90,9 +105,9 @@ function displayImage(imageURL) {
 }
 
 const desiredWidth = 1000;
-async function convertPDFToImages(file) {
+async function convertPDFToImages(fileUrl) {
     // returns { numPages, imageIterator }
-    const pdf = await pdfjsLib.getDocument(URL.createObjectURL(file)).promise;
+    const pdf = await pdfjsLib.getDocument(fileUrl).promise;
     const numPages = pdf.numPages;
     async function* images() {
         for (let i = 1; i <= numPages; i++) {
