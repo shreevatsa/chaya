@@ -60,8 +60,8 @@ async function startPm(fileUrl, parentNode) {
         dropzone.innerText = `Processing page ${i} of ${pdf.numPages}`;
         const imageUrl = await imageForPage(page);
 
-        // OCR
-        const { data: { text }, } = await worker.recognize(imageUrl);
+        // const { data: { text }, } = await worker.recognize(imageUrl);
+        const text = 'hello';
         const pageNode = schema.node('page', { pageNum: i, pageImage: imageUrl }, schema.text(text));
         pageNodes.push(pageNode);
     }
@@ -71,7 +71,8 @@ async function startPm(fileUrl, parentNode) {
         },
         pageNodes,
     );
-    const myFilterPlugin = new Plugin({
+    const preventPagesDeletion = new Plugin({
+        // Alternative: https://discuss.prosemirror.net/t/how-to-prevent-node-deletion/130/9
         filterTransaction: (transaction, state) => {
             // Avoid endless recursion when simulating the effects of the transaction
             if (transaction.getMeta("filteringRequiredNodeDeletion") === true) return true;
@@ -79,7 +80,6 @@ async function startPm(fileUrl, parentNode) {
 
             // Simulate the transaction
             const newState = state.apply(transaction);
-
             function childPageNodes(node) {
                 const ret: number[] = [];
                 node.descendants(child => {
@@ -107,7 +107,7 @@ async function startPm(fileUrl, parentNode) {
             history(),
             keymap({ 'Mod-z': undo, 'Mod-y': redo }),
             keymap(baseKeymap),
-            myFilterPlugin,
+            preventPagesDeletion,
         ],
     });
     // Display the editor.
