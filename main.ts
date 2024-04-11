@@ -22,7 +22,12 @@ const schema = new Schema({
                 pageImage: { default: null },
             },
             toDOM(node) {
-                return ['div', { class: 'page' }, ['img', { class: 'page-image', src: node.attrs.pageImage }], ['div', { class: 'page-contents' }, 0]];
+                return [
+                    'div',
+                    { class: 'page' },
+                    ['img', { class: 'page-image', src: node.attrs.pageImage }],
+                    ['div', { class: 'page-contents' }, 0]
+                ];
             },
         },
         // The document (page) is a nonempty sequence of lines.
