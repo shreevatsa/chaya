@@ -1,4 +1,4 @@
-import { EditorState } from 'prosemirror-state';
+import { EditorState, Plugin } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import {
     DOMOutputSpec, DOMParser, Fragment, Node, NodeType, Schema, Slice,
@@ -64,12 +64,45 @@ async function startPm(fileUrl, parentNode) {
         },
         pageNodes,
     );
+    const myFilterPlugin = new Plugin({
+        filterTransaction: (transaction, state) => {
+            // Avoid endless recursion when simulating the effects of the transaction
+            if (transaction.getMeta("filteringRequiredNodeDeletion") === true) return true;
+            transaction.setMeta("filteringRequiredNodeDeletion", true);
+
+            // Simulate the transaction
+            const newState = state.apply(transaction);
+
+            function childPageNodes(node) {
+                const ret: number[] = [];
+                node.descendants(child => {
+                    if (child.type.name === 'page') {
+                        ret.push(child.attrs.pageNum);
+                        console.log(`Now ${child.attrs.pageNum} is of type ${typeof child.attrs.pageNum}`);
+                    }
+                });
+                return ret;
+            }
+            function isEqual(array1: number[], array2: number[]) {
+                console.log(`Checking equality of ${array1} and ${array2}`);
+                return array1.length == array2.length && array1.every((value, index) => value == array2[index]);
+            }
+            // Check that the same page nodes are still present in any order
+            return isEqual(
+                childPageNodes(state.doc.content).sort(),
+                childPageNodes(newState.doc.content).sort()
+            )
+        }
+    });
+
+
     const state = EditorState.create({
         doc,
         plugins: [
             history(),
             keymap({ 'Mod-z': undo, 'Mod-y': redo }),
             keymap(baseKeymap),
+            myFilterPlugin,
         ],
     });
     // Display the editor.
