@@ -1,15 +1,25 @@
-import { AllSelection } from 'prosemirror-state';
+import { EditorState } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
 import {
     DOMOutputSpec, DOMParser, Fragment, Node, NodeType, Schema, Slice,
 } from 'prosemirror-model';
+import { keymap } from 'prosemirror-keymap';
+import { undo, redo, history } from 'prosemirror-history';
+import { baseKeymap } from 'prosemirror-commands';
+import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const schema = new Schema({
     nodes: {
         text: { inline: true },
         page: {
-            content: '',
+            content: 'text*',
             attrs: {
                 pageNum: { default: null },
+            },
+            toDOM(node) {
+                return ['div', { style: "display: flex" }, ["div"], ["div", 0]]
             },
         },
         // The document (page) is a nonempty sequence of lines.
@@ -22,14 +32,44 @@ const schema = new Schema({
     },
 });
 
-import Tesseract from 'tesseract.js';
+async function startPm(fileUrl, parentNode) {
+    let pageNodes: Node[] = [];
 
-import * as pdfjsLib from 'pdfjs-dist';
-import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs';
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+    const pdf = await pdfjsLib.getDocument(fileUrl).promise;
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const pageNode = schema.node('page', { pageNum: i }, schema.text(`Page ${i}`));
+        pageNodes.push(pageNode);
+    }
+    const doc = schema.nodes.doc.createChecked(
+        {
+            file: fileUrl,
+        },
+        pageNodes,
+    );
+    const state = EditorState.create({
+        doc,
+        plugins: [
+            history(),
+            keymap({ 'Mod-z': undo, 'Mod-y': redo }),
+            keymap(baseKeymap),
+        ],
+    });
+    // Display the editor.
+    const view = new EditorView(
+        parentNode,
+        {
+            state,
+        }
+    );
+    return doc;
+}
+
+import Tesseract from 'tesseract.js';
 
 const dropzone = document.getElementById('dropzone') as HTMLElement;
 const fileInput = document.getElementById('fileInput') as HTMLInputElement;
+const docView = document.getElementById('docView') as HTMLElement;
 
 let fileSelectionAllowed = true;
 dropzone.addEventListener('click', () => { if (fileSelectionAllowed) { fileInput.click(); } });
@@ -39,13 +79,12 @@ dropzone.addEventListener('drop', event => {
     event.preventDefault();
     if (fileSelectionAllowed) {
         dropzone.classList.remove('drag-over');
-        const file = event.dataTransfer.files[0];
-        fileInput.files = event.dataTransfer.files;
+        fileInput.files = event.dataTransfer!.files;
     }
 });
 
 fileInput.addEventListener('change', (event) => {
-    const file = event.target.files[0];
+    const file = (event.target as HTMLInputElement).files![0];
     processFile(file);
 });
 
@@ -58,18 +97,8 @@ async function processFile(file) {
     console.assert(file.type === 'application/pdf');
     const fileUrl = URL.createObjectURL(file);
     // await workOnPdf(fileUrl);
-    await startPm(fileUrl);
+    await startPm(fileUrl, docView);
     dropzone.innerText = 'Done.';
-}
-
-async function startPm(fileUrl) {
-    const doc = schema.nodes.doc.createChecked(
-        {
-            file: fileUrl,
-        },
-        schema.node('page', schema.text('hello')),
-    );
-    return doc;
 }
 
 async function workOnPdf(fileUrl) {
