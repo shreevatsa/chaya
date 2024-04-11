@@ -10,6 +10,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
+const desiredWidth = 1000;
+
 const schema = new Schema({
     nodes: {
         text: { inline: true },
@@ -34,6 +36,7 @@ const schema = new Schema({
 });
 
 async function startPm(fileUrl, parentNode) {
+    const worker = await Tesseract.createWorker('kan');
     let pageNodes: Node[] = [];
 
     const pdf = await pdfjsLib.getDocument(fileUrl).promise;
@@ -55,7 +58,11 @@ async function startPm(fileUrl, parentNode) {
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         dropzone.innerText = `Processing page ${i} of ${pdf.numPages}`;
-        const pageNode = schema.node('page', { pageNum: i, pageImage: await imageForPage(page) }, schema.text(`Page ${i}`));
+        const imageUrl = await imageForPage(page);
+
+        // OCR
+        const { data: { text }, } = await worker.recognize(imageUrl);
+        const pageNode = schema.node('page', { pageNum: i, pageImage: imageUrl }, schema.text(text));
         pageNodes.push(pageNode);
     }
     const doc = schema.nodes.doc.createChecked(
@@ -78,13 +85,11 @@ async function startPm(fileUrl, parentNode) {
                 node.descendants(child => {
                     if (child.type.name === 'page') {
                         ret.push(child.attrs.pageNum);
-                        console.log(`Now ${child.attrs.pageNum} is of type ${typeof child.attrs.pageNum}`);
                     }
                 });
                 return ret;
             }
             function isEqual(array1: number[], array2: number[]) {
-                console.log(`Checking equality of ${array1} and ${array2}`);
                 return array1.length == array2.length && array1.every((value, index) => value == array2[index]);
             }
             // Check that the same page nodes are still present in any order
@@ -112,6 +117,7 @@ async function startPm(fileUrl, parentNode) {
             state,
         }
     );
+    // await worker.terminate();
     return doc;
 }
 
@@ -149,47 +155,4 @@ async function processFile(file) {
     // await workOnPdf(fileUrl);
     await startPm(fileUrl, docView);
     dropzone.innerText = 'Done.';
-}
-
-async function workOnPdf(fileUrl) {
-    const worker = await Tesseract.createWorker('kan');
-
-    const { numPages, imageIterator } = await convertPDFToImages(fileUrl);
-    let done = 0;
-    dropzone.innerText = `Processing ${numPages} page${numPages > 1 ? 's' : ''}`;
-    for await (const { imageURL } of imageIterator) {
-        const textarea = displayImage(imageURL);
-        const { text } = await ocrImage(worker, imageURL);
-        textarea.value = text.trim();
-        textarea.style.height = (textarea.scrollHeight + 5) + 'px';
-        done += 1;
-        dropzone.innerText = `Done ${done} of ${numPages}`;
-    }
-
-    await worker.terminate();
-}
-
-// Display the image and a textarea next to it.
-function displayImage(imageURL) {
-    const container = document.createElement('div');
-    const imgElement = document.createElement('img');
-    imgElement.src = imageURL;
-    container.appendChild(imgElement);
-
-    const altTextarea = document.createElement('textarea');
-    altTextarea.classList.add('textarea-alt');
-    altTextarea.placeholder = 'OCRing image...';
-    container.appendChild(altTextarea);
-    return altTextarea;
-}
-
-const desiredWidth = 1000;
-
-async function ocrImage(worker, imageUrl) {
-    const response = await worker.recognize(imageUrl);
-    console.log(response);
-    const {
-        data: { text },
-    } = response;
-    return { text };
 }
