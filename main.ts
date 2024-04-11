@@ -17,9 +17,10 @@ const schema = new Schema({
             content: 'text*',
             attrs: {
                 pageNum: { default: null },
+                pageImage: { default: null },
             },
             toDOM(node) {
-                return ['div', { style: "display: flex" }, ["div"], ["div", 0]]
+                return ['div', { class: 'page' }, ['img', { class: 'page-image', src: node.attrs.pageImage }], ['div', { class: 'page-contents' }, 0]];
             },
         },
         // The document (page) is a nonempty sequence of lines.
@@ -36,9 +37,25 @@ async function startPm(fileUrl, parentNode) {
     let pageNodes: Node[] = [];
 
     const pdf = await pdfjsLib.getDocument(fileUrl).promise;
+
+    async function imageForPage(page: pdfjsLib.PDFPageProxy) {
+        const viewport = page.getViewport({ scale: 1 });
+        const canvas = document.createElement('canvas');
+        canvas.width = desiredWidth;
+        canvas.height = (desiredWidth / viewport.width) * viewport.height;
+        const renderContext = {
+            canvasContext: canvas.getContext('2d')!,
+            viewport: page.getViewport({ scale: desiredWidth / viewport.width }),
+        };
+        await page.render(renderContext).promise;
+        const imageURL = canvas.toDataURL('image/jpeg', 0.8);
+        return imageURL;
+    }
+
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
-        const pageNode = schema.node('page', { pageNum: i }, schema.text(`Page ${i}`));
+        dropzone.innerText = `Processing page ${i} of ${pdf.numPages}`;
+        const pageNode = schema.node('page', { pageNum: i, pageImage: await imageForPage(page) }, schema.text(`Page ${i}`));
         pageNodes.push(pageNode);
     }
     const doc = schema.nodes.doc.createChecked(
@@ -134,33 +151,6 @@ function displayImage(imageURL) {
 }
 
 const desiredWidth = 1000;
-async function convertPDFToImages(fileUrl) {
-    // returns { numPages, imageIterator }
-    const pdf = await pdfjsLib.getDocument(fileUrl).promise;
-    const numPages = pdf.numPages;
-    async function* images() {
-        for (let i = 1; i <= numPages; i++) {
-            try {
-                const page = await pdf.getPage(i);
-                const viewport = page.getViewport({ scale: 1 });
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d')!;
-                canvas.width = desiredWidth;
-                canvas.height = (desiredWidth / viewport.width) * viewport.height;
-                const renderContext = {
-                    canvasContext: context,
-                    viewport: page.getViewport({ scale: desiredWidth / viewport.width }),
-                };
-                await page.render(renderContext).promise;
-                const imageURL = canvas.toDataURL('image/jpeg', 0.8);
-                yield { imageURL };
-            } catch (error) {
-                console.error(`Error rendering page ${i}:`, error);
-            }
-        }
-    }
-    return { numPages: numPages, imageIterator: images() };
-}
 
 async function ocrImage(worker, imageUrl) {
     const response = await worker.recognize(imageUrl);
