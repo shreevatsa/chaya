@@ -42,17 +42,10 @@ const schema = new Schema({
 
 async function startPm(fileUrl, parentNode) {
     let later: any[] = [];
-    let worker;
-    let later2 = [
-        async () => {
-            dropzone.innerText = 'Initializing OCR worker...';
-            worker = await Tesseract.createWorker('kan');
-            dropzone.innerText = 'Initialized OCR worker.';
-        }
-    ];
     let pageNodes: Node[] = [];
 
     const pdf = await pdfjsLib.getDocument(fileUrl).promise;
+    const numPages = pdf.numPages;
 
     async function imageForPage(page: pdfjsLib.PDFPageProxy) {
         const viewport = page.getViewport({ scale: 1 });
@@ -71,7 +64,6 @@ async function startPm(fileUrl, parentNode) {
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         dropzone.innerText = `Processing page ${i} of ${pdf.numPages}`;
-        // const { data: { text }, } = await worker.recognize(imageUrl);
         const text = 'hello';
         const img = document.createElement('img');
         img.classList.add('page-image');
@@ -134,14 +126,47 @@ async function startPm(fileUrl, parentNode) {
             state,
         }
     );
-    later2.push(() => worker.terminate());
-    later = later.concat(later2);
-    later.push(() => { dropzone.innerText = 'Done.'; });
     setTimeout(
         async () => {
             for (let i = 0; i < later.length; ++i) {
                 await later[i]();
             }
+            dropzone.innerText = 'Done rendering pages. Initializing OCR worker...';
+            let worker = await Tesseract.createWorker('kan');
+            dropzone.innerText = 'Initialized OCR worker.';
+
+            for (let i = 1; i <= numPages; ++i) {
+                // const pageNode = view.state.doc.content.child(i - 1);
+                // let found = { node: pageNode, pos: 0 };
+
+                // Find the position of the node.
+                let found;
+                doc.descendants((node, pos) => {
+                    if (node.attrs.pageNum == i) {
+                        found = { node, pos };
+                        if (found) return false;
+                    }
+                });
+                if (found) {
+                    let { node, pos } = found;
+                    pos += 1;
+                    let end = pos + node.content.size - 1;
+                    console.log(found);
+                    console.log(`Found page ${i} at position ${found} = ${pos} to ${end}`);
+                    const { data: { text }, } = await worker.recognize(node.attrs.pageImageNode.src);
+                    console.log(`OCRed text: ${text}`);
+                    // const newNode = schema.text(text);
+                    // const tr = state.tr.replaceWith(pos, end, newNode);
+                    const tr = view.state.tr;
+                    console.log(`Can replace with ${pos} to ${end}?`);
+                    tr.replaceRangeWith(pos, end, schema.text(text));
+                    view.updateState(view.state.apply(tr));
+                } else {
+                    console.log(`Did not find anything for page ${i}`);
+                }
+            }
+            worker.terminate();
+            dropzone.innerText = 'Done.';
         },
         0);
     return doc;
