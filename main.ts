@@ -19,13 +19,13 @@ const schema = new Schema({
             content: 'text*',
             attrs: {
                 pageNum: { default: null },
-                pageImage: { default: null },
+                pageImageNode: { default: null },
             },
             toDOM(node) {
                 return [
                     'div',
                     { class: 'page' },
-                    ['img', { class: 'page-image', src: node.attrs.pageImage }],
+                    node.attrs.pageImageNode,
                     ['div', { class: 'page-contents' }, 0]
                 ];
             },
@@ -41,6 +41,8 @@ const schema = new Schema({
 });
 
 async function startPm(fileUrl, parentNode) {
+    let later: any[] = [];
+    let later2: any[] = [];
     const worker = await Tesseract.createWorker('kan');
     let pageNodes: Node[] = [];
 
@@ -63,11 +65,12 @@ async function startPm(fileUrl, parentNode) {
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         dropzone.innerText = `Processing page ${i} of ${pdf.numPages}`;
-        const imageUrl = await imageForPage(page);
-
         // const { data: { text }, } = await worker.recognize(imageUrl);
         const text = 'hello';
-        const pageNode = schema.node('page', { pageNum: i, pageImage: imageUrl }, schema.text(text));
+        const img = document.createElement('img');
+        img.classList.add('page-image');
+        const pageNode = schema.node('page', { pageNum: i, pageImageNode: img }, schema.text(text));
+        later.push(async () => { img.src = await imageForPage(page); });
         pageNodes.push(pageNode);
     }
     const doc = schema.nodes.doc.createChecked(
@@ -122,7 +125,15 @@ async function startPm(fileUrl, parentNode) {
             state,
         }
     );
-    // await worker.terminate();
+    later = later.concat(later2);
+    later.push(() => worker.terminate());
+    setTimeout(
+        async () => {
+            for (let i = 0; i < later.length; ++i) {
+                await later[i]();
+            }
+        },
+        0);
     return doc;
 }
 
@@ -158,6 +169,6 @@ async function processFile(file) {
     console.assert(file.type === 'application/pdf');
     const fileUrl = URL.createObjectURL(file);
     // await workOnPdf(fileUrl);
-    await startPm(fileUrl, docView);
+    let doc = await startPm(fileUrl, docView);
     dropzone.innerText = 'Done.';
 }
