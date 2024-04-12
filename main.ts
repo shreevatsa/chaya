@@ -42,8 +42,14 @@ const schema = new Schema({
 
 async function startPm(fileUrl, parentNode) {
     let later: any[] = [];
-    let later2: any[] = [];
-    const worker = await Tesseract.createWorker('kan');
+    let worker;
+    let later2 = [
+        async () => {
+            dropzone.innerText = 'Initializing OCR worker...';
+            worker = await Tesseract.createWorker('kan');
+            dropzone.innerText = 'Initialized OCR worker.';
+        }
+    ];
     let pageNodes: Node[] = [];
 
     const pdf = await pdfjsLib.getDocument(fileUrl).promise;
@@ -70,7 +76,10 @@ async function startPm(fileUrl, parentNode) {
         const img = document.createElement('img');
         img.classList.add('page-image');
         const pageNode = schema.node('page', { pageNum: i, pageImageNode: img }, schema.text(text));
-        later.push(async () => { img.src = await imageForPage(page); });
+        later.push(async () => {
+            img.src = await imageForPage(page);
+            dropzone.innerText = `Rendered page ${i} of ${pdf.numPages}`;
+        });
         pageNodes.push(pageNode);
     }
     const doc = schema.nodes.doc.createChecked(
@@ -125,8 +134,9 @@ async function startPm(fileUrl, parentNode) {
             state,
         }
     );
+    later2.push(() => worker.terminate());
     later = later.concat(later2);
-    later.push(() => worker.terminate());
+    later.push(() => { dropzone.innerText = 'Done.'; });
     setTimeout(
         async () => {
             for (let i = 0; i < later.length; ++i) {
@@ -170,5 +180,5 @@ async function processFile(file) {
     const fileUrl = URL.createObjectURL(file);
     // await workOnPdf(fileUrl);
     let doc = await startPm(fileUrl, docView);
-    dropzone.innerText = 'Done.';
+    window['doc'] = doc;
 }
