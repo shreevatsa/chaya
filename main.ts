@@ -139,10 +139,12 @@ async function startPm(fileUrl, parentNode) {
 
 import Tesseract from 'tesseract.js';
 
-const dropzone = document.getElementById('dropzone') as HTMLElement;
-const fileInput = document.getElementById('fileInput') as HTMLInputElement;
 const docView = document.getElementById('docView') as HTMLElement;
 
+// Set up the two file input areas.
+// Area 1
+const dropzone = document.getElementById('dropzone') as HTMLElement;
+const fileInput = document.getElementById('fileInput') as HTMLInputElement;
 let fileSelectionAllowed = true;
 dropzone.addEventListener('click', () => { if (fileSelectionAllowed) { fileInput.click(); } });
 dropzone.addEventListener('dragover', event => { event.preventDefault(); if (fileSelectionAllowed) { dropzone.classList.add('drag-over'); } });
@@ -154,10 +156,39 @@ dropzone.addEventListener('drop', event => {
         fileInput.files = event.dataTransfer!.files;
     }
 });
-
 fileInput.addEventListener('change', (event) => {
     const file = (event.target as HTMLInputElement).files![0];
     processFile(file);
+});
+// Area 2
+const newSc = document.getElementById('newSc')!;
+newSc.addEventListener('click', event => { event.stopPropagation(); });
+const dropzoneSc = document.getElementById('dropzoneSc')!;
+const fileInputSc = document.getElementById('fileInputSc') as HTMLInputElement;
+let fileSelectionAllowedSc = true;
+dropzoneSc.addEventListener('click', () => { if (fileSelectionAllowedSc) { fileInputSc.click(); } });
+dropzoneSc.addEventListener('dragover', event => { event.preventDefault(); if (fileSelectionAllowedSc) { dropzoneSc.classList.add('drag-over'); } });
+dropzoneSc.addEventListener('dragleave', event => { event.preventDefault(); if (fileSelectionAllowedSc) { dropzoneSc.classList.remove('drag-over'); } });
+dropzoneSc.addEventListener('drop', event => {
+    event.preventDefault();
+    if (fileSelectionAllowedSc) {
+        dropzoneSc.classList.remove('drag-over');
+        fileInputSc.files = event.dataTransfer!.files;
+    }
+});
+fileInputSc.addEventListener('change', (event) => {
+    const file = (event.target as HTMLInputElement).files![0];
+});
+// Area 3
+const saveSc = document.getElementById('saveSc')!;
+saveSc.addEventListener('click', () => {
+    const content = JSON.stringify(window['view'].state.doc.toJSON(), null, 2);
+    const a = document.createElement('a');
+    const file = new Blob([content], { type: 'application/octet-stream' });
+    a.href = URL.createObjectURL(file);
+    a.download = 'example.sc';
+    a.click();
+    URL.revokeObjectURL(a.href);
 });
 
 async function processFile(file) {
@@ -166,7 +197,7 @@ async function processFile(file) {
     dropzone.classList.add('disabled');
     dropzone.innerText = 'Processing file...';
 
-    console.assert(file.type === 'application/pdf');
+    console.assert(file && file.type === 'application/pdf');
     const fileUrl = URL.createObjectURL(file);
     // await workOnPdf(fileUrl);
     let view = await startPm(fileUrl, docView);
