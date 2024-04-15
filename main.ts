@@ -131,45 +131,10 @@ async function startPm(fileUrl, parentNode) {
             for (let i = 0; i < later.length; ++i) {
                 await later[i]();
             }
-            dropzone.innerText = 'Done rendering pages. Initializing OCR worker...';
-            let worker = await Tesseract.createWorker('kan');
-            dropzone.innerText = 'Initialized OCR worker.';
-
-            for (let i = 1; i <= numPages; ++i) {
-                // const pageNode = view.state.doc.content.child(i - 1);
-                // let found = { node: pageNode, pos: 0 };
-
-                // Find the position of the node.
-                let found;
-                doc.descendants((node, pos) => {
-                    if (node.attrs.pageNum == i) {
-                        found = { node, pos };
-                        if (found) return false;
-                    }
-                });
-                if (found) {
-                    let { node, pos } = found;
-                    pos += 1;
-                    let end = pos + node.content.size - 1;
-                    console.log(found);
-                    console.log(`Found page ${i} at position ${found} = ${pos} to ${end}`);
-                    const { data: { text }, } = await worker.recognize(node.attrs.pageImageNode.src);
-                    console.log(`OCRed text: ${text}`);
-                    // const newNode = schema.text(text);
-                    // const tr = state.tr.replaceWith(pos, end, newNode);
-                    const tr = view.state.tr;
-                    console.log(`Can replace with ${pos} to ${end}?`);
-                    tr.replaceRangeWith(pos, end, schema.text(text));
-                    view.updateState(view.state.apply(tr));
-                } else {
-                    console.log(`Did not find anything for page ${i}`);
-                }
-            }
-            worker.terminate();
-            dropzone.innerText = 'Done.';
+            dropzone.innerText = 'Done rendering pages.';
         },
         0);
-    return doc;
+    return view;
 }
 
 import Tesseract from 'tesseract.js';
@@ -204,6 +169,48 @@ async function processFile(file) {
     console.assert(file.type === 'application/pdf');
     const fileUrl = URL.createObjectURL(file);
     // await workOnPdf(fileUrl);
-    let doc = await startPm(fileUrl, docView);
-    window['doc'] = doc;
+    let view = await startPm(fileUrl, docView);
+    window['view'] = view;
+    ocrAllPages(view);
+}
+
+async function ocrAllPages(view) {
+    dropzone.innerText = 'Initializing OCR worker...';
+    let worker = await Tesseract.createWorker('kan');
+    dropzone.innerText = 'Initialized OCR worker.';
+
+    const numPages = view.state.doc.childCount;
+
+    for (let i = 1; i <= numPages; ++i) {
+        // const pageNode = view.state.doc.content.child(i - 1);
+        // let found = { node: pageNode, pos: 0 };
+
+        // Find the position of the node.
+        let found;
+        view.state.doc.descendants((node, pos) => {
+            if (node.attrs.pageNum == i) {
+                found = { node, pos };
+                if (found) return false;
+            }
+        });
+        if (found) {
+            let { node, pos } = found;
+            pos += 1;
+            let end = pos + node.content.size - 1;
+            console.log(found);
+            console.log(`Found page ${i} at position ${found} = ${pos} to ${end}`);
+            const { data: { text }, } = await worker.recognize(node.attrs.pageImageNode.src);
+            console.log(`OCRed text: ${text}`);
+            // const newNode = schema.text(text);
+            // const tr = state.tr.replaceWith(pos, end, newNode);
+            const tr = view.state.tr;
+            console.log(`Can replace with ${pos} to ${end}?`);
+            tr.replaceRangeWith(pos, end, schema.text(text));
+            view.updateState(view.state.apply(tr));
+        } else {
+            console.log(`Did not find anything for page ${i}`);
+        }
+    }
+    worker.terminate();
+    dropzone.innerText = 'Done.';
 }
