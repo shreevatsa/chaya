@@ -9,8 +9,15 @@ import { baseKeymap } from 'prosemirror-commands';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+import Tesseract from 'tesseract.js';
 
 const desiredWidth = 1000;
+
+// "Global" PDF.js state
+let pdfFileUrl;
+let pdfPromise: Promise<pdfjsLib.PDFDocumentProxy>;
+let pagePromise: Promise<pdfjsLib.PDFPageProxy>[] = [];
+let pageCanvasPromise: Promise<HTMLCanvasElement>[] = [];
 
 const schema = new Schema({
     nodes: {
@@ -40,14 +47,19 @@ const schema = new Schema({
     },
 });
 
-async function startPm(fileUrl, parentNode) {
-    let later: any[] = [];
-    let pageNodes: Node[] = [];
-
-    const pdf = await pdfjsLib.getDocument(fileUrl).promise;
-    const numPages = pdf.numPages;
-
-    async function imageForPage(page: pdfjsLib.PDFPageProxy) {
+async function startPdfRendering(fileUrl) {
+    console.log('Processing PDF');
+    pdfPromise = pdfjsLib.getDocument(fileUrl).promise;
+    const pdf = await pdfPromise;
+    console.log('Loaded PDF');
+    for (let i = 1; i <= pdf.numPages; ++i) {
+        pagePromise[i] = pdf.getPage(i);
+        pageCanvasPromise[i] = canvasForPage(i);
+    }
+    async function canvasForPage(i: number) {
+        console.log(`Loading page ${i} of ${pdf.numPages}`);
+        const page = await pagePromise[i];
+        console.log(`Loaded page ${i} of ${pdf.numPages}`);
         const viewport = page.getViewport({ scale: 1 });
         const canvas = document.createElement('canvas');
         canvas.width = desiredWidth;
@@ -56,21 +68,24 @@ async function startPm(fileUrl, parentNode) {
             canvasContext: canvas.getContext('2d')!,
             viewport: page.getViewport({ scale: desiredWidth / viewport.width }),
         };
+        console.log(`Rendering page ${i} of ${pdf.numPages}`);
         await page.render(renderContext).promise;
-        const imageURL = canvas.toDataURL('image/jpeg', 0.8);
-        return imageURL;
+        console.log(`Rendered page ${i} of ${pdf.numPages}`);
+        return canvas;
     }
+}
+
+async function startPm(fileUrl, parentNode) {
+    let later: any[] = [];
+    let pageNodes: Node[] = [];
+    const pdf = await pdfPromise;
 
     for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        dropzone.innerText = `Processing page ${i} of ${pdf.numPages}`;
-        const text = 'hello';
         const img = document.createElement('img');
         img.classList.add('page-image');
-        const pageNode = schema.node('page', { pageNum: i, pageImageNode: img }, schema.text(text));
+        const pageNode = schema.node('page', { pageNum: i, pageImageNode: img }, schema.text('(wait for OCR)'));
         later.push(async () => {
-            img.src = await imageForPage(page);
-            dropzone.innerText = `Rendered page ${i} of ${pdf.numPages}`;
+            img.src = (await pageCanvasPromise[i]).toDataURL('image/jpeg', 0.8);
         });
         pageNodes.push(pageNode);
     }
@@ -137,7 +152,6 @@ async function startPm(fileUrl, parentNode) {
     return view;
 }
 
-import Tesseract from 'tesseract.js';
 
 const docView = document.getElementById('docView') as HTMLElement;
 
@@ -162,7 +176,17 @@ fileInput.addEventListener('change', (event) => {
 });
 // Area 2
 const newSc = document.getElementById('newSc')!;
-newSc.addEventListener('click', event => { event.stopPropagation(); });
+newSc.addEventListener('click', async event => {
+    // Don't want this click to be treated as a click on the parent div (sc dropzone)
+    event.stopPropagation();
+    // Don't want this click to be treated as a click on the <a href=""></a>
+    event.preventDefault();
+    // Actual work
+    let view = await startPm(pdfFileUrl, docView);
+    window['view'] = view;
+    console.log('Done creating the PM view');
+    setTimeout(() => ocrAllPages(view), 1000);
+});
 const dropzoneSc = document.getElementById('dropzoneSc')!;
 const fileInputSc = document.getElementById('fileInputSc') as HTMLInputElement;
 let fileSelectionAllowedSc = true;
@@ -195,14 +219,11 @@ async function processFile(file) {
     // Used up. Reload the page to add a different file.
     fileSelectionAllowed = false;
     dropzone.classList.add('disabled');
-    dropzone.innerText = 'Processing file...';
-
+    console.log(file);
     console.assert(file && file.type === 'application/pdf');
-    const fileUrl = URL.createObjectURL(file);
-    // await workOnPdf(fileUrl);
-    let view = await startPm(fileUrl, docView);
-    window['view'] = view;
-    ocrAllPages(view);
+    dropzone.innerText = `PDF file: ${file.name} of size ${file.size} bytes.`;
+    pdfFileUrl = URL.createObjectURL(file);
+    startPdfRendering(pdfFileUrl);
 }
 
 async function ocrAllPages(view) {
@@ -228,14 +249,12 @@ async function ocrAllPages(view) {
             let { node, pos } = found;
             pos += 1;
             let end = pos + node.content.size - 1;
-            console.log(found);
-            console.log(`Found page ${i} at position ${found} = ${pos} to ${end}`);
-            const { data: { text }, } = await worker.recognize(node.attrs.pageImageNode.src);
-            console.log(`OCRed text: ${text}`);
+            console.log(`Found page ${i} at position`, found, `= ${pos} to ${end}`);
+            // const { data: { text }, } = await worker.recognize(node.attrs.pageImageNode.src);
+            const text = 'fake ocr result';
             // const newNode = schema.text(text);
             // const tr = state.tr.replaceWith(pos, end, newNode);
             const tr = view.state.tr;
-            console.log(`Can replace with ${pos} to ${end}?`);
             tr.replaceRangeWith(pos, end, schema.text(text));
             view.updateState(view.state.apply(tr));
         } else {
