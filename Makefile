@@ -1,7 +1,6 @@
-# Build JS.
-js-dev:
-	npx esbuild main.ts --outfile=main.js --bundle --watch --format=esm
-
-# Build JS for production.
-js-prod:
-	npx esbuild main.ts --outfile=main.js --bundle --minify --format=esm
+# Suggestion:
+#     ls main.ts ocr.htm | entr make
+# Build JS. Add --minify if desired.
+js:
+	npx esbuild main.ts --outfile=main.js --bundle --format=esm
+	./build-inline.deno.ts
