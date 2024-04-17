@@ -16,8 +16,18 @@ const desiredWidth = 1000;
 // "Global" PDF.js state
 let pdfFileUrl;
 let pdfPromise: Promise<pdfjsLib.PDFDocumentProxy>;
-let pagePromise: Promise<pdfjsLib.PDFPageProxy>[] = [];
-let pageCanvasPromise: Promise<HTMLCanvasElement>[] = [];
+let pagePromise = [newUnresolved()];
+let pdfPage: pdfjsLib.PDFPageProxy[] = [];
+let pageCanvasPromise = [newUnresolved()];
+let pageCanvas: HTMLCanvasElement[] = [];
+
+function newUnresolved() {
+    let resolve;
+    let promise = new Promise((res, rej) => {
+        resolve = res;
+    });
+    return { promise, resolve };
+}
 
 const schema = new Schema({
     nodes: {
@@ -47,31 +57,41 @@ const schema = new Schema({
     },
 });
 
+async function canvasForPage(i: number, numPages: number) {
+    console.log(`Loading page ${i} of ${numPages}`);
+    await pagePromise[i].promise;
+    const page = pdfPage[i];
+    console.log(`Loaded page ${i} of ${numPages}`);
+    const viewport = page.getViewport({ scale: 1 });
+    const canvas = document.createElement('canvas');
+    canvas.width = desiredWidth;
+    canvas.height = (desiredWidth / viewport.width) * viewport.height;
+    const renderContext = {
+        canvasContext: canvas.getContext('2d')!,
+        viewport: page.getViewport({ scale: desiredWidth / viewport.width }),
+    };
+    console.log(`Rendering page ${i} of ${numPages}`);
+    await page.render(renderContext).promise;
+    console.log(`Rendered page ${i} of ${numPages}`);
+    return canvas;
+}
+
 async function startPdfRendering(fileUrl) {
-    console.log('Processing PDF');
+    console.log('Loading PDF');
     pdfPromise = pdfjsLib.getDocument(fileUrl).promise;
     const pdf = await pdfPromise;
     console.log('Loaded PDF');
     for (let i = 1; i <= pdf.numPages; ++i) {
-        pagePromise[i] = pdf.getPage(i);
-        pageCanvasPromise[i] = canvasForPage(i);
+        pagePromise[i] = newUnresolved();
+        pageCanvasPromise[i] = newUnresolved();
     }
-    async function canvasForPage(i: number) {
-        console.log(`Loading page ${i} of ${pdf.numPages}`);
-        const page = await pagePromise[i];
-        console.log(`Loaded page ${i} of ${pdf.numPages}`);
-        const viewport = page.getViewport({ scale: 1 });
-        const canvas = document.createElement('canvas');
-        canvas.width = desiredWidth;
-        canvas.height = (desiredWidth / viewport.width) * viewport.height;
-        const renderContext = {
-            canvasContext: canvas.getContext('2d')!,
-            viewport: page.getViewport({ scale: desiredWidth / viewport.width }),
-        };
-        console.log(`Rendering page ${i} of ${pdf.numPages}`);
-        await page.render(renderContext).promise;
-        console.log(`Rendered page ${i} of ${pdf.numPages}`);
-        return canvas;
+    for (let i = 1; i <= pdf.numPages; ++i) {
+        pdfPage[i] = await pdf.getPage(i);
+        pagePromise[i].resolve();
+    }
+    for (let i = 1; i <= pdf.numPages; ++i) {
+        pageCanvas[i] = await canvasForPage(i, pdf.numPages);
+        pageCanvasPromise[i].resolve();
     }
 }
 
@@ -83,9 +103,10 @@ async function startPm(fileUrl, parentNode) {
     for (let i = 1; i <= pdf.numPages; i++) {
         const img = document.createElement('img');
         img.classList.add('page-image');
-        const pageNode = schema.node('page', { pageNum: i, pageImageNode: img }, schema.text('(wait for OCR)'));
+        const pageNode = schema.node('page', { pageNum: i, pageImageNode: img }, schema.text(`(wait for page ${i})`));
         later.push(async () => {
-            img.src = (await pageCanvasPromise[i]).toDataURL('image/jpeg', 0.8);
+            await pageCanvasPromise[i].promise;
+            img.src = pageCanvas[i].toDataURL('image/jpeg', 0.8);
         });
         pageNodes.push(pageNode);
     }
@@ -146,7 +167,6 @@ async function startPm(fileUrl, parentNode) {
             for (let i = 0; i < later.length; ++i) {
                 await later[i]();
             }
-            dropzone.innerText = 'Done rendering pages.';
         },
         0);
     return view;
@@ -227,9 +247,7 @@ async function processFile(file) {
 }
 
 async function ocrAllPages(view) {
-    dropzone.innerText = 'Initializing OCR worker...';
     let worker = await Tesseract.createWorker('kan');
-    dropzone.innerText = 'Initialized OCR worker.';
 
     const numPages = view.state.doc.childCount;
 
@@ -251,7 +269,7 @@ async function ocrAllPages(view) {
             let end = pos + node.content.size - 1;
             console.log(`Found page ${i} at position`, found, `= ${pos} to ${end}`);
             // const { data: { text }, } = await worker.recognize(node.attrs.pageImageNode.src);
-            const text = 'fake ocr result';
+            const text = `fake ocr result for page ${i}`;
             // const newNode = schema.text(text);
             // const tr = state.tr.replaceWith(pos, end, newNode);
             const tr = view.state.tr;
@@ -262,5 +280,4 @@ async function ocrAllPages(view) {
         }
     }
     worker.terminate();
-    dropzone.innerText = 'Done.';
 }
