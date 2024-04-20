@@ -14,7 +14,7 @@
     .dropzone {
       box-sizing: border-box;
       width: 100%;
-      height: 3em;
+      min-height: 3em;
       border: 2px dashed #ccc;
       display: flex;
       justify-content: center;
@@ -23,6 +23,10 @@
       cursor: pointer;
       padding: 1em;
       margin-bottom: 2em;
+    }
+
+    .dropzone p {
+      margin: 0;
     }
 
     .dropzone.disabled {
@@ -159,7 +163,7 @@
   <!-- File input element: not displayed, use through the dropzone. -->
   <input type="file" id="fileInput" accept=".pdf" style="display: none;" />
   <div class="dropzone" id="dropzone">
-    Drag and drop a PDF file here or click to select a file
+    <p>Drag and drop a PDF file here or click to select a file</p>
   </div>
   <input type="file" id="fileInputSc" accept=".sc" style="display: none;" />
   <div class="dropzone" id="dropzoneSc" style="display: none;">
