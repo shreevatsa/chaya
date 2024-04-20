@@ -22,7 +22,7 @@
       font-size: 24px;
       cursor: pointer;
       padding: 1em;
-      margin-bottom: 1em;
+      margin-bottom: 2em;
     }
 
     .dropzone.disabled {
@@ -32,6 +32,34 @@
     .dropzone.drag-over {
       background-color: pink;
     }
+
+.button {
+  font-size: 18px;
+  color: #fff;
+  background-color: #007bff; /* Use a distinct, eye-catching color */
+  padding: 1em;
+  border: none;
+  border-radius: 0.25em;
+  transition: background-color 0.3s;
+}
+
+.button:hover, .button:focus {
+  background-color: #0056b3; /* Darken the color on hover/focus for feedback */
+  outline: none; /* Remove the default focus outline */
+}
+
+.button:active {
+  background-color: #004494; /* Even darker when clicked */
+  transform: translateY(2px); /* Slight push effect when active */
+}
+
+/* Optionally, you can also style the button to be full-width on mobile screens */
+@media (max-width: 768px) {
+  .button {
+    display: block;
+    width: 100%;
+  }
+}
   </style>
   <style>
     .ProseMirror {
@@ -129,9 +157,7 @@
     <p>Drag and drop a <code>.sc</code> file here or click to select a file, or <a href="" id="newSc">create new</a>.
     </p>
   </div>
-  <div class="dropzone" id="saveSc">
-    Click here to save the current file.
-  </div>
+  <button class="button" id="saveSc">Save the current file</button>
   <div id="docView"></div>
   <!-- This script is at the bottom so that nothing comes after the huge blob. -->
   <script defer type="module" src="main.js"></script>
