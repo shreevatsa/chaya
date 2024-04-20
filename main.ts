@@ -203,11 +203,6 @@ newSc.addEventListener('click', async event => {
     // Don't want this click to be treated as a click on the <a href=""></a>
     event.preventDefault();
     processFileSc(null);
-    // Actual work
-    let view = await startPm(pdfFileUrl, docView);
-    window['view'] = view;
-    console.log('Done creating the PM view');
-    setTimeout(() => ocrAllPages(view), 1000);
 });
 const dropzoneSc = document.getElementById('dropzoneSc')!;
 const fileInputSc = document.getElementById('fileInputSc') as HTMLInputElement;
@@ -251,7 +246,7 @@ async function processFile(file) {
     startPdfRendering(pdfFileUrl);
 }
 
-async function processFileSc(file) {
+async function processFileSc(file: File | null) {
     fileSelectionAllowedSc = false;
     console.log(file);
     dropzoneSc.classList.add('disabled');
@@ -261,6 +256,12 @@ async function processFileSc(file) {
         dropzoneSc.innerText = '(New chāyā; click the button below to save.)';
     }
     saveSc.style.display = '';
+
+    // Actual work
+    let view = await startPm(pdfFileUrl, docView);
+    window['view'] = view;
+    console.log('Done creating the PM view');
+    setTimeout(() => ocrAllPages(view), 1000);
 }
 
 async function ocrAllPages(view) {
