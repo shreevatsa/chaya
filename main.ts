@@ -14,7 +14,8 @@ import Tesseract from 'tesseract.js';
 const desiredWidth = 1000;
 
 // "Global" PDF.js state
-let pdfFileUrl;
+let pdfFileUrl: string;
+let pdfFileName: string;
 let pdfPromise: Promise<pdfjsLib.PDFDocumentProxy>;
 let pagePromise = [newUnresolved()];
 let pdfPage: pdfjsLib.PDFPageProxy[] = [];
@@ -230,7 +231,7 @@ saveSc.addEventListener('click', () => {
     const a = document.createElement('a');
     const file = new Blob([content], { type: 'application/octet-stream' });
     a.href = URL.createObjectURL(file);
-    a.download = 'example.sc';
+    a.download = `${pdfFileName}.sc`;
     a.click();
     URL.revokeObjectURL(a.href);
 });
@@ -241,7 +242,8 @@ async function processFile(file) {
     dropzone.classList.add('disabled');
     console.log(file);
     console.assert(file && file.type === 'application/pdf');
-    dropzone.innerText = `PDF file: ${file.name} of size ${file.size} bytes.`;
+    pdfFileName = file.name;
+    dropzone.innerText = `PDF file: ${pdfFileName} of size ${file.size} bytes.`;
     pdfFileUrl = URL.createObjectURL(file);
     startPdfRendering(pdfFileUrl);
 }
@@ -266,7 +268,7 @@ async function ocrAllPages(view) {
         if (found) {
             let { node, pos } = found;
             pos += 1;
-            let end = pos + node.content.size - 1;
+            let end = pos + node.content.size;
             console.log(`Found page ${i} at position`, found, `= ${pos} to ${end}`);
             // const { data: { text }, } = await worker.recognize(node.attrs.pageImageNode.src);
             const text = `fake ocr result for page ${i}`;
