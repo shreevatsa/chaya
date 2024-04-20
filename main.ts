@@ -178,20 +178,20 @@ const docView = document.getElementById('docView') as HTMLElement;
 
 // Set up the two file input areas.
 // Area 1
-const dropzone = document.getElementById('dropzone') as HTMLElement;
-const fileInput = document.getElementById('fileInput') as HTMLInputElement;
-let fileSelectionAllowed = true;
-dropzone.addEventListener('click', () => { if (fileSelectionAllowed) { fileInput.click(); } });
-dropzone.addEventListener('dragover', event => { event.preventDefault(); if (fileSelectionAllowed) { dropzone.classList.add('drag-over'); } });
-dropzone.addEventListener('dragleave', event => { event.preventDefault(); if (fileSelectionAllowed) { dropzone.classList.remove('drag-over'); } });
-dropzone.addEventListener('drop', event => {
+const dropzonePdf = document.getElementById('dropzone') as HTMLElement;
+const fileInputPdf = document.getElementById('fileInput') as HTMLInputElement;
+let fileSelectionAllowedPdf = true;
+dropzonePdf.addEventListener('click', () => { if (fileSelectionAllowedPdf) { fileInputPdf.click(); } });
+dropzonePdf.addEventListener('dragover', event => { event.preventDefault(); if (fileSelectionAllowedPdf) { dropzonePdf.classList.add('drag-over'); } });
+dropzonePdf.addEventListener('dragleave', event => { event.preventDefault(); if (fileSelectionAllowedPdf) { dropzonePdf.classList.remove('drag-over'); } });
+dropzonePdf.addEventListener('drop', event => {
     event.preventDefault();
-    if (fileSelectionAllowed) {
-        dropzone.classList.remove('drag-over');
-        fileInput.files = event.dataTransfer!.files;
+    if (fileSelectionAllowedPdf) {
+        dropzonePdf.classList.remove('drag-over');
+        fileInputPdf.files = event.dataTransfer!.files;
     }
 });
-fileInput.addEventListener('change', (event) => {
+fileInputPdf.addEventListener('change', (event) => {
     const file = (event.target as HTMLInputElement).files![0];
     processFile(file);
 });
@@ -202,6 +202,7 @@ newSc.addEventListener('click', async event => {
     event.stopPropagation();
     // Don't want this click to be treated as a click on the <a href=""></a>
     event.preventDefault();
+    processFileSc(null);
     // Actual work
     let view = await startPm(pdfFileUrl, docView);
     window['view'] = view;
@@ -223,6 +224,7 @@ dropzoneSc.addEventListener('drop', event => {
 });
 fileInputSc.addEventListener('change', (event) => {
     const file = (event.target as HTMLInputElement).files![0];
+    processFileSc(file);
 });
 // Area 3
 const saveSc = document.getElementById('saveSc')!;
@@ -238,14 +240,27 @@ saveSc.addEventListener('click', () => {
 
 async function processFile(file) {
     // Used up. Reload the page to add a different file.
-    fileSelectionAllowed = false;
-    dropzone.classList.add('disabled');
+    fileSelectionAllowedPdf = false;
     console.log(file);
     console.assert(file && file.type === 'application/pdf');
     pdfFileName = file.name;
-    dropzone.innerText = `PDF file: ${pdfFileName} of size ${file.size} bytes.`;
+    dropzonePdf.classList.add('disabled');
+    dropzonePdf.innerText = `PDF file: ${pdfFileName} of size ${file.size} bytes.`;
+    dropzoneSc.style.display = '';
     pdfFileUrl = URL.createObjectURL(file);
     startPdfRendering(pdfFileUrl);
+}
+
+async function processFileSc(file) {
+    fileSelectionAllowedSc = false;
+    console.log(file);
+    dropzoneSc.classList.add('disabled');
+    if (file) {
+        dropzoneSc.innerText = `Chāyā file: ${file.name} of size ${file.size} bytes.`;
+    } else {
+        dropzoneSc.innerText = '(New chāyā; click the button below to save.)';
+    }
+    saveSc.style.display = '';
 }
 
 async function ocrAllPages(view) {

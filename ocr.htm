@@ -14,7 +14,7 @@
     .dropzone {
       box-sizing: border-box;
       width: 100%;
-      height: 10em;
+      height: 3em;
       border: 2px dashed #ccc;
       display: flex;
       justify-content: center;
@@ -151,7 +151,10 @@
 </head>
 
 <body>
-  <h1>OCR PDFs</h1>
+  <h1>Chāyā</h1>
+
+  <p>This is a tool to “transcribe” a PDF file into paragraphs (etc.), while keeping them associated
+    with regions of the original pages. (This way, one can verify or edit the transcription at any time.)</p>
 
   <!-- File input element: not displayed, use through the dropzone. -->
   <input type="file" id="fileInput" accept=".pdf" style="display: none;" />
@@ -159,11 +162,11 @@
     Drag and drop a PDF file here or click to select a file
   </div>
   <input type="file" id="fileInputSc" accept=".sc" style="display: none;" />
-  <div class="dropzone" id="dropzoneSc">
+  <div class="dropzone" id="dropzoneSc" style="display: none;">
     <p>Drag and drop a <code>.sc</code> file here or click to select a file, or <a href="" id="newSc">create new</a>.
     </p>
   </div>
-  <button class="button" id="saveSc">Save the current file</button>
+  <button class="button" id="saveSc" style="display: none;">Save the current file</button>
   <div id="docView"></div>
   <!-- This script is at the bottom so that nothing comes after the huge blob. -->
   <script defer type="module" src="main.js"></script>
