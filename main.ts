@@ -233,7 +233,7 @@ saveSc.addEventListener('click', () => {
     const a = document.createElement('a');
     const file = new Blob([content], { type: 'application/octet-stream' });
     a.href = URL.createObjectURL(file);
-    a.download = `${pdfFileName}.sc`;
+    a.download = `${pdfFileName}.chaya`;
     a.click();
     URL.revokeObjectURL(a.href);
 });

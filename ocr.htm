@@ -3,6 +3,7 @@
 
 <head>
   <title>OCR PDFs</title>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
@@ -160,17 +161,18 @@
   <p>This is a tool to “transcribe” a PDF file into paragraphs (etc.), while keeping them associated
     with regions of the original pages. (This way, one can verify or edit the transcription at any time.)</p>
 
-  <!-- File input element: not displayed, use through the dropzone. -->
+  <!-- File input element for PDF: not displayed; use through the dropzone. -->
   <input type="file" id="fileInput" accept=".pdf" style="display: none;" />
   <div class="dropzone" id="dropzone">
-    <p>Drag and drop a PDF file here or click to select a file</p>
+    <p>Drag and drop a PDF file here or click to select a file.</p>
   </div>
-  <input type="file" id="fileInputSc" accept=".sc" style="display: none;" />
+  <!-- File input element for chaya: not displayed; use through the dropzone. -->
+  <input type="file" id="fileInputSc" accept=".chaya" style="display: none;" />
   <div class="dropzone" id="dropzoneSc" style="display: none;">
-    <p>Drag and drop a <code>.sc</code> file here or click to select a file, or <a href="" id="newSc">create new</a>.
+    <p>Drag and drop a <code>.chaya</code> file here or click to select a file, or <a href="" id="newSc">create new</a>.
     </p>
   </div>
-  <button class="button" id="saveSc" style="display: none;">Save the current file</button>
+  <button class="button" id="saveSc" style="display: none;">Save the current <code>.chaya</code> file</button>
   <div id="docView"></div>
   <!-- This script is at the bottom so that nothing comes after the huge blob. -->
   <script defer type="module" src="main.js"></script>
