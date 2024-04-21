@@ -96,7 +96,7 @@ async function startPdfRendering(fileUrl) {
     }
 }
 
-async function startPm(fileUrl, parentNode) {
+async function startPm(fileUrl, parentNode: HTMLElement, docOrNull) {
     let later: any[] = [];
     let pageNodes: Node[] = [];
     const pdf = await pdfPromise;
@@ -111,12 +111,18 @@ async function startPm(fileUrl, parentNode) {
         });
         pageNodes.push(pageNode);
     }
-    const doc = schema.nodes.doc.createChecked(
-        {
-            file: fileUrl,
-        },
-        pageNodes,
-    );
+    let doc: Node;
+    if (docOrNull) {
+        doc = docOrNull;
+    } else {
+        doc = schema.nodes.doc.createChecked(
+            {
+                file: fileUrl,
+            },
+            pageNodes,
+        );
+    }
+    console.log(`Using doc: `, doc);
     const preventPagesDeletion = new Plugin({
         // Alternative: https://discuss.prosemirror.net/t/how-to-prevent-node-deletion/130/9
         filterTransaction: (transaction, state) => {
@@ -258,7 +264,7 @@ async function processFileSc(file: File | null) {
     saveSc.style.display = '';
 
     // Actual work
-    let view = await startPm(pdfFileUrl, docView);
+    let view = await startPm(pdfFileUrl, docView, file);
     window['view'] = view;
     console.log('Done creating the PM view');
     setTimeout(() => ocrAllPages(view), 1000);
