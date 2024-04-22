@@ -298,7 +298,9 @@ async function processFileSc(file: File | null) {
     let view = await startPm(pdfFileUrl, docView, doc);
     window['view'] = view;
     console.log('Done creating the PM view');
-    setTimeout(() => ocrAllPages(view), 1000);
+    if (doc == null) {
+        setTimeout(() => ocrAllPages(view), 0);
+    }
 }
 
 async function ocrAllPages(view) {
