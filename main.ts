@@ -32,8 +32,16 @@ function newUnresolved() {
 
 const schema = new Schema({
     nodes: {
-        text: { inline: true },
-        page: {
+        // The document is a nonempty sequence of regions.
+        doc: {
+            content: "region+",
+            attrs: {
+                file: { default: null },
+            }
+        },
+        // Each region is a part of a page (page number and bounding box),
+        // along with some text.
+        region: {
             content: 'text*',
             attrs: {
                 pageNum: { default: null },
@@ -48,17 +56,12 @@ const schema = new Schema({
                 ];
             },
         },
-        // The document (page) is a nonempty sequence of lines.
-        doc: {
-            content: "page+",
-            attrs: {
-                file: { default: null },
-            }
-        },
+        // Text is just text.
+        text: { inline: true },
     },
 });
 
-async function canvasForPage(i: number, numPages: number) {
+async function canvasForPage(i: number, numPages: number): Promise<HTMLCanvasElement> {
     console.log(`Loading page ${i} of ${numPages}`);
     await pagePromise[i].promise;
     const page = pdfPage[i];
@@ -77,7 +80,7 @@ async function canvasForPage(i: number, numPages: number) {
     return canvas;
 }
 
-async function startPdfRendering(fileUrl) {
+async function startPdfRendering(fileUrl: string) {
     console.log('Loading PDF');
     pdfPromise = pdfjsLib.getDocument(fileUrl).promise;
     const pdf = await pdfPromise;
@@ -96,32 +99,49 @@ async function startPdfRendering(fileUrl) {
     }
 }
 
-async function startPm(fileUrl, parentNode: HTMLElement, docOrNull) {
+async function startPm(fileUrl, parentNode: HTMLElement, docOrNull: Node | null) {
     let later: any[] = [];
     let pageNodes: Node[] = [];
     const pdf = await pdfPromise;
 
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const img = document.createElement('img');
-        img.classList.add('page-image');
-        const pageNode = schema.node('page', { pageNum: i, pageImageNode: img }, schema.text(`(wait for page ${i})`));
-        later.push(async () => {
-            await pageCanvasPromise[i].promise;
-            img.src = pageCanvas[i].toDataURL('image/jpeg', 0.8);
-        });
-        pageNodes.push(pageNode);
-    }
-    let doc: Node;
     if (docOrNull) {
-        doc = docOrNull;
+        for (let i = 0; i < docOrNull.content.childCount; ++i) {
+            const pageNodeOld: Node = docOrNull.content.child(i);
+            console.log(`Read child number ${i}: it is`, pageNodeOld);
+            const img = document.createElement('img');
+            img.classList.add('page-image');
+            const pageNum = pageNodeOld.attrs.pageNum;
+            const pageNode = schema.node(
+                'region',
+                { pageNum: pageNum, pageImageNode: img },
+                pageNodeOld.content,
+            );
+            later.push(async () => {
+                console.log(`Trying to replace img for page ${pageNum}`)
+                await pageCanvasPromise[pageNum].promise;
+                img.src = pageCanvas[pageNum].toDataURL('image/jpeg', 0.8);
+                console.log(`Done replacing img for page ${pageNum}`);
+            });
+            pageNodes.push(pageNode);
+        }
     } else {
-        doc = schema.nodes.doc.createChecked(
-            {
-                file: fileUrl,
-            },
-            pageNodes,
-        );
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const img = document.createElement('img');
+            img.classList.add('page-image');
+            const pageNode = schema.node('region', { pageNum: i, pageImageNode: img }, schema.text(`(wait for page ${i})`));
+            later.push(async () => {
+                await pageCanvasPromise[i].promise;
+                img.src = pageCanvas[i].toDataURL('image/jpeg', 0.8);
+            });
+            pageNodes.push(pageNode);
+        }
     }
+    const doc: Node = schema.nodes.doc.createChecked(
+        {
+            file: fileUrl,
+        },
+        pageNodes,
+    );
     console.log(`Using doc: `, doc);
     const preventPagesDeletion = new Plugin({
         // Alternative: https://discuss.prosemirror.net/t/how-to-prevent-node-deletion/130/9
@@ -239,7 +259,7 @@ saveSc.addEventListener('click', () => {
     URL.revokeObjectURL(a.href);
 });
 
-async function processFile(file) {
+async function processFile(file: File) {
     // Used up. Reload the page to add a different file.
     fileSelectionAllowedPdf = false;
     console.log(file);
@@ -263,8 +283,19 @@ async function processFileSc(file: File | null) {
     }
     saveSc.style.display = '';
 
+    let doc: Node | null = null;
+    if (file) {
+        try {
+            const json = JSON.parse(await file.text());
+            console.log(json);
+            doc = schema.nodeFromJSON(json);
+        } catch (error) {
+            console.error("Error reading file into doc:", error);
+        }
+    }
+
     // Actual work
-    let view = await startPm(pdfFileUrl, docView, file);
+    let view = await startPm(pdfFileUrl, docView, doc);
     window['view'] = view;
     console.log('Done creating the PM view');
     setTimeout(() => ocrAllPages(view), 1000);
