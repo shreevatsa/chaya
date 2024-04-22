@@ -183,12 +183,12 @@
         <input type="radio" id="useTesseract" name="ocrOption" value="tesseract" checked>
         <label for="useTesseract">Use Tesseract <a
             href="https://tesseract-ocr.github.io/tessdoc/Data-Files-in-different-versions.html">(lang)</a></label>
-        <input type="text" id="tesseractLanguage" name="tesseractLanguage" placeholder="eng/san/kan"></input>
+        <input type="text" id="tesseractLanguage" name="tesseractLanguage" placeholder="(eng, san, kan+eng, etc.)"></input>
       </p>
       <p class="inline">
         <input type="radio" id="useGoogleOcr" name="ocrOption" value="googleOcr">
         <label for="useGoogleOcr">Use Google OCR</label>
-        <input type="text" id="apiKey" name="apiKey" placeholder="Enter Google API Key">
+        <input type="text" id="apiKey" name="apiKey" placeholder="Google API Key">
       </p>
       <button type="button" id="ocrFormProcess">Process</button>
     </form>

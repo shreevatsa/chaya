@@ -319,7 +319,7 @@ async function processFileSc(file: File | null) {
 }
 
 async function ocrAllPages(view) {
-    let worker = await Tesseract.createWorker('kan');
+    let worker = await Tesseract.createWorker('san+eng');
 
     const numPages = view.state.doc.childCount;
 
@@ -341,9 +341,27 @@ async function ocrAllPages(view) {
             let end = pos + node.content.size;
             console.log(`Found page ${i} at position`, found, `= ${pos} to ${end}`);
             // const { data: { text }, } = await worker.recognize(node.attrs.pageImageNode.src);
-            const text = `fake ocr result for page ${i}`;
-            // const newNode = schema.text(text);
-            // const tr = state.tr.replaceWith(pos, end, newNode);
+
+            const image = node.attrs.pageImageNode.src;
+            console.log(image);
+            // const base64Image = Buffer.from(image).toString('base64');
+            const base64Image = image.split(',')[1];
+
+            const apiKey = '';
+            const apiUrl = 'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey;
+
+            const requestData = { requests: [ { image: { content: base64Image }, features: [ { type: 'DOCUMENT_TEXT_DETECTION' } ] } ] };
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                body: JSON.stringify(requestData),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const responseData = await response.json();
+            console.log(responseData);
+            // We have sent a single image request, and requested only DOCUMENT_TEXT_DETECTION, so responses will have only one element.
+            console.assert(responseData.responses.length == 1);
+            const ocrResponse = responseData.responses[0];
+            const text = ocrResponse.fullTextAnnotation.text;
             const tr = view.state.tr;
             tr.replaceRangeWith(pos, end, schema.text(text));
             view.updateState(view.state.apply(tr));
