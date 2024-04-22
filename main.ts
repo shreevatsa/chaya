@@ -119,7 +119,7 @@ async function startPm(fileUrl, parentNode: HTMLElement, docOrNull: Node | null)
             later.push(async () => {
                 console.log(`Trying to replace img for page ${pageNum}`)
                 await pageCanvasPromise[pageNum].promise;
-                img.src = pageCanvas[pageNum].toDataURL('image/jpeg', 0.8);
+                img.src = pageCanvas[pageNum].toDataURL('image/jpeg', 1.0);
                 console.log(`Done replacing img for page ${pageNum}`);
             });
             pageNodes.push(pageNode);
@@ -131,7 +131,7 @@ async function startPm(fileUrl, parentNode: HTMLElement, docOrNull: Node | null)
             const pageNode = schema.node('region', { pageNum: i, pageImageNode: img }, schema.text(`(wait for page ${i})`));
             later.push(async () => {
                 await pageCanvasPromise[i].promise;
-                img.src = pageCanvas[i].toDataURL('image/jpeg', 0.8);
+                img.src = pageCanvas[i].toDataURL('image/jpeg', 1.0);
             });
             pageNodes.push(pageNode);
         }
@@ -247,6 +247,20 @@ fileInputSc.addEventListener('change', (event) => {
     const file = (event.target as HTMLInputElement).files![0];
     processFileSc(file);
 });
+// OCR form
+const ocrForm = document.getElementById('ocrForm')!;
+function processSelection(): void {
+    const selectedOption = (document.querySelector('input[name="ocrOption"]:checked') as HTMLInputElement).value;
+    const apiKey = (document.getElementById('apiKey') as HTMLInputElement).value;
+
+    console.log(`Selected OCR Option: ${selectedOption}`);
+    if (selectedOption === 'google' && apiKey) {
+        console.log(`Using Google OCR with API Key: ${apiKey}`);
+    } else if (selectedOption === 'tesseract') {
+        console.log('Using Tesseract OCR');
+    }
+}
+document.getElementById('ocrFormProcess')?.addEventListener('click', processSelection);
 // Area 3
 const saveSc = document.getElementById('saveSc')!;
 saveSc.addEventListener('click', () => {
@@ -279,7 +293,8 @@ async function processFileSc(file: File | null) {
     if (file) {
         dropzoneSc.innerText = `Chāyā file: ${file.name} of size ${file.size} bytes.`;
     } else {
-        dropzoneSc.innerText = '(New chāyā; click the button below to save.)';
+        dropzoneSc.innerText = 'Chāyā file: (New; click below to save.)';
+        ocrForm.style.display = '';
     }
     saveSc.style.display = '';
 

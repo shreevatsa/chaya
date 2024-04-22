@@ -2,9 +2,9 @@
 <html>
 
 <head>
-  <title>OCR PDFs</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chāyā: Transcribe PDFs with OCR</title>
   <style>
     body {
       padding: 1em;
@@ -36,6 +36,10 @@
 
     .dropzone.drag-over {
       background-color: pink;
+    }
+
+    .dropzone p.inline {
+      display: inline-block;
     }
 
     .button {
@@ -159,8 +163,8 @@
 <body>
   <h1>Chāyā</h1>
 
-  <p>This is a tool to “transcribe” a PDF file into paragraphs (etc.), while keeping them associated
-    with regions of the original pages. (This way, one can verify or edit the transcription at any time.)</p>
+  <p>This is a tool to “transcribe” a PDF file into paragraphs (etc.) that remain associated with regions of the
+    original pages. (This way, one can verify or edit the transcription at any time.)</p>
 
   <!-- File input element for PDF: not displayed; use through the dropzone. -->
   <input type="file" id="fileInput" accept=".pdf" style="display: none;" />
@@ -172,6 +176,22 @@
   <div class="dropzone" id="dropzoneSc" style="display: none;">
     <p>Drag and drop a <code>.chaya</code> file here or click to select a file, or <a href="" id="newSc">create new</a>.
     </p>
+  </div>
+  <div class="dropzone" id="ocrForm" style="display: none;">
+    <form>
+      <p class="inline">
+        <input type="radio" id="useTesseract" name="ocrOption" value="tesseract" checked>
+        <label for="useTesseract">Use Tesseract <a
+            href="https://tesseract-ocr.github.io/tessdoc/Data-Files-in-different-versions.html">(lang)</a></label>
+        <input type="text" id="tesseractLanguage" name="tesseractLanguage" placeholder="eng/san/kan"></input>
+      </p>
+      <p class="inline">
+        <input type="radio" id="useGoogleOcr" name="ocrOption" value="googleOcr">
+        <label for="useGoogleOcr">Use Google OCR</label>
+        <input type="text" id="apiKey" name="apiKey" placeholder="Enter Google API Key">
+      </p>
+      <button type="button" id="ocrFormProcess">Process</button>
+    </form>
   </div>
   <button class="button" id="saveSc" style="display: none;">Save the current <code>.chaya</code> file</button>
   <div id="docView"></div>
