@@ -347,10 +347,10 @@ async function ocrAllPages(view) {
             // const base64Image = Buffer.from(image).toString('base64');
             const base64Image = image.split(',')[1];
 
-            const apiKey = '';
+            const apiKey = new URLSearchParams(window.location.hash.substring(1)).get('google_api_key');
             const apiUrl = 'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey;
 
-            const requestData = { requests: [ { image: { content: base64Image }, features: [ { type: 'DOCUMENT_TEXT_DETECTION' } ] } ] };
+            const requestData = { requests: [{ image: { content: base64Image }, features: [{ type: 'DOCUMENT_TEXT_DETECTION' }] }] };
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 body: JSON.stringify(requestData),
