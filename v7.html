@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Options</title>
+    <style>
+        body,
+        html {
+            height: 100%;
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            /* Improved font */
+            background-color: #f7f7f7;
+            /* Softer background color */
+            color: #333;
+        }
+
+        .drag-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            /* Consistent border radius */
+            height: 150px;
+            width: 95%;
+            margin: 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            /* Adding shadow for depth */
+        }
+
+        .options-container {
+            box-sizing: border-box;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px auto;
+            width: 95%;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            /* Consistent shadow for depth */
+        }
+
+        .options-heading {
+            text-align: left;
+            margin: 0;
+            padding-bottom: 10px;
+            font-size: 24px;
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            /* Separator for the heading */
+            margin-bottom: 20px;
+            /* Spacing after the heading */
+        }
+
+        .option {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .option label {
+            margin-right: 20px;
+            /* Increased spacing */
+        }
+
+        .file-input,
+        .text-input input {
+            padding: 10px;
+            margin-left: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 300px;
+            /* Standardized input width */
+            display: inline-block;
+            vertical-align: middle;
+            /* Align inputs with labels */
+        }
+
+        input[type="radio"] {
+            accent-color: #4CAF50;
+            /* Styled radio buttons */
+        }
+
+        button {
+            padding: 15px;
+            /* Larger clickable area */
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 20px 0;
+            /* Spacing around buttons */
+            width: 300px;
+            /* Matching input width */
+            font-weight: bold;
+            /* More prominent buttons */
+            transition: background-color 0.3s;
+            /* Transition for hover effect */
+        }
+
+        #start-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        #save-btn {
+            background-color: #008CBA;
+            color: white;
+            width: 95%;
+            display: block;
+            margin: 20px auto;
+        }
+
+        button:hover {
+            opacity: 0.8;
+            /* Hover effect for buttons */
+        }
+
+        @media screen and (max-width: 768px) {
+            .option {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .file-input,
+            .text-input input,
+            button {
+                width: 90%;
+                /* Full width on smaller screens */
+                margin-top: 10px;
+                /* Spacing for stacked inputs on smaller screens */
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="drag-area" id="pdf-drop">
+        Drop PDF here
+    </div>
+
+    <div class="options-container">
+        <h2 class="options-heading">Start with…</h2>
+        <div class="option">
+            <input type="radio" id="option-text" name="ocr-option" value="text" checked>
+            <label for="option-text">Saved text file</label>
+            <input type="file" id="text-file" class="file-input">
+        </div>
+        <div class="option">
+            <input type="radio" id="option-tesseract" name="ocr-option" value="tesseract">
+            <label for="option-tesseract">Tesseract</label>
+            <input type="text" id="tesseract-code" class="text-input" placeholder="Enter language code">
+        </div>
+        <div class="option">
+            <input type="radio" id="option-google" name="ocr-option" value="google">
+            <label for="option-google">Google OCR</label>
+            <input type="text" id="google-api-key" class="text-input" placeholder="Enter Google OCR API Key">
+        </div>
+        <button id="start-btn">Start</button>
+    </div>
+
+    <button id="save-btn">Save current text to file</button>
+</body>
+
+</html>
