@@ -11,8 +11,6 @@ import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import Tesseract from 'tesseract.js';
 
-const desiredWidth = 1000;
-
 // "Global" PDF.js state
 let pdfFileUrl: string;
 let pdfFileName: string;
@@ -68,6 +66,7 @@ async function canvasForPage(i: number, numPages: number): Promise<HTMLCanvasEle
     console.log(`Loaded page ${i} of ${numPages}`);
     const viewport = page.getViewport({ scale: 1 });
     const canvas = document.createElement('canvas');
+    const desiredWidth = 1000;
     canvas.width = desiredWidth;
     canvas.height = (desiredWidth / viewport.width) * viewport.height;
     const renderContext = {
@@ -211,10 +210,13 @@ dropzonePdf.addEventListener('click', () => { if (fileSelectionAllowedPdf) { fil
 dropzonePdf.addEventListener('dragover', event => { event.preventDefault(); if (fileSelectionAllowedPdf) { dropzonePdf.classList.add('drag-over'); } });
 dropzonePdf.addEventListener('dragleave', event => { event.preventDefault(); if (fileSelectionAllowedPdf) { dropzonePdf.classList.remove('drag-over'); } });
 dropzonePdf.addEventListener('drop', event => {
+    console.log('Drop event');
     event.preventDefault();
     if (fileSelectionAllowedPdf) {
         dropzonePdf.classList.remove('drag-over');
         fileInputPdf.files = event.dataTransfer!.files;
+        const file = fileInputPdf.files[0];
+        processFile(file);
     }
 });
 fileInputPdf.addEventListener('change', (event) => {
