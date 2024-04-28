@@ -201,71 +201,91 @@ async function startPm(fileUrl, parentNode: HTMLElement, docOrNull: Node | null)
 
 const docView = document.getElementById('docView') as HTMLElement;
 
-// Set up the two file input areas.
-// Area 1
+// #region page-interactions
+// There are three areas: a PDF drop area, an options container, and a save button.
+// With 'E' = "Enabled" and 'D' = "Disabled", they cycle through states:
+// State 0: EDD (initial state, before PDF upload)
+// State 1: DED (after PDF uploaded)
+// State 2: DDD (after PM editor has been started)
+// State 3: DDE (when chāyā is ready to be saved)
+
+// Area 1: Drop the PDF file.
+const fileInputPdf = document.getElementById('fileInputPdf') as HTMLInputElement;
 const dropzonePdf = document.getElementById('dropzone') as HTMLElement;
-const fileInputPdf = document.getElementById('fileInput') as HTMLInputElement;
-let fileSelectionAllowedPdf = true;
-dropzonePdf.addEventListener('click', () => { if (fileSelectionAllowedPdf) { fileInputPdf.click(); } });
-dropzonePdf.addEventListener('dragover', event => { event.preventDefault(); if (fileSelectionAllowedPdf) { dropzonePdf.classList.add('drag-over'); } });
-dropzonePdf.addEventListener('dragleave', event => { event.preventDefault(); if (fileSelectionAllowedPdf) { dropzonePdf.classList.remove('drag-over'); } });
+dropzonePdf.addEventListener('click', () => { fileInputPdf.click(); });
+dropzonePdf.addEventListener('dragover', event => { event.preventDefault(); dropzonePdf.classList.add('drag-over'); });
+dropzonePdf.addEventListener('dragleave', event => { event.preventDefault(); dropzonePdf.classList.remove('drag-over'); });
 dropzonePdf.addEventListener('drop', event => {
-    console.log('Drop event');
     event.preventDefault();
-    if (fileSelectionAllowedPdf) {
-        dropzonePdf.classList.remove('drag-over');
-        fileInputPdf.files = event.dataTransfer!.files;
-        const file = fileInputPdf.files[0];
-        processFile(file);
-    }
+    dropzonePdf.classList.remove('drag-over');
+    fileInputPdf.files = event.dataTransfer!.files;
+    state0to1(fileInputPdf.files[0]);
 });
 fileInputPdf.addEventListener('change', (event) => {
     const file = (event.target as HTMLInputElement).files![0];
-    processFile(file);
+    state0to1(file);
 });
-// Area 2
-const newSc = document.getElementById('newSc')!;
-newSc.addEventListener('click', async event => {
-    // Don't want this click to be treated as a click on the parent div (sc dropzone)
-    event.stopPropagation();
-    // Don't want this click to be treated as a click on the <a href=""></a>
-    event.preventDefault();
-    processFileSc(null);
-});
-const dropzoneSc = document.getElementById('dropzoneSc')!;
-const fileInputSc = document.getElementById('fileInputSc') as HTMLInputElement;
-let fileSelectionAllowedSc = true;
-dropzoneSc.addEventListener('click', () => { if (fileSelectionAllowedSc) { fileInputSc.click(); } });
-dropzoneSc.addEventListener('dragover', event => { event.preventDefault(); if (fileSelectionAllowedSc) { dropzoneSc.classList.add('drag-over'); } });
-dropzoneSc.addEventListener('dragleave', event => { event.preventDefault(); if (fileSelectionAllowedSc) { dropzoneSc.classList.remove('drag-over'); } });
-dropzoneSc.addEventListener('drop', event => {
-    event.preventDefault();
-    if (fileSelectionAllowedSc) {
-        dropzoneSc.classList.remove('drag-over');
-        fileInputSc.files = event.dataTransfer!.files;
-    }
-});
-fileInputSc.addEventListener('change', (event) => {
-    const file = (event.target as HTMLInputElement).files![0];
-    processFileSc(file);
-});
-// OCR form
-const ocrForm = document.getElementById('ocrForm')!;
-function processSelection(): void {
-    const selectedOption = (document.querySelector('input[name="ocrOption"]:checked') as HTMLInputElement).value;
-    const apiKey = (document.getElementById('apiKey') as HTMLInputElement).value;
-
-    console.log(`Selected OCR Option: ${selectedOption}`);
-    if (selectedOption === 'google' && apiKey) {
-        console.log(`Using Google OCR with API Key: ${apiKey}`);
-    } else if (selectedOption === 'tesseract') {
-        console.log('Using Tesseract OCR');
-    }
+function state0to1(file: File) {
+    console.log(file);
+    pdfFileName = file.name;
+    dropzonePdf.classList.add('disabled');
+    dropzonePdf.innerText = `PDF file: ${pdfFileName} of size ${file.size} bytes.`;
+    console.assert(file && file.type === 'application/pdf');
+    pdfFileUrl = URL.createObjectURL(file);
+    startPdfRendering(pdfFileUrl);
+    optionsContainer.classList.remove('disabled');
 }
-document.getElementById('ocrFormProcess')?.addEventListener('click', processSelection);
-// Area 3
-const saveSc = document.getElementById('saveSc')!;
-saveSc.addEventListener('click', () => {
+function state1to2() {
+    optionsContainer.classList.add('disabled');
+}
+function state2to3() {
+    saveChaya.classList.remove('disabled');
+}
+
+// Area 2: the options for starting an editor
+const optionsContainer = document.getElementsByClassName('options-container')[0] as HTMLElement;
+const startButton = document.getElementById('startButton') as HTMLButtonElement;
+if (true) {
+    startButton.addEventListener("click", () => {
+        const options = document.querySelectorAll<HTMLInputElement>('input[type="radio"][name="ocr-option"]');
+        const selectedOption = Array.from(options).find(option => option.checked)!;
+        console.log(`Selected start option: `, selectedOption);
+    });
+}
+const form = document.getElementById("ocrForm") as HTMLFormElement;
+form.addEventListener("submit", event => {
+    event.preventDefault(); // Prevent normal form submission
+    state1to2();
+    const formData = new FormData(form);
+    console.log(Array.from(formData.entries()));
+    const selectedOption = formData.get('ocr-option')!;
+    console.log(`Selected OCR Option: ${selectedOption}`);
+
+    switch (selectedOption.valueOf()) {
+        case "load":
+            const fileInput = document.getElementById("chaya-file") as HTMLInputElement;
+            const file = fileInput.files![0];
+            console.log(`.chaya file: ${file.name}`);
+            startEditor(file);
+            break;
+        case "tesseract":
+            const langInput = document.getElementById("tesseract-lang") as HTMLInputElement;
+            console.log(`Tesseract Language Code: ${langInput.value}`);
+            startEditor(null);
+            break;
+        case "google":
+            const apiKeyInput = document.getElementById("google-api-key") as HTMLInputElement;
+            console.log(`Google OCR API Key: ${apiKeyInput.value}`);
+            startEditor(null);
+            break;
+        default:
+            console.error(`Unknown option!`);
+    }
+});
+
+// Area 3: the save button
+const saveChaya = document.getElementById('saveChaya')!;
+saveChaya.addEventListener('click', () => {
     const content = JSON.stringify(window['view'].state.doc.toJSON(), null, 2);
     const a = document.createElement('a');
     const file = new Blob([content], { type: 'application/octet-stream' });
@@ -274,32 +294,9 @@ saveSc.addEventListener('click', () => {
     a.click();
     URL.revokeObjectURL(a.href);
 });
+// #endregion
 
-async function processFile(file: File) {
-    // Used up. Reload the page to add a different file.
-    fileSelectionAllowedPdf = false;
-    console.log(file);
-    console.assert(file && file.type === 'application/pdf');
-    pdfFileName = file.name;
-    dropzonePdf.classList.add('disabled');
-    dropzonePdf.innerText = `PDF file: ${pdfFileName} of size ${file.size} bytes.`;
-    dropzoneSc.style.display = '';
-    pdfFileUrl = URL.createObjectURL(file);
-    startPdfRendering(pdfFileUrl);
-}
-
-async function processFileSc(file: File | null) {
-    fileSelectionAllowedSc = false;
-    console.log(file);
-    dropzoneSc.classList.add('disabled');
-    if (file) {
-        dropzoneSc.innerText = `Chāyā file: ${file.name} of size ${file.size} bytes.`;
-    } else {
-        dropzoneSc.innerText = 'Chāyā file: (New; click below to save.)';
-        ocrForm.style.display = '';
-    }
-    saveSc.style.display = '';
-
+async function startEditor(file: File | null) {
     let doc: Node | null = null;
     if (file) {
         try {
@@ -310,14 +307,16 @@ async function processFileSc(file: File | null) {
             console.error("Error reading file into doc:", error);
         }
     }
-
     // Actual work
     let view = await startPm(pdfFileUrl, docView, doc);
     window['view'] = view;
     console.log('Done creating the PM view');
     if (doc == null) {
-        setTimeout(() => ocrAllPages(view), 0);
+        console.log('Will OCR all pages');
+        await ocrAllPages(view);
+        console.log('All pages OCRed');
     }
+    state2to3();
 }
 
 async function ocrAllPages(view) {
@@ -326,6 +325,7 @@ async function ocrAllPages(view) {
     const numPages = view.state.doc.childCount;
 
     for (let i = 1; i <= numPages; ++i) {
+        console.log(`Trying to find and OCR page ${i} of ${numPages}`);
         // const pageNode = view.state.doc.content.child(i - 1);
         // let found = { node: pageNode, pos: 0 };
 
@@ -342,30 +342,35 @@ async function ocrAllPages(view) {
             pos += 1;
             let end = pos + node.content.size;
             console.log(`Found page ${i} at position`, found, `= ${pos} to ${end}`);
-            // const { data: { text }, } = await worker.recognize(node.attrs.pageImageNode.src);
+            let pageText: string;
+            if (true) {
+                const { data: { text }, } = await worker.recognize(node.attrs.pageImageNode.src);
+                pageText = text;
+            } else {
+                const image = node.attrs.pageImageNode.src;
+                console.log(image);
+                // const base64Image = Buffer.from(image).toString('base64');
+                const base64Image = image.split(',')[1];
 
-            const image = node.attrs.pageImageNode.src;
-            console.log(image);
-            // const base64Image = Buffer.from(image).toString('base64');
-            const base64Image = image.split(',')[1];
+                const apiKey = new URLSearchParams(window.location.hash.substring(1)).get('google_api_key');
+                const apiUrl = 'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey;
 
-            const apiKey = new URLSearchParams(window.location.hash.substring(1)).get('google_api_key');
-            const apiUrl = 'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey;
-
-            const requestData = { requests: [{ image: { content: base64Image }, features: [{ type: 'DOCUMENT_TEXT_DETECTION' }] }] };
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                body: JSON.stringify(requestData),
-                headers: { 'Content-Type': 'application/json' }
-            });
-            const responseData = await response.json();
-            console.log(responseData);
-            // We have sent a single image request, and requested only DOCUMENT_TEXT_DETECTION, so responses will have only one element.
-            console.assert(responseData.responses.length == 1);
-            const ocrResponse = responseData.responses[0];
-            const text = ocrResponse.fullTextAnnotation.text;
+                const requestData = { requests: [{ image: { content: base64Image }, features: [{ type: 'DOCUMENT_TEXT_DETECTION' }] }] };
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify(requestData),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const responseData = await response.json();
+                console.log(responseData);
+                // We have sent a single image request, and requested only DOCUMENT_TEXT_DETECTION, so responses will have only one element.
+                console.assert(responseData.responses.length == 1);
+                const ocrResponse = responseData.responses[0];
+                const text = ocrResponse.fullTextAnnotation.text;
+                pageText = text;
+            }
             const tr = view.state.tr;
-            tr.replaceRangeWith(pos, end, schema.text(text));
+            tr.replaceRangeWith(pos, end, schema.text(pageText));
             view.updateState(view.state.apply(tr));
         } else {
             console.log(`Did not find anything for page ${i}`);

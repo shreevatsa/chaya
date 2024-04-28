@@ -139,7 +139,7 @@
       /* Transition for hover effect */
     }
 
-    #start-button {
+    #startButton {
       background-color: #4CAF50;
       color: white;
       width: 200px;
@@ -261,13 +261,12 @@
   <p>This is a tool to “transcribe” a PDF file into paragraphs (etc.) that remain associated with regions of the
     original pages. (This way, one can verify or edit the transcription at any time.)</p>
 
-  <!-- File input element for PDF: not displayed; use through the dropzone. -->
-  <input type="file" id="fileInput" accept=".pdf" style="display: none;" />
+  <input type="file" id="fileInputPdf" accept=".pdf" style="display: none;" />
   <div class="dropzone" id="dropzone">
     <p>Drop a PDF file here or click to select a file.</p>
   </div>
 
-  <div class="options-container disabled">
+  <form id="ocrForm" class="options-container disabled">
     <h2 class="options-heading">Start with…</h2>
     <div class="option">
       <div>
@@ -281,7 +280,8 @@
         <input type="radio" name="ocr-option" id="option-tesseract" value="tesseract">
         <label for="option-tesseract">Tesseract</label>
       </div>
-      <input type="text" id="tesseract-lang" placeholder="Enter language code">
+      <input type="text" id="tesseract-lang" placeholder="Enter language code" pattern="[a-zA-Z]+(-[a-zA-Z]+)*"
+        title="Please enter a valid language code.">
       <a href="https://tesseract-ocr.github.io/tessdoc/Data-Files-in-different-versions.html">eng, kan, san+eng, …</a>
     </div>
     <div class="option">
@@ -289,10 +289,10 @@
         <input type="radio" name="ocr-option" id="option-google" value="google">
         <label for="option-google">Google OCR</label>
       </div>
-      <input type="text" id="google-api-key" placeholder="Enter Google OCR API key">
+      <input type="text" id="google-api-key" placeholder="Enter Google OCR API key" minlength="39" maxlength="39">
     </div>
-    <button id="start-button">Start</button>
-  </div>
+    <button type="submit" id="startButton">Start</button>
+  </form>
 
   <button class="button disabled" id="saveChaya">Save the current <code>.chaya</code> file</button>
   <button class="disabled" id="save-btn">Save the current <code>.chaya</code> file</button>
