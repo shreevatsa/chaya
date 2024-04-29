@@ -32,7 +32,7 @@ const schema = new Schema({
     nodes: {
         // The document is a nonempty sequence of regions.
         doc: {
-            content: "region+",
+            content: "region*",
             attrs: {
                 file: { default: null },
             }
@@ -98,43 +98,8 @@ async function startPdfRendering(fileUrl: string) {
     }
 }
 
-async function startPm(fileUrl, parentNode: HTMLElement, docOrNull: Node | null) {
-    let later: any[] = [];
+function startPm(fileUrl, parentNode: HTMLElement) {
     let pageNodes: Node[] = [];
-    const pdf = await pdfPromise;
-
-    if (docOrNull) {
-        for (let i = 0; i < docOrNull.content.childCount; ++i) {
-            const pageNodeOld: Node = docOrNull.content.child(i);
-            console.log(`Read child number ${i}: it is`, pageNodeOld);
-            const img = document.createElement('img');
-            img.classList.add('page-image');
-            const pageNum = pageNodeOld.attrs.pageNum;
-            const pageNode = schema.node(
-                'region',
-                { pageNum: pageNum, pageImageNode: img },
-                pageNodeOld.content,
-            );
-            later.push(async () => {
-                console.log(`Trying to replace img for page ${pageNum}`)
-                await pageCanvasPromise[pageNum].promise;
-                img.src = pageCanvas[pageNum].toDataURL('image/jpeg', 1.0);
-                console.log(`Done replacing img for page ${pageNum}`);
-            });
-            pageNodes.push(pageNode);
-        }
-    } else {
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const img = document.createElement('img');
-            img.classList.add('page-image');
-            const pageNode = schema.node('region', { pageNum: i, pageImageNode: img }, schema.text(`(wait for page ${i})`));
-            later.push(async () => {
-                await pageCanvasPromise[i].promise;
-                img.src = pageCanvas[i].toDataURL('image/jpeg', 1.0);
-            });
-            pageNodes.push(pageNode);
-        }
-    }
     const doc: Node = schema.nodes.doc.createChecked(
         {
             file: fileUrl,
@@ -171,7 +136,6 @@ async function startPm(fileUrl, parentNode: HTMLElement, docOrNull: Node | null)
         }
     });
 
-
     const state = EditorState.create({
         doc,
         plugins: [
@@ -188,13 +152,6 @@ async function startPm(fileUrl, parentNode: HTMLElement, docOrNull: Node | null)
             state,
         }
     );
-    setTimeout(
-        async () => {
-            for (let i = 0; i < later.length; ++i) {
-                await later[i]();
-            }
-        },
-        0);
     return view;
 }
 
@@ -253,7 +210,7 @@ if (true) {
     });
 }
 const form = document.getElementById("ocrForm") as HTMLFormElement;
-form.addEventListener("submit", event => {
+form.addEventListener("submit", async event => {
     event.preventDefault(); // Prevent normal form submission
     state1to2();
     const formData = new FormData(form);
@@ -266,17 +223,25 @@ form.addEventListener("submit", event => {
             const fileInput = document.getElementById("chaya-file") as HTMLInputElement;
             const file = fileInput.files![0];
             console.log(`.chaya file: ${file.name}`);
-            startEditor(file);
+            window['view'] = startPm(pdfFileUrl, docView);
+            await populateEditorFromChaya(file);
+            state2to3();
             break;
         case "tesseract":
-            const langInput = document.getElementById("tesseract-lang") as HTMLInputElement;
-            console.log(`Tesseract Language Code: ${langInput.value}`);
-            startEditor(null);
+            const langCodeInput = document.getElementById("tesseract-lang") as HTMLInputElement;
+            const langCode = langCodeInput.value || 'kan+eng';
+            console.log(`Using Tesseract with language code ${langCode}`);
+            window['view'] = startPm(pdfFileUrl, docView);
+            await populateEditorFromTesseract(await pdfPromise, langCode);
+            state2to3();
             break;
         case "google":
             const apiKeyInput = document.getElementById("google-api-key") as HTMLInputElement;
-            console.log(`Google OCR API Key: ${apiKeyInput.value}`);
-            startEditor(null);
+            const apiKey = new URLSearchParams(window.location.hash.substring(1)).get('google_api_key') || apiKeyInput.value;
+            console.log(`Using Google OCR`);
+            window['view'] = startPm(pdfFileUrl, docView);
+            await populateEditorFromGoogleOcr(await pdfPromise, apiKey);
+            state2to3();
             break;
         default:
             console.error(`Unknown option!`);
@@ -296,85 +261,84 @@ saveChaya.addEventListener('click', () => {
 });
 // #endregion
 
-async function startEditor(file: File | null) {
-    let doc: Node | null = null;
-    if (file) {
-        try {
-            const json = JSON.parse(await file.text());
-            console.log(json);
-            doc = schema.nodeFromJSON(json);
-        } catch (error) {
-            console.error("Error reading file into doc:", error);
-        }
+async function populateEditorFromChaya(file: File) {
+    const json = JSON.parse(await file.text());
+    let doc = schema.nodeFromJSON(json);
+
+    for (let i = 0; i < doc.content.childCount; ++i) {
+        const pageNodeOld: Node = doc.content.child(i);
+        console.log(`Read child number ${i}: it is`, pageNodeOld);
+        const img = document.createElement('img');
+        img.classList.add('page-image');
+        const pageNum = pageNodeOld.attrs.pageNum;
+        await pageCanvasPromise[pageNum].promise;
+        img.src = pageCanvas[pageNum].toDataURL('image/jpeg', 1.0);
+        const pageNode = schema.node(
+            'region',
+            { pageNum: pageNum, pageImageNode: img },
+            pageNodeOld.content,
+        );
+
+        const view = window['view'];
+        const tr = view.state.tr;
+        const insertPos = view.state.doc.content.size;
+        tr.insert(insertPos, pageNode);
+        view.dispatch(tr);
     }
-    // Actual work
-    let view = await startPm(pdfFileUrl, docView, doc);
-    window['view'] = view;
-    console.log('Done creating the PM view');
-    if (doc == null) {
-        console.log('Will OCR all pages');
-        await ocrAllPages(view);
-        console.log('All pages OCRed');
-    }
-    state2to3();
 }
 
-async function ocrAllPages(view) {
-    let worker = await Tesseract.createWorker('san+eng');
-
-    const numPages = view.state.doc.childCount;
-
-    for (let i = 1; i <= numPages; ++i) {
-        console.log(`Trying to find and OCR page ${i} of ${numPages}`);
-        // const pageNode = view.state.doc.content.child(i - 1);
-        // let found = { node: pageNode, pos: 0 };
-
-        // Find the position of the node.
-        let found;
-        view.state.doc.descendants((node, pos) => {
-            if (node.attrs.pageNum == i) {
-                found = { node, pos };
-                if (found) return false;
-            }
-        });
-        if (found) {
-            let { node, pos } = found;
-            pos += 1;
-            let end = pos + node.content.size;
-            console.log(`Found page ${i} at position`, found, `= ${pos} to ${end}`);
-            let pageText: string;
-            if (true) {
-                const { data: { text }, } = await worker.recognize(node.attrs.pageImageNode.src);
-                pageText = text;
-            } else {
-                const image = node.attrs.pageImageNode.src;
-                console.log(image);
-                // const base64Image = Buffer.from(image).toString('base64');
-                const base64Image = image.split(',')[1];
-
-                const apiKey = new URLSearchParams(window.location.hash.substring(1)).get('google_api_key');
-                const apiUrl = 'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey;
-
-                const requestData = { requests: [{ image: { content: base64Image }, features: [{ type: 'DOCUMENT_TEXT_DETECTION' }] }] };
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify(requestData),
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const responseData = await response.json();
-                console.log(responseData);
-                // We have sent a single image request, and requested only DOCUMENT_TEXT_DETECTION, so responses will have only one element.
-                console.assert(responseData.responses.length == 1);
-                const ocrResponse = responseData.responses[0];
-                const text = ocrResponse.fullTextAnnotation.text;
-                pageText = text;
-            }
-            const tr = view.state.tr;
-            tr.replaceRangeWith(pos, end, schema.text(pageText));
-            view.updateState(view.state.apply(tr));
-        } else {
-            console.log(`Did not find anything for page ${i}`);
-        }
+async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langCode: string) {
+    let worker = await Tesseract.createWorker(langCode);
+    for (let i = 1; i <= pdf.numPages; i++) {
+        console.log(`Trying to OCR page ${i}`);
+        const img = document.createElement('img');
+        img.classList.add('page-image');
+        await pageCanvasPromise[i].promise;
+        img.src = pageCanvas[i].toDataURL('image/jpeg', 1.0);
+        const { data: { text }, } = await worker.recognize(img.src);
+        const pageNode = schema.node('region', { pageNum: i, pageImageNode: img }, schema.text(text));
+        const view = window['view'];
+        const tr = view.state.tr;
+        const insertPos = view.state.doc.content.size;
+        tr.insert(insertPos, pageNode);
+        // view.updateState(view.state.apply(tr));
+        view.dispatch(tr);
     }
     worker.terminate();
+}
+
+async function populateEditorFromGoogleOcr(pdf: pdfjsLib.PDFDocumentProxy, apiKey: string) {
+    for (let i = 1; i <= pdf.numPages; i++) {
+        console.log(`Trying to OCR page ${i}`);
+        const img = document.createElement('img');
+        img.classList.add('page-image');
+        await pageCanvasPromise[i].promise;
+        img.src = pageCanvas[i].toDataURL('image/jpeg', 1.0);
+        console.log(img.src);
+        // const base64Image = Buffer.from(image).toString('base64');
+        const base64Image = img.src.split(',')[1];
+
+        const apiUrl = 'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey;
+
+        const requestData = { requests: [{ image: { content: base64Image }, features: [{ type: 'DOCUMENT_TEXT_DETECTION' }] }] };
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            body: JSON.stringify(requestData),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const responseData = await response.json();
+        console.log(responseData);
+        // We have sent a single image request, and requested only DOCUMENT_TEXT_DETECTION, so responses will have only one element.
+        console.assert(responseData.responses.length == 1);
+        const ocrResponse = responseData.responses[0];
+        const text = ocrResponse.fullTextAnnotation.text;
+
+        const pageNode = schema.node('region', { pageNum: i, pageImageNode: img }, schema.text(text));
+        const view = window['view'];
+        const tr = view.state.tr;
+        const insertPos = view.state.doc.content.size;
+        tr.insert(insertPos, pageNode);
+        // view.updateState(view.state.apply(tr));
+        view.dispatch(tr);
+    }
 }

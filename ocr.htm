@@ -275,14 +275,16 @@
       </div>
       <input type="text" id="tesseract-lang" placeholder="Enter language code" pattern="[a-zA-Z]+(-[a-zA-Z]+)*"
         title="Please enter a valid language code.">
-      <a href="https://tesseract-ocr.github.io/tessdoc/Data-Files-in-different-versions.html">eng, kan, san+eng, …</a>
+      <a href="https://tesseract-ocr.github.io/tessdoc/Data-Files-in-different-versions.html">(eng, kan, san+eng, …)</a>
     </div>
     <div class="option">
       <div>
         <input type="radio" name="ocr-option" id="option-google" value="google">
         <label for="option-google">Google OCR</label>
       </div>
-      <input type="text" id="google-api-key" placeholder="Enter Google OCR API key" minlength="39" maxlength="39">
+      <input type="text" id="google-api-key" style="width: 200px" placeholder="Enter Google OCR API key" minlength="39"
+        maxlength="39">
+      <a href="https://console.cloud.google.com/apis/credentials">(Set up / find it here)</a>
     </div>
     <button type="submit" id="startButton">Start</button>
   </form>
