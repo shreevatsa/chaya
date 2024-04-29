@@ -59,11 +59,9 @@ const schema = new Schema({
     },
 });
 
-async function canvasForPage(i: number, numPages: number): Promise<HTMLCanvasElement> {
-    console.log(`Loading page ${i} of ${numPages}`);
+async function canvasForPage(i: number): Promise<HTMLCanvasElement> {
     await pagePromise[i].promise;
     const page = pdfPage[i];
-    console.log(`Loaded page ${i} of ${numPages}`);
     const viewport = page.getViewport({ scale: 1 });
     const canvas = document.createElement('canvas');
     const desiredWidth = 1000;
@@ -73,9 +71,7 @@ async function canvasForPage(i: number, numPages: number): Promise<HTMLCanvasEle
         canvasContext: canvas.getContext('2d')!,
         viewport: page.getViewport({ scale: desiredWidth / viewport.width }),
     };
-    console.log(`Rendering page ${i} of ${numPages}`);
     await page.render(renderContext).promise;
-    console.log(`Rendered page ${i} of ${numPages}`);
     return canvas;
 }
 
@@ -93,7 +89,7 @@ async function startPdfRendering(fileUrl: string) {
         pagePromise[i].resolve();
     }
     for (let i = 1; i <= pdf.numPages; ++i) {
-        pageCanvas[i] = await canvasForPage(i, pdf.numPages);
+        pageCanvas[i] = await canvasForPage(i);
         pageCanvasPromise[i].resolve();
     }
 }
@@ -290,7 +286,12 @@ async function populateEditorFromChaya(file: File) {
 
 async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langCode: string) {
     saveChaya.innerText = 'Loading Tesseract';
-    let worker = await Tesseract.createWorker(langCode);
+    const logger = (m) => {
+        const s = saveChaya.innerText;
+        const prefixLength = s.includes('(') ? s.indexOf('(') : s.length;
+        saveChaya.innerText = s.slice(0, prefixLength).trim() + ` (${(m.progress*100).toFixed(0)}% done)`;
+    };
+    let worker = await Tesseract.createWorker(langCode, 1/*LSTM_ONLY*/, { logger });
     for (let i = 1; i <= pdf.numPages; i++) {
         saveChaya.innerText = `Running OCR on page ${i} of ${pdf.numPages}`;
         const img = document.createElement('img');
