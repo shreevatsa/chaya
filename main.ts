@@ -196,6 +196,7 @@ function state1to2() {
     optionsContainer.classList.add('disabled');
 }
 function state2to3() {
+    saveChaya.innerHTML = `Save the current <code>.chaya</code> file`;
     saveChaya.classList.remove('disabled');
 }
 
@@ -249,7 +250,7 @@ form.addEventListener("submit", async event => {
 });
 
 // Area 3: the save button
-const saveChaya = document.getElementById('saveChaya')!;
+const saveChaya = document.getElementById('saveChaya') as HTMLButtonElement;
 saveChaya.addEventListener('click', () => {
     const content = JSON.stringify(window['view'].state.doc.toJSON(), null, 2);
     const a = document.createElement('a');
@@ -288,9 +289,10 @@ async function populateEditorFromChaya(file: File) {
 }
 
 async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langCode: string) {
+    saveChaya.innerText = 'Loading Tesseract';
     let worker = await Tesseract.createWorker(langCode);
     for (let i = 1; i <= pdf.numPages; i++) {
-        console.log(`Trying to OCR page ${i}`);
+        saveChaya.innerText = `Running OCR on page ${i} of ${pdf.numPages}`;
         const img = document.createElement('img');
         img.classList.add('page-image');
         await pageCanvasPromise[i].promise;
@@ -309,7 +311,7 @@ async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langC
 
 async function populateEditorFromGoogleOcr(pdf: pdfjsLib.PDFDocumentProxy, apiKey: string) {
     for (let i = 1; i <= pdf.numPages; i++) {
-        console.log(`Trying to OCR page ${i}`);
+        saveChaya.innerText = `Running OCR on page ${i} of ${pdf.numPages}`;
         const img = document.createElement('img');
         img.classList.add('page-image');
         await pageCanvasPromise[i].promise;
