@@ -49,7 +49,7 @@ const schema = new Schema({
                 return [
                     'div',
                     { class: 'page' },
-                    node.attrs.pageImageNode,
+                    ['div', {}, node.attrs.pageImageNode],
                     ['div', { class: 'page-contents' }, 0]
                 ];
             },
