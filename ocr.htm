@@ -259,14 +259,7 @@
     <h2 class="options-heading">Start with…</h2>
     <div class="option">
       <div>
-        <input type="radio" name="ocr-option" id="option-load" value="load" checked>
-        <label for="option-load">Saved <code>.chaya</code> file</label>
-      </div>
-      <input type="file" id="chaya-file" accept=".chaya">
-    </div>
-    <div class="option">
-      <div>
-        <input type="radio" name="ocr-option" id="option-tesseract" value="tesseract">
+        <input type="radio" name="ocr-option" id="option-tesseract" value="tesseract" checked>
         <label for="option-tesseract">Tesseract</label>
       </div>
       <input type="text" id="tesseract-lang" placeholder="Enter language code" pattern="[a-zA-Z]+(-[a-zA-Z]+)*"
@@ -281,6 +274,13 @@
       <input type="text" id="google-api-key" style="width: 200px" placeholder="Enter Google OCR API key" minlength="39"
         maxlength="39">
       <a href="https://console.cloud.google.com/apis/credentials">(Set up / find it here)</a>
+    </div>
+    <div class="option">
+      <div>
+        <input type="radio" name="ocr-option" id="option-load" value="load">
+        <label for="option-load">Saved <code>.chaya</code> file</label>
+      </div>
+      <input type="file" id="chaya-file" accept=".chaya">
     </div>
     <button type="submit" id="startButton">Start</button>
   </form>

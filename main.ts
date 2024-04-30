@@ -300,7 +300,7 @@ async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langC
     };
     let worker = await Tesseract.createWorker(langCode, 1/*LSTM_ONLY*/, { logger });
     for (let i = 1; i <= pdf.numPages; i++) {
-        saveChaya.innerText = `Running OCR on page ${i} of ${pdf.numPages}`;
+        saveChaya.innerText = `Running OCR on page ${i} of ${pdf.numPages} (0% done)`;
         const img = document.createElement('img');
         img.classList.add('page-image');
         await pageCanvasPromise[i].promise;
