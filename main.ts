@@ -47,7 +47,8 @@ const schema = new Schema({
         // Each region is a part of a page (page number and bounding box),
         // along with some text.
         region: {
-            content: 'text*',
+            content: 'paragraph*',
+            isolating: true,
             attrs: {
                 pageNum: { default: null },
                 pageImageNode: { default: null },
@@ -55,11 +56,17 @@ const schema = new Schema({
             toDOM(node) {
                 return [
                     'div',
-                    { class: 'page' },
+                    { class: 'page', 'data-page-num': node.attrs.pageNum },
                     ['div', {}, node.attrs.pageImageNode],
                     ['div', { class: 'page-contents' }, 0]
                 ];
             },
+        },
+        paragraph: {
+            content: 'text*',
+            group: 'block',
+            parseDom: [{tag: 'p'}],
+            toDOM: () => ['p', 0],
         },
         // Text is just text.
         text: { inline: true },
@@ -291,6 +298,17 @@ async function populateEditorFromChaya(file: File) {
     }
 }
 
+function addRegionWithText(text: string, i: number, img: HTMLImageElement) {
+    const regionNode = schema.node('region', { pageNum: i, pageImageNode: img },
+        schema.node('paragraph', null, schema.text(text)));
+    const view = window['view'];
+    const tr = view.state.tr;
+    const insertPos = view.state.doc.content.size;
+    tr.insert(insertPos, regionNode);
+    // view.updateState(view.state.apply(tr));
+    view.dispatch(tr);
+}
+
 async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langCode: string) {
     saveChaya.innerText = 'Loading Tesseract';
     const logger = (m) => {
@@ -306,13 +324,7 @@ async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langC
         await pageCanvasPromise[i].promise;
         img.src = pageCanvas[i].toDataURL('image/jpeg', 1.0);
         const { data: { text }, } = await worker.recognize(img.src);
-        const pageNode = schema.node('region', { pageNum: i, pageImageNode: img }, schema.text(text));
-        const view = window['view'];
-        const tr = view.state.tr;
-        const insertPos = view.state.doc.content.size;
-        tr.insert(insertPos, pageNode);
-        // view.updateState(view.state.apply(tr));
-        view.dispatch(tr);
+        addRegionWithText(text, i, img);
     }
     worker.terminate();
 }
@@ -324,7 +336,6 @@ async function populateEditorFromGoogleOcr(pdf: pdfjsLib.PDFDocumentProxy, apiKe
         img.classList.add('page-image');
         await pageCanvasPromise[i].promise;
         img.src = pageCanvas[i].toDataURL('image/jpeg', 1.0);
-        console.log(img.src);
         // const base64Image = Buffer.from(image).toString('base64');
         const base64Image = img.src.split(',')[1];
 
@@ -342,13 +353,6 @@ async function populateEditorFromGoogleOcr(pdf: pdfjsLib.PDFDocumentProxy, apiKe
         console.assert(responseData.responses.length == 1);
         const ocrResponse = responseData.responses[0];
         const text = ocrResponse.fullTextAnnotation.text;
-
-        const pageNode = schema.node('region', { pageNum: i, pageImageNode: img }, schema.text(text));
-        const view = window['view'];
-        const tr = view.state.tr;
-        const insertPos = view.state.doc.content.size;
-        tr.insert(insertPos, pageNode);
-        // view.updateState(view.state.apply(tr));
-        view.dispatch(tr);
+        addRegionWithText(text, i, img);
     }
 }
