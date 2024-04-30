@@ -1,14 +1,21 @@
 import { EditorState, Plugin } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import {
-    DOMOutputSpec, DOMParser, Fragment, Node, NodeType, Schema, Slice,
-} from 'prosemirror-model';
+import { Node, Schema } from 'prosemirror-model';
 import { keymap } from 'prosemirror-keymap';
 import { undo, redo, history } from 'prosemirror-history';
 import { baseKeymap } from 'prosemirror-commands';
+
 import * as pdfjsLib from 'pdfjs-dist';
+// // Option 1: Works fine, but requires server to serve the other file.
+// pdfjsLib.GlobalWorkerOptions.workerSrc = './node_modules/pdfjs-dist/build/pdf.worker.mjs';
+// // Option 2: Works, with "Warning: Setting up fake worker."
+// import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs';
+// pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// Option 3: Works?
 import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs';
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+const workerBlob = new Blob([pdfjsWorker], { type: 'application/javascript' });
+pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(workerBlob);
+
 import Tesseract from 'tesseract.js';
 
 // "Global" PDF.js state
@@ -30,7 +37,7 @@ function newUnresolved() {
 
 const schema = new Schema({
     nodes: {
-        // The document is a nonempty sequence of regions.
+        // The document is a sequence of regions.
         doc: {
             content: "region*",
             attrs: {
@@ -289,7 +296,7 @@ async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langC
     const logger = (m) => {
         const s = saveChaya.innerText;
         const prefixLength = s.includes('(') ? s.indexOf('(') : s.length;
-        saveChaya.innerText = s.slice(0, prefixLength).trim() + ` (${(m.progress*100).toFixed(0)}% done)`;
+        saveChaya.innerText = s.slice(0, prefixLength).trim() + ` (${(m.progress * 100).toFixed(0)}% done)`;
     };
     let worker = await Tesseract.createWorker(langCode, 1/*LSTM_ONLY*/, { logger });
     for (let i = 1; i <= pdf.numPages; i++) {
