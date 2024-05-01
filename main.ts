@@ -300,11 +300,10 @@ async function populateEditorFromChaya(file: File) {
 
 function addRegionWithText(text: string, i: number, img: HTMLImageElement) {
     const paragraphs: Node[] = [];
-    text.split(/(?:\r\n?|\n)/, -1).forEach((line) => {
+    for (const line of text.split(/(?:\r\n?|\n)/, -1)) {
         paragraphs.push(schema.node('paragraph', null, schema.text(line || ' ')));
-      });
-      const regionNode = schema.node('region', { pageNum: i, pageImageNode: img }, paragraphs);
-
+    }
+    const regionNode = schema.node('region', { pageNum: i, pageImageNode: img }, paragraphs);
     const view = window['view'];
     const tr = view.state.tr;
     const insertPos = view.state.doc.content.size;
