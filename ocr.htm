@@ -243,6 +243,22 @@
       min-width: 30em;
     }
   </style>
+  <style>
+    :root {
+      --img-zoom-factor: 1;
+      --text-zoom-factor: 1;
+    }
+
+    img.page-image {
+      width: calc(1000px * var(--img-zoom-factor));
+      height: auto;
+      transition: width 0.3s ease;
+    }
+
+    .ProseMirror {
+      font-size: calc(20px * var(--text-zoom-factor));
+    }
+  </style>
 </head>
 
 <body>
@@ -287,6 +303,21 @@
   </form>
 
   <button class="button disabled" id="saveChaya">Save the current <code>.chaya</code> file</button>
+
+  <label for="img-zoom-slider">Image zoom:</label>
+  <input type="range" id="img-zoom-slider" min="0.5" max="3" step="0.1" value="1">
+  <script>
+    document.getElementById('img-zoom-slider').addEventListener('input', function () {
+      document.documentElement.style.setProperty('--img-zoom-factor', this.value.toString());
+    });
+  </script>
+  <label for="text-zoom-slider">Text zoom:</label>
+  <input type="range" id="text-zoom-slider" min="0.5" max="3" step="0.1" value="1">
+  <script>
+    document.getElementById('text-zoom-slider').addEventListener('input', function () {
+      document.documentElement.style.setProperty('--text-zoom-factor', this.value.toString());
+    });
+  </script>
   <div id="docView"></div>
 
   <h2>About</h2>
