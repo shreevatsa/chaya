@@ -171,6 +171,7 @@ function startPm(fileUrl, parentNode: HTMLElement) {
             state,
         }
     );
+    // view.focus();
     return view;
 }
 
@@ -309,6 +310,7 @@ async function populateEditorFromChaya(file: File) {
 
 function addRegionWithText(text: string, i: number, img: HTMLImageElement) {
     const paragraphs: Node[] = [];
+    // The "-1" is so that empty lines are retained: https://stackoverflow.com/q/14602062
     for (const line of text.split(/(?:\r\n?|\n)/, -1)) {
         paragraphs.push(schema.node('paragraph', null, schema.text(line || ' ')));
     }
