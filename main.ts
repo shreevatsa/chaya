@@ -3,7 +3,8 @@ import { EditorView } from 'prosemirror-view';
 import { Node, Schema } from 'prosemirror-model';
 import { keymap } from 'prosemirror-keymap';
 import { undo, redo, history } from 'prosemirror-history';
-import { baseKeymap } from 'prosemirror-commands';
+import { baseKeymap, toggleMark } from 'prosemirror-commands';
+import { schema as basicSchema } from 'prosemirror-schema-basic';
 
 import * as pdfjsLib from 'pdfjs-dist';
 // // Option 1: Works fine, but requires server to serve the other file.
@@ -65,12 +66,16 @@ const schema = new Schema({
         paragraph: {
             content: 'text*',
             group: 'block',
-            parseDom: [{tag: 'p'}],
+            parseDom: [{ tag: 'p' }],
             toDOM: () => ['p', 0],
         },
         // Text is just text.
         text: { inline: true },
     },
+    marks: {
+        strong: basicSchema.spec.marks.get('strong')!,
+        em: basicSchema.spec.marks.get('em')!,
+    }
 });
 
 async function canvasForPage(i: number): Promise<HTMLCanvasElement> {
@@ -150,7 +155,11 @@ function startPm(fileUrl, parentNode: HTMLElement) {
         doc,
         plugins: [
             history(),
-            keymap({ 'Mod-z': undo, 'Mod-y': redo }),
+            keymap({ 'Mod-z': undo, 'Mod-y': redo, }),
+            keymap({
+                'Mod-b': toggleMark(schema.marks.strong),
+                'Mod-i': toggleMark(schema.marks.em),
+            }),
             keymap(baseKeymap),
             preventPagesDeletion,
         ],

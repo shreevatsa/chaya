@@ -5,6 +5,7 @@
     "prosemirror-history": "^1.4.0",
     "prosemirror-keymap": "^1.2.2",
     "prosemirror-model": "^1.20.0",
+    "prosemirror-schema-basic": "^1.2.2",
     "prosemirror-state": "^1.4.3",
     "tesseract.js": "^5.0.5"
   },
