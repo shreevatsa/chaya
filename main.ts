@@ -308,7 +308,10 @@ async function populateEditorFromChaya(file: File) {
     }
 }
 
-function addRegionWithText(text: string, i: number, img: HTMLImageElement) {
+function addRegionWithText(text: string, i: number, url: string) {
+    const img = document.createElement('img');
+    img.classList.add('page-image');
+    img.src = url;
     const paragraphs: Node[] = [];
     // The "-1" is so that empty lines are retained: https://stackoverflow.com/q/14602062
     for (const line of text.split(/(?:\r\n?|\n)/, -1)) {
@@ -333,12 +336,10 @@ async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langC
     let worker = await Tesseract.createWorker(langCode, 1/*LSTM_ONLY*/, { logger });
     for (let i = 1; i <= pdf.numPages; i++) {
         saveChaya.innerText = `Running OCR on page ${i} of ${pdf.numPages} (0% done)`;
-        const img = document.createElement('img');
-        img.classList.add('page-image');
         await pageCanvasPromise[i].promise;
-        img.src = pageCanvas[i].toDataURL('image/jpeg', 1.0);
-        const { data: { text }, } = await worker.recognize(img.src);
-        addRegionWithText(text, i, img);
+        const url = pageCanvas[i].toDataURL('image/jpeg', 1.0);
+        const { data: { text }, } = await worker.recognize(url);
+        addRegionWithText(text, i, url);
     }
     worker.terminate();
 }
@@ -346,12 +347,10 @@ async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langC
 async function populateEditorFromGoogleOcr(pdf: pdfjsLib.PDFDocumentProxy, apiKey: string) {
     for (let i = 1; i <= pdf.numPages; i++) {
         saveChaya.innerText = `Running OCR on page ${i} of ${pdf.numPages}`;
-        const img = document.createElement('img');
-        img.classList.add('page-image');
         await pageCanvasPromise[i].promise;
-        img.src = pageCanvas[i].toDataURL('image/jpeg', 1.0);
+        const url = pageCanvas[i].toDataURL('image/jpeg', 1.0);
         // const base64Image = Buffer.from(image).toString('base64');
-        const base64Image = img.src.split(',')[1];
+        const base64Image = url.split(',')[1];
 
         const apiUrl = 'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey;
 
@@ -367,6 +366,6 @@ async function populateEditorFromGoogleOcr(pdf: pdfjsLib.PDFDocumentProxy, apiKe
         console.assert(responseData.responses.length == 1);
         const ocrResponse = responseData.responses[0];
         const text = ocrResponse.fullTextAnnotation.text;
-        addRegionWithText(text, i, img);
+        addRegionWithText(text, i, url);
     }
 }
