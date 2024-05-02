@@ -23,8 +23,6 @@ import Tesseract from 'tesseract.js';
 let pdfFileUrl: string;
 let pdfFileName: string;
 let pdfPromise: Promise<pdfjsLib.PDFDocumentProxy>;
-let pagePromise = [newUnresolved()];
-let pdfPage: pdfjsLib.PDFPageProxy[] = [];
 let pageCanvasPromise = [newUnresolved()];
 let pageCanvas: HTMLCanvasElement[] = [];
 
@@ -36,6 +34,32 @@ function newUnresolved() {
     return { promise, resolve };
 }
 
+async function startPdfRendering(fileUrl: string) {
+    console.log('Loading PDF');
+    pdfPromise = pdfjsLib.getDocument(fileUrl).promise;
+    const pdf = await pdfPromise;
+    console.log('Loaded PDF');
+    for (let i = 1; i <= pdf.numPages; ++i) {
+        pageCanvasPromise[i] = newUnresolved();
+    }
+    for (let i = 1; i <= pdf.numPages; ++i) {
+        const page = await pdf.getPage(i);
+        // Render page onto canvas
+        const viewport = page.getViewport({ scale: 1 });
+        const canvas = document.createElement('canvas');
+        const desiredWidth = 1000;
+        canvas.width = desiredWidth;
+        canvas.height = (desiredWidth / viewport.width) * viewport.height;
+        const renderContext = {
+            canvasContext: canvas.getContext('2d')!,
+            viewport: page.getViewport({ scale: desiredWidth / viewport.width }),
+        };
+        await page.render(renderContext).promise;
+        pageCanvas[i] = canvas;
+        pageCanvasPromise[i].resolve();
+    }
+}
+
 const schema = new Schema({
     nodes: {
         // The document is a sequence of regions.
@@ -43,6 +67,7 @@ const schema = new Schema({
             content: "region*",
             attrs: {
                 file: { default: null },
+                version: { default: '2024.01' },
             }
         },
         // Each region is a part of a page (page number and bounding box),
@@ -77,41 +102,6 @@ const schema = new Schema({
         em: basicSchema.spec.marks.get('em')!,
     }
 });
-
-async function canvasForPage(i: number): Promise<HTMLCanvasElement> {
-    await pagePromise[i].promise;
-    const page = pdfPage[i];
-    const viewport = page.getViewport({ scale: 1 });
-    const canvas = document.createElement('canvas');
-    const desiredWidth = 1000;
-    canvas.width = desiredWidth;
-    canvas.height = (desiredWidth / viewport.width) * viewport.height;
-    const renderContext = {
-        canvasContext: canvas.getContext('2d')!,
-        viewport: page.getViewport({ scale: desiredWidth / viewport.width }),
-    };
-    await page.render(renderContext).promise;
-    return canvas;
-}
-
-async function startPdfRendering(fileUrl: string) {
-    console.log('Loading PDF');
-    pdfPromise = pdfjsLib.getDocument(fileUrl).promise;
-    const pdf = await pdfPromise;
-    console.log('Loaded PDF');
-    for (let i = 1; i <= pdf.numPages; ++i) {
-        pagePromise[i] = newUnresolved();
-        pageCanvasPromise[i] = newUnresolved();
-    }
-    for (let i = 1; i <= pdf.numPages; ++i) {
-        pdfPage[i] = await pdf.getPage(i);
-        pagePromise[i].resolve();
-    }
-    for (let i = 1; i <= pdf.numPages; ++i) {
-        pageCanvas[i] = await canvasForPage(i);
-        pageCanvasPromise[i].resolve();
-    }
-}
 
 function startPm(fileUrl, parentNode: HTMLElement) {
     let pageNodes: Node[] = [];
