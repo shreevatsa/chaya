@@ -232,6 +232,7 @@
 
     .page {
       display: flex;
+      flex-wrap: wrap;
     }
 
     .page-image {
@@ -241,6 +242,7 @@
     .page-contents {
       outline: 1px dotted blue;
       min-width: 30em;
+      /* flex-grow: 1; */
     }
   </style>
   <style>
@@ -251,7 +253,10 @@
 
     div.page-image {
       width: calc(1000px * var(--img-zoom-factor));
-      height: auto;
+      height: calc(var(--region-height) * var(--img-zoom-factor));
+      background-position-y: calc(var(--position-y) * var(--img-zoom-factor) * -1);
+      background-size: calc(1000px * var(--img-zoom-factor)) auto;
+      background-repeat: no-repeat;
       transition: width 0.3s ease;
     }
 

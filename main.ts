@@ -95,11 +95,8 @@ const schema = new Schema({
                     const foreground = document.createElement('div');
                     foreground.classList.add('page-image');
                     foreground.style.backgroundImage = `url("${pageImageUrl[line.attrs.pageNum]}")`;
-                    foreground.style.height = `calc(${line.attrs.y2 - line.attrs.y1}px * var(--img-zoom-factor))`;
-                    foreground.style.backgroundPositionY = -line.attrs.y1 + 'px';
-                    foreground.style.backgroundRepeat = 'no-repeat';
-                    foreground.style.transform = `scale(var(--img-zoom-factor))`;
-                    foreground.style.transformOrigin = 'top left';
+                    foreground.style.setProperty('--region-height', `${line.attrs.y2 - line.attrs.y1}px`);
+                    foreground.style.setProperty('--position-y', `${line.attrs.y1}px`);
                     ret.appendChild(foreground);
                 }
                 const contentPlaceholder = document.createElement('div');
