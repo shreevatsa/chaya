@@ -12,7 +12,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 // // Option 2: Works, with "Warning: Setting up fake worker."
 // import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs';
 // pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-// Option 3: Works?
+// // Option 3: Works, with same warning?
 import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs';
 const workerBlob = new Blob([pdfjsWorker], { type: 'application/javascript' });
 pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(workerBlob);
@@ -323,12 +323,31 @@ async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langC
         const prefixLength = s.includes('(') ? s.indexOf('(') : s.length;
         saveChaya.innerText = s.slice(0, prefixLength).trim() + ` (${(m.progress * 100).toFixed(0)}% done)`;
     };
+    console.log('Tesseract', Tesseract);
     let worker = await Tesseract.createWorker(langCode, 1/*LSTM_ONLY*/, { logger });
     for (let i = 1; i <= pdf.numPages; i++) {
         saveChaya.innerText = `Running OCR on page ${i} of ${pdf.numPages} (0% done)`;
         await pageCanvasPromise[i].promise;
         const url = pageCanvas[i].toDataURL('image/jpeg', 1.0);
-        const { data: { text }, } = await worker.recognize(url);
+        console.log('worker', worker);
+        const response = await worker.recognize(url, undefined,
+            {
+                text: true, // TODO: Change this to false
+                blocks: true,
+                layoutBlocks: false,
+                hocr: false,
+                tsv: false,
+                box: false,
+                unlv: false,
+                osd: false,
+                pdf: false,
+                imageColor: false,
+                imageGrey: false,
+                imageBinary: false,
+                debug: false,
+            });
+        console.log('Result from Tesseract', response);
+        const { data: { text }, } = response;
         addRegionWithText(text, i, url);
     }
     worker.terminate();
