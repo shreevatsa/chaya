@@ -23,8 +23,9 @@ import Tesseract from 'tesseract.js';
 let pdfFileUrl: string;
 let pdfFileName: string;
 let pdfPromise: Promise<pdfjsLib.PDFDocumentProxy>;
-let pageCanvasPromise = [newUnresolved()];
+let pagePromise = [newUnresolved()];
 let pageCanvas: HTMLCanvasElement[] = [];
+let pageImageUrl: string[] = [];
 
 function newUnresolved() {
     let resolve;
@@ -40,7 +41,7 @@ async function startPdfRendering(fileUrl: string) {
     const pdf = await pdfPromise;
     console.log('Loaded PDF');
     for (let i = 1; i <= pdf.numPages; ++i) {
-        pageCanvasPromise[i] = newUnresolved();
+        pagePromise[i] = newUnresolved();
     }
     for (let i = 1; i <= pdf.numPages; ++i) {
         const page = await pdf.getPage(i);
@@ -56,7 +57,8 @@ async function startPdfRendering(fileUrl: string) {
         };
         await page.render(renderContext).promise;
         pageCanvas[i] = canvas;
-        pageCanvasPromise[i].resolve();
+        canvas.toBlob(blob => { pageImageUrl[i] = URL.createObjectURL(blob!); }, 'image/jpeg', 1.0);
+        pagePromise[i].resolve();
     }
 }
 
@@ -73,20 +75,37 @@ const schema = new Schema({
                 y2: {},
             },
             isolating: true,
+            toDOM: () => ["div", 0],
         },
         chunk: {
-            content: 'line+',
+            // Really should be line+, but ProseMirror doesn't like this:
+            // https://discuss.prosemirror.net/t/why-only-non-generatable-nodes-in-a-required-position/6021
+            content: 'line*',
             attrs: {
                 label: { default: null },
-            }
-            // TODO: Make this compute using y1, y2 etc.
+            },
             toDOM(node) {
-                return [
-                    'div',
-                    { class: 'page', 'data-page-num': node.attrs.pageNum },
-                    ['div', {}, node.attrs.pageImageNode],
-                    ['div', { class: 'page-contents' }, 0]
-                ];
+                const ret = document.createElement('div');
+                ret.classList.add('page');
+                // For now, just uses the first child
+                console.assert(node.childCount == 1, node.childCount);
+                for (let i = 0; i < node.childCount; ++i) {
+                    const line: Node = node.child(i);
+                    // The image for the page
+                    const foreground = document.createElement('div');
+                    foreground.classList.add('page-image');
+                    foreground.style.backgroundImage = `url("${pageImageUrl[line.attrs.pageNum]}")`;
+                    foreground.style.height = `calc(${line.attrs.y2 - line.attrs.y1}px * var(--img-zoom-factor))`;
+                    foreground.style.backgroundPositionY = -line.attrs.y1 + 'px';
+                    foreground.style.backgroundRepeat = 'no-repeat';
+                    foreground.style.transform = `scale(var(--img-zoom-factor))`;
+                    foreground.style.transformOrigin = 'top left';
+                    ret.appendChild(foreground);
+                }
+                const contentPlaceholder = document.createElement('div');
+                contentPlaceholder.classList.add('page-contents');
+                ret.appendChild(contentPlaceholder);
+                return { dom: ret, contentDOM: contentPlaceholder };
             },
         },
         // The document is a sequence of chunks.
@@ -283,8 +302,8 @@ async function populateEditorFromChaya(file: File) {
         const img = document.createElement('img');
         img.classList.add('page-image');
         const pageNum = pageNodeOld.attrs.pageNum;
-        await pageCanvasPromise[pageNum].promise;
-        img.src = pageCanvas[pageNum].toDataURL('image/jpeg', 1.0);
+        await pagePromise[pageNum].promise;
+        img.src = pageImageUrl[i];
         const pageNode = schema.node(
             'region',
             { pageNum: pageNum, pageImageNode: img },
@@ -295,6 +314,24 @@ async function populateEditorFromChaya(file: File) {
         const tr = view.state.tr;
         const insertPos = view.state.doc.content.size;
         tr.insert(insertPos, pageNode);
+        view.dispatch(tr);
+    }
+}
+
+function addLinesFromWords(words: Tesseract.Word[], pageNum: number) {
+    const view = window['view'];
+    for (let word of words) {
+        console.log(word.text, word.bbox, word.page);
+        const line = schema.node('line', {
+            pageNum: pageNum,
+            y1: word.bbox.y0,
+            y2: word.bbox.y1,
+        }, schema.text(word.text));
+        const chunk = schema.node('chunk', {}, [line]);
+        const tr = view.state.tr;
+        const insertPos = view.state.doc.content.size;
+        tr.insert(insertPos, chunk);
+        // view.updateState(view.state.apply(tr));
         view.dispatch(tr);
     }
 }
@@ -317,6 +354,8 @@ function addRegionWithText(text: string, i: number, url: string) {
     view.dispatch(tr);
 }
 
+
+
 async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langCode: string) {
     saveChaya.innerText = 'Loading Tesseract';
     const logger = (m) => {
@@ -324,16 +363,14 @@ async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langC
         const prefixLength = s.includes('(') ? s.indexOf('(') : s.length;
         saveChaya.innerText = s.slice(0, prefixLength).trim() + ` (${(m.progress * 100).toFixed(0)}% done)`;
     };
-    console.log('Tesseract', Tesseract);
     let worker = await Tesseract.createWorker(langCode, 1/*LSTM_ONLY*/, { logger });
     for (let i = 1; i <= pdf.numPages; i++) {
         saveChaya.innerText = `Running OCR on page ${i} of ${pdf.numPages} (0% done)`;
-        await pageCanvasPromise[i].promise;
-        const url = pageCanvas[i].toDataURL('image/jpeg', 1.0);
-        console.log('worker', worker);
-        const response = await worker.recognize(url, undefined,
+        await pagePromise[i].promise;
+        // const response = await worker.recognize(pageCanvas[i].toDataURL('image/jpeg', 1.0));
+        const response = await worker.recognize(pageImageUrl[i], undefined,
             {
-                text: true, // TODO: Change this to false
+                text: false,
                 blocks: true,
                 layoutBlocks: false,
                 hocr: false,
@@ -348,8 +385,7 @@ async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langC
                 debug: false,
             });
         console.log('Result from Tesseract', response);
-        const { data: { text }, } = response;
-        addRegionWithText(text, i, url);
+        addLinesFromWords(response.data.words, i);
     }
     worker.terminate();
 }
@@ -357,7 +393,7 @@ async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langC
 async function populateEditorFromGoogleOcr(pdf: pdfjsLib.PDFDocumentProxy, apiKey: string) {
     for (let i = 1; i <= pdf.numPages; i++) {
         saveChaya.innerText = `Running OCR on page ${i} of ${pdf.numPages}`;
-        await pageCanvasPromise[i].promise;
+        await pagePromise[i].promise;
         const url = pageCanvas[i].toDataURL('image/jpeg', 1.0);
         // const base64Image = Buffer.from(image).toString('base64');
         const base64Image = url.split(',')[1];
@@ -376,6 +412,6 @@ async function populateEditorFromGoogleOcr(pdf: pdfjsLib.PDFDocumentProxy, apiKe
         console.assert(responseData.responses.length == 1);
         const ocrResponse = responseData.responses[0];
         const text = ocrResponse.fullTextAnnotation.text;
-        addRegionWithText(text, i, url);
+        addRegionWithText(text, i, pageImageUrl[i]);
     }
 }
