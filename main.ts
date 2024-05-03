@@ -62,23 +62,24 @@ async function startPdfRendering(fileUrl: string) {
 
 const schema = new Schema({
     nodes: {
-        // The document is a sequence of regions.
-        doc: {
-            content: "region*",
+        // At the lowest level is text.
+        text: { inline: true },
+        // There are lines of text (recognized from words' bounding boxes)
+        line: {
+            content: 'text*',
             attrs: {
-                file: { default: null },
-                version: { default: '2024.01' },
-            }
-        },
-        // Each region is a part of a page (page number and bounding box),
-        // along with some text.
-        region: {
-            content: 'paragraph*',
-            isolating: true,
-            attrs: {
-                pageNum: { default: null },
-                pageImageNode: { default: null },
+                pageNum: {},
+                y1: {},
+                y2: {},
             },
+            isolating: true,
+        },
+        chunk: {
+            content: 'line+',
+            attrs: {
+                label: { default: null },
+            }
+            // TODO: Make this compute using y1, y2 etc.
             toDOM(node) {
                 return [
                     'div',
@@ -88,14 +89,14 @@ const schema = new Schema({
                 ];
             },
         },
-        paragraph: {
-            content: 'text*',
-            group: 'block',
-            parseDom: [{ tag: 'p' }],
-            toDOM: () => ['p', 0],
+        // The document is a sequence of chunks.
+        doc: {
+            content: "chunk*",
+            attrs: {
+                file: { default: null },
+                schemaVersion: { default: '2024.01' },
+            }
         },
-        // Text is just text.
-        text: { inline: true },
     },
     marks: {
         strong: basicSchema.spec.marks.get('strong')!,
