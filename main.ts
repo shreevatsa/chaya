@@ -44,6 +44,7 @@ async function startPdfRendering(fileUrl: string) {
         pagePromise[i] = newUnresolved();
     }
     for (let i = 1; i <= pdf.numPages; ++i) {
+        console.log(`Rendering page ${i} of ${pdf.numPages}`);
         const page = await pdf.getPage(i);
         // Render page onto canvas
         const viewport = page.getViewport({ scale: 1 });
@@ -58,6 +59,7 @@ async function startPdfRendering(fileUrl: string) {
         await page.render(renderContext).promise;
         pageCanvas[i] = canvas;
         canvas.toBlob(blob => { pageImageUrl[i] = URL.createObjectURL(blob!); }, 'image/jpeg', 1.0);
+        console.log(`Rendered page ${i} of ${pdf.numPages}`);
         pagePromise[i].resolve();
     }
 }
@@ -315,15 +317,71 @@ async function populateEditorFromChaya(file: File) {
     }
 }
 
-function addLinesFromWords(words: Tesseract.Word[], pageNum: number) {
-    const view = window['view'];
+type Word = {
+    text: string;
+    xmin: number;
+    xmax: number;
+    ymin: number;
+    ymax: number;
+};
+
+function addLinesFromWords(words: Word[], pageNum: number) {
+    function same_line(word, prev) {
+        return word.ymin < prev.ymin || word.ymax < prev.ymax || word.ymin < prev.ymin + 0.4 * (prev.ymax - word.ymin);
+    }
+    words.sort((w1, w2) => w1.ymin - w2.ymin);
+
+    const lines: Word[][] = [];
     for (let word of words) {
-        console.log(word.text, word.bbox, word.page);
-        const line = schema.node('line', {
-            pageNum: pageNum,
-            y1: word.bbox.y0,
-            y2: word.bbox.y1,
-        }, schema.text(word.text));
+        if (lines.length == 0) {
+            lines.push([word]);
+            continue;
+        }
+        let currentLine = lines[lines.length - 1];
+        if (currentLine.some(prev => same_line(word, prev))) {
+            currentLine.push(word);
+        } else {
+            // Otherwise, start a new line.
+            lines.push([word]);
+        }
+    }
+    console.log('lines:', lines);
+
+    const linesWithBox = lines.map(line => ({
+        text: line.map(word => word.text).join(' '),
+        y1: Math.min(...line.map(word => word.ymin)),
+        y2: Math.max(...line.map(word => word.ymax)),
+    }));
+
+    // Distribute all the "missing" y-coordinates.
+    if (linesWithBox.length > 0) {
+        linesWithBox[0].y1 = 0;
+        for (let i = 1; i < linesWithBox.length; ++i) {
+            const prev = linesWithBox[i - 1].y2;
+            const cur = linesWithBox[i].y1;
+            if (prev >= cur) continue;
+            const avg = prev + (cur - prev) / 2;
+            linesWithBox[i - 1].y2 = avg;
+            linesWithBox[i].y1 = avg;
+        }
+        if (linesWithBox.length > 1) {
+            const lastBox = linesWithBox[linesWithBox.length - 1];
+            console.log(`Bumping up ${lastBox.y2} to 1000...`);
+            lastBox.y2 = Math.max(lastBox.y2, 1000);
+            console.log(`...gives ${linesWithBox[linesWithBox.length - 1].y2}`);
+        }
+    }
+    console.log(linesWithBox);
+
+    const lineNodes = linesWithBox.map(line => schema.node('line', {
+        pageNum: pageNum,
+        y1: line.y1,
+        y2: line.y2,
+    }, schema.text(line.text)));
+
+    // Insert each line.
+    const view = window['view'];
+    for (let line of lineNodes) {
         const chunk = schema.node('chunk', {}, [line]);
         const tr = view.state.tr;
         const insertPos = view.state.doc.content.size;
@@ -382,7 +440,14 @@ async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langC
                 debug: false,
             });
         console.log('Result from Tesseract', response);
-        addLinesFromWords(response.data.words, i);
+        const words: Word[] = response.data.words.map(word => ({
+            text: word.text,
+            xmin: word.bbox.x0,
+            xmax: word.bbox.x1,
+            ymin: word.bbox.y0,
+            ymax: word.bbox.y1,
+        }));
+        addLinesFromWords(words, i);
     }
     worker.terminate();
 }
