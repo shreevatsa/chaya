@@ -26,6 +26,7 @@ let pdfPromise: Promise<pdfjsLib.PDFDocumentProxy>;
 let pagePromise = [newUnresolved()];
 let pageCanvas: HTMLCanvasElement[] = [];
 let pageImageUrl: string[] = [];
+let pageHeight: number[] = [];
 
 function newUnresolved() {
     let resolve;
@@ -56,6 +57,7 @@ async function startPdfRendering(fileUrl: string) {
             canvasContext: canvas.getContext('2d')!,
             viewport: page.getViewport({ scale: desiredWidth / viewport.width }),
         };
+        pageHeight[i] = canvas.height;
         await page.render(renderContext).promise;
         pageCanvas[i] = canvas;
         canvas.toBlob(blob => { pageImageUrl[i] = URL.createObjectURL(blob!); }, 'image/jpeg', 1.0);
@@ -326,24 +328,39 @@ type Word = {
 };
 
 function addLinesFromWords(words: Word[], pageNum: number) {
-    function same_line(word, prev) {
-        return word.ymin < prev.ymin || word.ymax < prev.ymax || word.ymin < prev.ymin + 0.4 * (prev.ymax - word.ymin);
-    }
-    words.sort((w1, w2) => w1.ymin - w2.ymin);
+    // Retaining the order of words in `words`, partition them into "lines" [y1..y2],
+    // such that for every word in `words`,
+    // the fraction of it which overlaps a "line" (i.e. ≥y1 or ≤y2) is either 1 or at most 0.4.
 
     const lines: Word[][] = [];
+    let currentLine: Word[] = [];
+    let currentYmin: number = Number.POSITIVE_INFINITY;
+    let currentYmax: number = Number.NEGATIVE_INFINITY;
     for (let word of words) {
-        if (lines.length == 0) {
-            lines.push([word]);
+        // When there is no current line, we start a new line.
+        if (currentLine.length == 0) {
+            currentLine = [word];
+            currentYmin = word.ymin;
+            currentYmax = word.ymax;
             continue;
         }
-        let currentLine = lines[lines.length - 1];
-        if (currentLine.some(prev => same_line(word, prev))) {
+        // Is this line forced to stay in the current line?
+        const overlapFraction = (Math.min(word.ymax, currentYmax) - Math.max(word.ymin, currentYmin)) / (word.ymax - word.ymin);
+        if (overlapFraction > 0.4) {
             currentLine.push(word);
-        } else {
-            // Otherwise, start a new line.
-            lines.push([word]);
+            currentYmin = Math.min(currentYmin, word.ymin);
+            currentYmax = Math.max(currentYmax, word.ymax);
+            continue;
         }
+        // TODO: currentLine.some(prev => same_line(word, prev))      
+        // Start a new line (optimistically)
+        lines.push(currentLine);
+        currentLine = [word];
+        currentYmin = word.ymin;
+        currentYmax = word.ymax;
+    }
+    if (currentLine.length > 0) {
+        lines.push(currentLine);
     }
     console.log('lines:', lines);
 
@@ -366,8 +383,8 @@ function addLinesFromWords(words: Word[], pageNum: number) {
         }
         if (linesWithBox.length > 1) {
             const lastBox = linesWithBox[linesWithBox.length - 1];
-            console.log(`Bumping up ${lastBox.y2} to 1000...`);
-            lastBox.y2 = Math.max(lastBox.y2, 1000);
+            console.log(`Bumping up ${lastBox.y2} to ${pageHeight[pageNum]}...`);
+            lastBox.y2 = Math.max(lastBox.y2, pageHeight[pageNum]);
             console.log(`...gives ${linesWithBox[linesWithBox.length - 1].y2}`);
         }
     }
