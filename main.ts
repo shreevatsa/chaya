@@ -456,26 +456,6 @@ function addLinesFromWords(words: Word[], pageNum: number) {
     }
 }
 
-function addRegionWithText(text: string, i: number, url: string) {
-    const img = document.createElement('img');
-    img.classList.add('page-image');
-    img.src = url;
-    const paragraphs: Node[] = [];
-    // The "-1" is so that empty lines are retained: https://stackoverflow.com/q/14602062
-    for (const line of text.split(/(?:\r\n?|\n)/, -1)) {
-        paragraphs.push(schema.node('paragraph', null, schema.text(line || ' ')));
-    }
-    const regionNode = schema.node('region', { pageNum: i, pageImageNode: img }, paragraphs);
-    const view = window['view'];
-    const tr = view.state.tr;
-    const insertPos = view.state.doc.content.size;
-    tr.insert(insertPos, regionNode);
-    // view.updateState(view.state.apply(tr));
-    view.dispatch(tr);
-}
-
-
-
 async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langCode: string) {
     saveChaya.innerText = 'Loading Tesseract';
     const logger = (m) => {
@@ -538,7 +518,18 @@ async function populateEditorFromGoogleOcr(pdf: pdfjsLib.PDFDocumentProxy, apiKe
         // We have sent a single image request, and requested only DOCUMENT_TEXT_DETECTION, so responses will have only one element.
         console.assert(responseData.responses.length == 1);
         const ocrResponse = responseData.responses[0];
+        let words: Word[] = [];
+        for (let word of ocrResponse.textAnnotations.slice(1)) {
+            let box = ('boundingPoly' in word) ? word.boundingPoly : word.boundingBox;
+            words.push({
+                text: word.description,
+                xmin: Math.min(...box.vertices.map(({ x: v }) => v)),
+                xmax: Math.max(...box.vertices.map(({ x: v }) => v)),
+                ymin: Math.min(...box.vertices.map(({ y: v }) => v)),
+                ymax: Math.max(...box.vertices.map(({ y: v }) => v)),
+            });
+        }
         const text = ocrResponse.fullTextAnnotation.text;
-        addRegionWithText(text, i, pageImageUrl[i]);
+        addLinesFromWords(words, i);
     }
 }
