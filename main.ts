@@ -332,7 +332,24 @@ function addLinesFromWords(words: Word[], pageNum: number) {
     // such that for every word in `words`,
     // the fraction of it which overlaps a "line" (i.e. ≥y1 or ≤y2) is either 1 or at most 0.4.
 
-    const lines: Word[][] = [];
+    // What fraction of [c..d] overlaps with [a..b].
+    function overlapFraction(a, b, c, d) {
+        console.assert(a <= b);
+        console.assert(c <= d);
+        if (d <= a) return 0; // [c, d] [a, b]
+        if (c >= b) return 0; // [a, b] [c, d]
+        // Only four cases remain.
+        console.assert(a >= 0, {}, a, b, c, d);
+        console.assert(c >= 0, {}, a, b, c, d);
+        if (a <= c && c <= b && b <= d) return (b - c) / (d - c);
+        if (a <= c && c <= d && d <= b) return 1;
+        if (c <= a && a <= b && b <= d) return 1; // We're not doing (b - a) / (d - c) here.
+        if (c <= a && a <= d && d <= b) return (d - a) / (d - c);
+        console.assert(false, {}, a, b, c, d);
+        return 0;
+    }
+
+    let lines: Word[][] = [];
     let currentLine: Word[] = [];
     let currentYmin: number = Number.POSITIVE_INFINITY;
     let currentYmax: number = Number.NEGATIVE_INFINITY;
@@ -345,14 +362,12 @@ function addLinesFromWords(words: Word[], pageNum: number) {
             continue;
         }
         // Is this line forced to stay in the current line?
-        const overlapFraction = (Math.min(word.ymax, currentYmax) - Math.max(word.ymin, currentYmin)) / (word.ymax - word.ymin);
-        if (overlapFraction > 0.4) {
+        if (overlapFraction(currentYmin, currentYmax, word.ymin, word.ymax) > 0.4) {
             currentLine.push(word);
             currentYmin = Math.min(currentYmin, word.ymin);
             currentYmax = Math.max(currentYmax, word.ymax);
             continue;
         }
-        // TODO: currentLine.some(prev => same_line(word, prev))      
         // Start a new line (optimistically)
         lines.push(currentLine);
         currentLine = [word];
@@ -361,6 +376,41 @@ function addLinesFromWords(words: Word[], pageNum: number) {
     }
     if (currentLine.length > 0) {
         lines.push(currentLine);
+    }
+    console.log('lines before merging', lines);
+    // Merge lines that overlap
+    let tryMerge = true;
+    while (tryMerge) {
+        tryMerge = false;
+        for (let j = 1; j < lines.length; ++j) {
+            if (tryMerge) break;
+            const i = j - 1;
+            const imin = Math.min(...lines[i].map(word => word.ymin));
+            const imax = Math.max(...lines[i].map(word => word.ymax));
+            const jmin = Math.min(...lines[j].map(word => word.ymin));
+            const jmax = Math.max(...lines[j].map(word => word.ymax));
+            for (let word of lines[i]) {
+                if (tryMerge) break;
+                if (overlapFraction(jmin, jmax, word.ymin, word.ymax) > 0.4) {
+                    console.log(word, 'on line', i, 'overlaps next line', jmin, jmax);
+                    lines = [...lines.slice(0, i), [...lines[i], ...lines[j]], ...lines.slice(j + 1)];
+                    tryMerge = true;
+                    break;
+                }
+            }
+            if (tryMerge) break;
+            for (let word of lines[j]) {
+                if (tryMerge) break;
+                if (overlapFraction(imin, imax, word.ymin, word.ymax) > 0.4) {
+                    console.log(word, 'on line', j, 'overlaps prev line', imin, imax);
+                    // console.log('Before merge', lines.map(line => line.length));
+                    lines = [...lines.slice(0, i), [...lines[i], ...lines[j]], ...lines.slice(j + 1)];
+                    // console.log('After merge', lines.map(line => line.length));
+                    tryMerge = true;
+                    break;
+                }
+            }
+        }
     }
     console.log('lines:', lines);
 
@@ -383,9 +433,7 @@ function addLinesFromWords(words: Word[], pageNum: number) {
         }
         if (linesWithBox.length > 1) {
             const lastBox = linesWithBox[linesWithBox.length - 1];
-            console.log(`Bumping up ${lastBox.y2} to ${pageHeight[pageNum]}...`);
             lastBox.y2 = Math.max(lastBox.y2, pageHeight[pageNum]);
-            console.log(`...gives ${linesWithBox[linesWithBox.length - 1].y2}`);
         }
     }
     console.log(linesWithBox);

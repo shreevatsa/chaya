@@ -98,6 +98,10 @@
       /* Styled radio buttons */
     }
 
+    input[type="range"] {
+      width: calc(min(1000px, 100%));
+    }
+
     .button {
       font-size: 18px;
       color: #fff;
@@ -311,20 +315,25 @@
 
   <button class="button disabled" id="saveChaya">Save the current <code>.chaya</code> file</button>
 
-  <label for="img-zoom-slider">Image zoom:</label>
-  <input type="range" id="img-zoom-slider" min="0.5" max="3" step="0.1" value="1">
-  <script>
-    document.getElementById('img-zoom-slider').addEventListener('input', function () {
-      document.documentElement.style.setProperty('--img-zoom-factor', this.value.toString());
-    });
-  </script>
-  <label for="text-zoom-slider">Text zoom:</label>
-  <input type="range" id="text-zoom-slider" min="0.5" max="3" step="0.1" value="1">
-  <script>
-    document.getElementById('text-zoom-slider').addEventListener('input', function () {
-      document.documentElement.style.setProperty('--text-zoom-factor', this.value.toString());
-    });
-  </script>
+  <div>
+    <label for="img-zoom-slider">Image zoom:</label>
+    <input type="range" id="img-zoom-slider" min="-30" max="30" step="1" value="0">
+    <script>
+      document.getElementById('img-zoom-slider').addEventListener('input', function () {
+        document.documentElement.style.setProperty('--img-zoom-factor', Math.pow(1.0625, this.value).toString());
+      });
+    </script>
+  </div>
+
+  <div>
+    <label for="text-zoom-slider">Text zoom:</label>
+    <input type="range" id="text-zoom-slider" min="-30" max="30" step="1" value="0">
+    <script>
+      document.getElementById('text-zoom-slider').addEventListener('input', function () {
+        document.documentElement.style.setProperty('--text-zoom-factor', Math.pow(1.0625, this.value).toString());
+      });
+    </script>
+  </div>
   <div id="docView"></div>
 
   <h2>About</h2>
