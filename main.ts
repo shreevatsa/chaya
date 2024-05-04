@@ -60,9 +60,11 @@ async function startPdfRendering(fileUrl: string) {
         pageHeight[i] = canvas.height;
         await page.render(renderContext).promise;
         pageCanvas[i] = canvas;
-        canvas.toBlob(blob => { pageImageUrl[i] = URL.createObjectURL(blob!); }, 'image/jpeg', 1.0);
-        console.log(`Rendered page ${i} of ${pdf.numPages}`);
-        pagePromise[i].resolve();
+        canvas.toBlob(blob => {
+            pageImageUrl[i] = URL.createObjectURL(blob!);
+            pagePromise[i].resolve();
+            console.log(`Rendered page ${i} of ${pdf.numPages}`);
+        }, 'image/jpeg', 1.0);
     }
 }
 
@@ -95,9 +97,10 @@ const schema = new Schema({
                 console.assert(node.childCount == 1, node.childCount);
                 for (let i = 0; i < node.childCount; ++i) {
                     const line: Node = node.child(i);
-                    // The image for the page
                     const foreground = document.createElement('div');
                     foreground.classList.add('page-image');
+                    foreground.dataset.pageNum = line.attrs.pageNum;
+                    console.assert(typeof pageImageUrl[line.attrs.pageNum] == 'string', line.attrs.pageNum, pageImageUrl[line.attrs.pageNum]);
                     foreground.style.backgroundImage = `url("${pageImageUrl[line.attrs.pageNum]}")`;
                     foreground.style.setProperty('--region-height', `${line.attrs.y2 - line.attrs.y1}px`);
                     foreground.style.setProperty('--position-y', `${line.attrs.y1}px`);
@@ -296,25 +299,18 @@ saveChaya.addEventListener('click', () => {
 async function populateEditorFromChaya(file: File) {
     const json = JSON.parse(await file.text());
     let doc = schema.nodeFromJSON(json);
-
     for (let i = 0; i < doc.content.childCount; ++i) {
-        const pageNodeOld: Node = doc.content.child(i);
-        console.log(`Read child number ${i}: it is`, pageNodeOld);
-        const img = document.createElement('img');
-        img.classList.add('page-image');
-        const pageNum = pageNodeOld.attrs.pageNum;
-        await pagePromise[pageNum].promise;
-        img.src = pageImageUrl[i];
-        const pageNode = schema.node(
-            'region',
-            { pageNum: pageNum, pageImageNode: img },
-            pageNodeOld.content,
-        );
-
+        const chunk: Node = doc.content.child(i);
+        // console.log(`Read child number ${i}: it is`, chunk);
+        for (let j = 0; j < chunk.childCount; ++j) {
+            const line = chunk.child(j);
+            console.log(`Chunk ${i} has page number ${line.attrs.pageNum}, with promise`, pagePromise[line.attrs.pageNum]);
+            await pagePromise[line.attrs.pageNum].promise;
+        }
         const view = window['view'];
         const tr = view.state.tr;
         const insertPos = view.state.doc.content.size;
-        tr.insert(insertPos, pageNode);
+        tr.insert(insertPos, chunk);
         view.dispatch(tr);
     }
 }
