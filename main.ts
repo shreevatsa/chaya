@@ -374,29 +374,34 @@ function addLinesFromWords(words: Word[], pageNum: number) {
         lines.push(currentLine);
     }
     console.log('lines before merging', lines);
+    // Whether any word in line i overlaps with line j.
+    function overlap(i, j) {
+        const jmin = Math.min(...lines[j].map(word => word.ymin));
+        const jmax = Math.max(...lines[j].map(word => word.ymax));
+        for (let word of lines[i]) {
+            if (overlapFraction(jmin, jmax, word.ymin, word.ymax) > 0.4) {
+                console.log(word, 'on line', i, 'overlaps line', j, 'which has range', jmin, jmax);
+                return true;
+            }
+        }
+    }
+
     // Merge lines that overlap
     outerLoop: while (true) {
+        // Adjacent lines that overlap
         for (let j = 1; j < lines.length; ++j) {
             const i = j - 1;
-            const imin = Math.min(...lines[i].map(word => word.ymin));
-            const imax = Math.max(...lines[i].map(word => word.ymax));
-            const jmin = Math.min(...lines[j].map(word => word.ymin));
-            const jmax = Math.max(...lines[j].map(word => word.ymax));
-
-            for (let word of lines[i]) {
-                if (overlapFraction(jmin, jmax, word.ymin, word.ymax) > 0.4) {
-                    console.log(word, 'on line', i, 'overlaps next line', jmin, jmax);
-                    lines = [...lines.slice(0, i), [...lines[i], ...lines[j]], ...lines.slice(j + 1)];
-                    continue outerLoop; // goto
-                }
+            if (overlap(i, j) || overlap(j, i)) {
+                lines = [...lines.slice(0, i), [...lines[i], ...lines[j]], ...lines.slice(j + 1)];
+                continue outerLoop; // goto
             }
-
-            for (let word of lines[j]) {
-                if (overlapFraction(imin, imax, word.ymin, word.ymax) > 0.4) {
-                    console.log(word, 'on line', j, 'overlaps prev line', imin, imax);
-                    lines = [...lines.slice(0, i), [...lines[i], ...lines[j]], ...lines.slice(j + 1)];
-                    continue outerLoop; // goto
-                }
+        }
+        // Try two apart, just in case
+        for (let i = 0; i < lines.length - 2; ++i) {
+            const j = i + 2;
+            if (overlap(i, j) || overlap(j, i)) {
+                lines = [...lines.slice(0, i), [...lines[i], ...lines[i + 1], ...lines[j]], ...lines.slice(j + 1)];
+                continue outerLoop;
             }
         }
         break;
