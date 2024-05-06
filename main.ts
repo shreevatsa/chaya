@@ -1,11 +1,31 @@
-import { EditorState, Plugin } from 'prosemirror-state';
+import { EditorState, Plugin, Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { Node, Schema } from 'prosemirror-model';
+import { Node, Schema, NodeSpec } from 'prosemirror-model';
 import { keymap } from 'prosemirror-keymap';
-import { undo, redo, history } from 'prosemirror-history';
-import { baseKeymap, toggleMark } from 'prosemirror-commands';
+import { history } from 'prosemirror-history';
+import { baseKeymap } from 'prosemirror-commands';
 import { schema as basicSchema } from 'prosemirror-schema-basic';
+import { dropCursor } from "prosemirror-dropcursor";
+import { gapCursor } from "prosemirror-gapcursor";
+import { menuBar } from "prosemirror-menu";
+import { inputRules, textblockTypeInputRule, smartQuotes, emDash, ellipsis, undoInputRule } from "prosemirror-inputrules";
+
+import { buildKeymap, buildMenuItems } from "prosemirror-example-setup";
+
 import 'prosemirror-view/style/prosemirror.css';
+import 'prosemirror-example-setup/style/style.css';
+import "prosemirror-menu/style/menu.css";
+
+// Based on https://github.com/ProseMirror/prosemirror-example-setup/blob/master/src/inputrules.ts
+function buildInputRules(schema: Schema) {
+    let rules = smartQuotes.concat(ellipsis, emDash);
+    rules.push(textblockTypeInputRule(
+        /*regexp*/new RegExp("^(#{1,6})\\s$"),
+        /*nodeType*/schema.nodes.heading,
+        /*getAttrs*/match => ({ level: match[1].length })));
+    return inputRules({ rules });
+}
+
 
 import * as pdfjsLib from 'pdfjs-dist';
 // // Option 1: Works fine, but requires server to serve the other file.
@@ -72,10 +92,12 @@ async function startPdfRendering(fileUrl: string) {
 const schema = new Schema({
     nodes: {
         // At the lowest level is text.
-        text: { inline: true },
+        text: {
+            group: "inline"
+        } as NodeSpec,
         // There are lines of text (recognized from words' bounding boxes)
         line: {
-            content: 'text*',
+            content: 'inline*',
             attrs: {
                 pageNum: {},
                 y1: {},
@@ -84,10 +106,23 @@ const schema = new Schema({
             isolating: true,
             toDOM: () => ["div", 0],
         },
+        heading: {
+            attrs: { level: { default: 1 } },
+            content: "inline*",
+            group: "block",
+            defining: true,
+            parseDOM: [{ tag: "h1", attrs: { level: 1 } },
+            { tag: "h2", attrs: { level: 2 } },
+            { tag: "h3", attrs: { level: 3 } },
+            { tag: "h4", attrs: { level: 4 } },
+            { tag: "h5", attrs: { level: 5 } },
+            { tag: "h6", attrs: { level: 6 } }],
+            toDOM(node) { return ["h" + node.attrs.level, 0] }
+        } as NodeSpec,
         chunk: {
             // Really should be line+, but ProseMirror doesn't like this:
             // https://discuss.prosemirror.net/t/why-only-non-generatable-nodes-in-a-required-position/6021
-            content: 'line*',
+            content: '(line|heading)*',
             attrs: {
                 label: { default: null },
             },
@@ -169,13 +204,21 @@ function startPm(fileUrl, parentNode: HTMLElement) {
     const state = EditorState.create({
         doc,
         plugins: [
-            history(),
-            keymap({ 'Mod-z': undo, 'Mod-y': redo, }),
-            keymap({
-                'Mod-b': toggleMark(schema.marks.strong),
-                'Mod-i': toggleMark(schema.marks.em),
-            }),
+            buildInputRules(schema),
+            keymap(buildKeymap(schema)),
             keymap(baseKeymap),
+            dropCursor(),
+            gapCursor(),
+            menuBar({
+                floating: true,
+                content: buildMenuItems(schema).fullMenu
+            }),
+            history(),
+            new Plugin({
+                props: {
+                    attributes: { class: "ProseMirror-example-setup-style" }
+                }
+            }),
             preventPagesDeletion,
         ],
     });
