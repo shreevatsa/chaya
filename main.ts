@@ -142,7 +142,7 @@ const schema = new Schema({
             content: '(line|heading)*',
             attrs: {
                 label: { default: null },
-                pageRanges: { default: null },
+                numChildren: { default: null },
             },
             toDOM(node) {
                 console.log('chunk todom');
@@ -192,10 +192,10 @@ function updateChunkAttrPlugin() {
                     step.getMap().forEach((oldStart, oldEnd, newStart, newEnd) => {
                         newState.doc.nodesBetween(newStart, newEnd, (node, pos) => {
                             if (node.type.name === "chunk") {
-                                const newAttrValue = combinedPageRanges(node);
-                                if (node.attrs.pageRanges !== newAttrValue) {
+                                const newAttrValue = node.childCount;
+                                if (node.attrs.numChildren !== newAttrValue) {
                                     if (!transactionToAppend) transactionToAppend = newState.tr;
-                                    transactionToAppend.setNodeAttribute(pos, 'pageRanges', newAttrValue);
+                                    transactionToAppend.setNodeAttribute(pos, 'numChildren', newAttrValue);
                                 }
                             }
                         });
