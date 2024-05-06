@@ -1,4 +1,4 @@
-import { EditorState, Plugin, Command } from 'prosemirror-state';
+import { EditorState, Plugin, Command, Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { Node, Schema, NodeSpec } from 'prosemirror-model';
 import { keymap } from 'prosemirror-keymap';
@@ -142,8 +142,7 @@ const schema = new Schema({
             content: '(line|heading)*',
             attrs: {
                 label: { default: null },
-                // Just a timestamp that can be updated to force re-render
-                lastUpdated: { default: null },
+                pageRanges: { default: null },
             },
             toDOM(node) {
                 console.log('chunk todom');
@@ -183,6 +182,30 @@ const schema = new Schema({
         em: basicSchema.spec.marks.get('em')!,
     }
 });
+
+function updateChunkAttrPlugin() {
+    return new Plugin({
+        appendTransaction(transactions, oldState, newState) {
+            let transactionToAppend: Transaction | null = null;
+            transactions.forEach(tx => {
+                tx.steps.forEach((step) => {
+                    step.getMap().forEach((oldStart, oldEnd, newStart, newEnd) => {
+                        newState.doc.nodesBetween(newStart, newEnd, (node, pos) => {
+                            if (node.type.name === "chunk") {
+                                const newAttrValue = combinedPageRanges(node);
+                                if (node.attrs.pageRanges !== newAttrValue) {
+                                    if (!transactionToAppend) transactionToAppend = newState.tr;
+                                    transactionToAppend.setNodeAttribute(pos, 'pageRanges', newAttrValue);
+                                }
+                            }
+                        });
+                    });
+                });
+            });
+            return transactionToAppend;
+        }
+    });
+}
 
 function startPm(fileUrl, parentNode: HTMLElement) {
     let pageNodes: Node[] = [];
@@ -242,6 +265,7 @@ function startPm(fileUrl, parentNode: HTMLElement) {
                 }
             }),
             // preventPagesDeletion,
+            updateChunkAttrPlugin(),
         ],
     });
     // Display the editor.
