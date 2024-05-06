@@ -5,6 +5,7 @@ import { keymap } from 'prosemirror-keymap';
 import { undo, redo, history } from 'prosemirror-history';
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { schema as basicSchema } from 'prosemirror-schema-basic';
+import 'prosemirror-view/style/prosemirror.css';
 
 import * as pdfjsLib from 'pdfjs-dist';
 // // Option 1: Works fine, but requires server to serve the other file.
