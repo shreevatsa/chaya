@@ -89,6 +89,20 @@ async function startPdfRendering(fileUrl: string) {
     }
 }
 
+// Merge the ranges of each "line" in chunk
+function combinedPageRanges(chunk: Node) {
+    const ranges = {};
+    for (let i = 0; i < chunk.childCount; ++i) {
+        const line: Node = chunk.child(i);
+        const pageNum = line.attrs.pageNum;
+        const empty = { y1: Number.POSITIVE_INFINITY, y2: Number.NEGATIVE_INFINITY };
+        const y1 = Math.min((ranges[pageNum] || empty).y1, parseInt(line.attrs.y1));
+        const y2 = Math.max((ranges[pageNum] || empty).y2, parseInt(line.attrs.y2));
+        ranges[pageNum] = { y1, y2 };
+    }
+    return ranges;
+}
+
 const schema = new Schema({
     nodes: {
         // At the lowest level is text.
@@ -104,7 +118,10 @@ const schema = new Schema({
                 y2: {},
             },
             isolating: true,
-            toDOM: () => ["div", 0],
+            toDOM: (node) => {
+                console.log('line todom');
+                return ["div", 0];
+            }
         },
         heading: {
             attrs: { level: { default: 1 } },
@@ -120,26 +137,30 @@ const schema = new Schema({
             toDOM(node) { return ["h" + node.attrs.level, 0] }
         } as NodeSpec,
         chunk: {
-            // Really should be line+, but ProseMirror doesn't like this:
+            // Really should be nonempty, but ProseMirror doesn't like this:
             // https://discuss.prosemirror.net/t/why-only-non-generatable-nodes-in-a-required-position/6021
             content: '(line|heading)*',
             attrs: {
                 label: { default: null },
+                // Just a timestamp that can be updated to force re-render
+                lastUpdated: { default: null },
             },
             toDOM(node) {
+                console.log('chunk todom');
                 const ret = document.createElement('div');
                 ret.classList.add('page');
-                // For now, just uses the first child
-                console.assert(node.childCount == 1, node.childCount);
-                for (let i = 0; i < node.childCount; ++i) {
-                    const line: Node = node.child(i);
+                console.assert(node.childCount > 0, node.childCount);
+                let pageRanges = combinedPageRanges(node);
+                for (let pageNum of Object.keys(pageRanges).map(Number).sort((a, b) => a - b)) {
+                    const { y1, y2 } = pageRanges[pageNum];
+                    console.log(`Page ${pageNum}: y1=${y1}, y2=${y2}`);
                     const foreground = document.createElement('div');
                     foreground.classList.add('page-image');
-                    foreground.dataset.pageNum = line.attrs.pageNum;
-                    console.assert(typeof pageImageUrl[line.attrs.pageNum] == 'string', line.attrs.pageNum, pageImageUrl[line.attrs.pageNum]);
-                    foreground.style.backgroundImage = `url("${pageImageUrl[line.attrs.pageNum]}")`;
-                    foreground.style.setProperty('--region-height', `${line.attrs.y2 - line.attrs.y1}px`);
-                    foreground.style.setProperty('--position-y', `${line.attrs.y1}px`);
+                    foreground.dataset.pageNum = pageNum.toString();
+                    console.assert(typeof pageImageUrl[pageNum] == 'string', pageNum, pageImageUrl[pageNum]);
+                    foreground.style.backgroundImage = `url("${pageImageUrl[pageNum]}")`;
+                    foreground.style.setProperty('--region-height', `${y2 - y1}px`);
+                    foreground.style.setProperty('--position-y', `${y1}px`);
                     ret.appendChild(foreground);
                 }
                 const contentPlaceholder = document.createElement('div');
@@ -184,7 +205,7 @@ function startPm(fileUrl, parentNode: HTMLElement) {
             function childPageNodes(node) {
                 const ret: number[] = [];
                 node.descendants(child => {
-                    if (child.type.name === 'page') {
+                    if (child.type.name === 'line') {
                         ret.push(child.attrs.pageNum);
                     }
                 });
@@ -193,11 +214,12 @@ function startPm(fileUrl, parentNode: HTMLElement) {
             function isEqual(array1: number[], array2: number[]) {
                 return array1.length == array2.length && array1.every((value, index) => value == array2[index]);
             }
-            // Check that the same page nodes are still present in any order
-            return isEqual(
+            // Check that the same line nodes are still present in any order
+            const ret = isEqual(
                 childPageNodes(state.doc.content).sort(),
                 childPageNodes(newState.doc.content).sort()
-            )
+            );
+            return ret;
         }
     });
 
@@ -219,7 +241,7 @@ function startPm(fileUrl, parentNode: HTMLElement) {
                     attributes: { class: "ProseMirror-example-setup-style" }
                 }
             }),
-            preventPagesDeletion,
+            // preventPagesDeletion,
         ],
     });
     // Display the editor.
