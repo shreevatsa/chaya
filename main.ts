@@ -95,6 +95,7 @@ function combinedPageRanges(chunk: Node) {
     for (let i = 0; i < chunk.childCount; ++i) {
         const line: Node = chunk.child(i);
         const pageNum = line.attrs.pageNum;
+        if (!pageNum) continue;
         const empty = { y1: Number.POSITIVE_INFINITY, y2: Number.NEGATIVE_INFINITY };
         const y1 = Math.min((ranges[pageNum] || empty).y1, parseInt(line.attrs.y1));
         const y2 = Math.max((ranges[pageNum] || empty).y2, parseInt(line.attrs.y2));
@@ -118,10 +119,7 @@ const schema = new Schema({
                 y2: {},
             },
             isolating: true,
-            toDOM: (node) => {
-                console.log('line todom');
-                return ["div", 0];
-            }
+            toDOM: () => ["div", 0],
         },
         heading: {
             attrs: { level: { default: 1 } },
@@ -142,10 +140,10 @@ const schema = new Schema({
             content: '(line|heading)*',
             attrs: {
                 label: { default: null },
+                // Just a hack to 
                 numChildren: { default: null },
             },
             toDOM(node) {
-                console.log('chunk todom');
                 const ret = document.createElement('div');
                 ret.classList.add('page');
                 console.assert(node.childCount > 0, node.childCount);
@@ -387,15 +385,23 @@ saveChaya.addEventListener('click', () => {
 // #endregion
 
 async function populateEditorFromChaya(file: File) {
+    saveChaya.innerText = 'Populating from saved file';
     const json = JSON.parse(await file.text());
     let doc = schema.nodeFromJSON(json);
-    for (let i = 0; i < doc.content.childCount; ++i) {
+    const numChunks = doc.content.childCount;
+
+    for (let i = 0; i < numChunks; ++i) {
+        saveChaya.innerText = `Adding chunk ${i} of ${numChunks}`;
         const chunk: Node = doc.content.child(i);
         // console.log(`Read child number ${i}: it is`, chunk);
         for (let j = 0; j < chunk.childCount; ++j) {
             const line = chunk.child(j);
-            console.log(`Chunk ${i} has page number ${line.attrs.pageNum}, with promise`, pagePromise[line.attrs.pageNum]);
-            await pagePromise[line.attrs.pageNum].promise;
+            console.log(`Chunk ${i} has page number ${line.attrs.pageNum}, currently ${saveChaya.innerText}`);
+            if (line.attrs.pageNum in pagePromise) {
+                await pagePromise[line.attrs.pageNum].promise;
+            } else {
+                console.error(`No page promise for pageNum`, line.attrs.pageNum, 'for', line, 'in', chunk);
+            }
         }
         const view = window['view'];
         const tr = view.state.tr;
