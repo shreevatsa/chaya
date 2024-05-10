@@ -16,15 +16,15 @@ import 'prosemirror-view/style/prosemirror.css';
 import 'prosemirror-example-setup/style/style.css';
 import "prosemirror-menu/style/menu.css";
 
-// Based on https://github.com/ProseMirror/prosemirror-example-setup/blob/master/src/inputrules.ts
-function buildInputRules(schema: Schema) {
-    let rules = smartQuotes.concat(ellipsis, emDash);
-    rules.push(textblockTypeInputRule(
-        /*regexp*/new RegExp("^(#{1,6})\\s$"),
-        /*nodeType*/schema.nodes.heading,
-        /*getAttrs*/match => ({ level: match[1].length })));
-    return inputRules({ rules });
-}
+// // Based on https://github.com/ProseMirror/prosemirror-example-setup/blob/master/src/inputrules.ts
+// function buildInputRules(schema: Schema) {
+//     let rules = smartQuotes.concat(ellipsis, emDash);
+//     rules.push(textblockTypeInputRule(
+//         /*regexp*/new RegExp("^(#{1,6})\\s$"),
+//         /*nodeType*/schema.nodes.heading,
+//         /*getAttrs*/match => ({ level: match[1].length })));
+//     return inputRules({ rules });
+// }
 
 
 import * as pdfjsLib from 'pdfjs-dist';
@@ -121,23 +121,23 @@ const schema = new Schema({
             isolating: true,
             toDOM: () => ["div", 0],
         },
-        heading: {
-            attrs: { level: { default: 1 } },
-            content: "inline*",
-            group: "block",
-            defining: true,
-            parseDOM: [{ tag: "h1", attrs: { level: 1 } },
-            { tag: "h2", attrs: { level: 2 } },
-            { tag: "h3", attrs: { level: 3 } },
-            { tag: "h4", attrs: { level: 4 } },
-            { tag: "h5", attrs: { level: 5 } },
-            { tag: "h6", attrs: { level: 6 } }],
-            toDOM(node) { return ["h" + node.attrs.level, 0] }
-        } as NodeSpec,
+        // heading: {
+        //     attrs: { level: { default: 1 } },
+        //     content: "inline*",
+        //     group: "block",
+        //     defining: true,
+        //     parseDOM: [{ tag: "h1", attrs: { level: 1 } },
+        //     { tag: "h2", attrs: { level: 2 } },
+        //     { tag: "h3", attrs: { level: 3 } },
+        //     { tag: "h4", attrs: { level: 4 } },
+        //     { tag: "h5", attrs: { level: 5 } },
+        //     { tag: "h6", attrs: { level: 6 } }],
+        //     toDOM(node) { return ["h" + node.attrs.level, 0] }
+        // } as NodeSpec,
         chunk: {
             // Really should be nonempty, but ProseMirror doesn't like this:
             // https://discuss.prosemirror.net/t/why-only-non-generatable-nodes-in-a-required-position/6021
-            content: '(line|heading)*',
+            content: 'line*',
             attrs: {
                 label: { default: null },
                 // Just a hack to 
@@ -247,7 +247,7 @@ function startPm(fileUrl, parentNode: HTMLElement) {
     const state = EditorState.create({
         doc,
         plugins: [
-            buildInputRules(schema),
+            // buildInputRules(schema),
             keymap(buildKeymap(schema)),
             keymap(baseKeymap),
             dropCursor(),
