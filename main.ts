@@ -1,13 +1,16 @@
 import { EditorState, Plugin, Command, Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { Node, Schema, NodeSpec, NodeType, Attrs } from 'prosemirror-model';
+import { Node, Schema, NodeSpec, NodeType, MarkType, Attrs } from 'prosemirror-model';
 import { keymap } from 'prosemirror-keymap';
 import { history } from 'prosemirror-history';
-import { baseKeymap } from 'prosemirror-commands';
+import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { schema as basicSchema } from 'prosemirror-schema-basic';
 import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
-import { menuBar } from "prosemirror-menu";
+import {
+    menuBar, wrapItem, blockTypeItem, Dropdown, DropdownSubmenu, joinUpItem, liftItem,
+    selectParentNodeItem, undoItem, redoItem, icons, MenuItem, MenuElement, MenuItemSpec
+} from "prosemirror-menu"
 import { inputRules, smartQuotes, emDash, ellipsis, undoInputRule, InputRule } from "prosemirror-inputrules";
 
 import { buildKeymap, buildMenuItems } from "prosemirror-example-setup";
@@ -260,6 +263,13 @@ function startPm(fileUrl, parentNode: HTMLElement) {
         }
     });
 
+    const menu = buildMenuItems(schema).fullMenu;
+    menu.push([new MenuItem({
+        run: saveFile,
+        title: 'Save the current .chaya file',
+        label: '💾'
+    })]);
+
     const state = EditorState.create({
         doc,
         plugins: [
@@ -270,7 +280,7 @@ function startPm(fileUrl, parentNode: HTMLElement) {
             gapCursor(),
             menuBar({
                 floating: true,
-                content: buildMenuItems(schema).fullMenu
+                content: menu
             }),
             history(),
             new Plugin({
@@ -389,7 +399,7 @@ form.addEventListener("submit", async event => {
 
 // Area 3: the save button
 const saveChaya = document.getElementById('saveChaya') as HTMLButtonElement;
-saveChaya.addEventListener('click', () => {
+function saveFile() {
     const content = JSON.stringify(window['view'].state.doc.toJSON(), null, 2);
     const a = document.createElement('a');
     const file = new Blob([content], { type: 'application/octet-stream' });
@@ -397,7 +407,8 @@ saveChaya.addEventListener('click', () => {
     a.download = `${pdfFileName}.chaya`;
     a.click();
     URL.revokeObjectURL(a.href);
-});
+}
+saveChaya.addEventListener('click', saveFile);
 // #endregion
 
 function zero() {
