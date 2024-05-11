@@ -265,22 +265,10 @@ function startPm(fileUrl, parentNode: HTMLElement) {
 
     // TODO: Replace both of these with the setting of a CSS variable
     function hidePageImages() {
-        showPageImages();
-        var stylesheet = document.styleSheets[0];
-        if (stylesheet) {
-            stylesheet.insertRule('.page-image { display: none; }');
-        }
+        document.documentElement.style.setProperty('--page-image-display', 'none');
     }
     function showPageImages() {
-        // Access the first stylesheet in the document
-        var stylesheet = document.styleSheets[0];
-        for (let index = 0; index < stylesheet.cssRules.length; ++index) {
-            const rule = stylesheet.cssRules[index];
-            if (rule.cssText == '.page-image { display: none; }') {
-                stylesheet.deleteRule(index);
-                --index;
-            }
-        }
+        document.documentElement.style.setProperty('--page-image-display', 'block');
     }
 
     const fooDropdown = new Dropdown(

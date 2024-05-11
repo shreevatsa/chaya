@@ -194,9 +194,11 @@
     :root {
       --img-zoom-factor: 1;
       --text-zoom-factor: 1;
+      --page-image-display: block;
     }
 
     div.page-image {
+      display: var(--page-image-display);
       width: calc(1000px * var(--img-zoom-factor));
       height: calc(var(--region-height) * var(--img-zoom-factor));
       background-position-y: calc(var(--position-y) * var(--img-zoom-factor) * -1);
