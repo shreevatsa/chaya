@@ -151,42 +151,30 @@ const schema = new Schema({
                 foreground.style.setProperty('--position-y', `${y1}px`);
                 ret.appendChild(foreground);
                 const contentPlaceholder = document.createElement('div');
-                contentPlaceholder.classList.add('page-contents');
+                contentPlaceholder.classList.add('line-contents');
                 ret.appendChild(contentPlaceholder);
                 return { dom: ret, contentDOM: contentPlaceholder };
             },
         },
-        // heading: {
-        //     attrs: { level: { default: 1 } },
-        //     content: "inline*",
-        //     group: "block",
-        //     defining: true,
-        //     parseDOM: [{ tag: "h1", attrs: { level: 1 } },
-        //     { tag: "h2", attrs: { level: 2 } },
-        //     { tag: "h3", attrs: { level: 3 } },
-        //     { tag: "h4", attrs: { level: 4 } },
-        //     { tag: "h5", attrs: { level: 5 } },
-        //     { tag: "h6", attrs: { level: 6 } }],
-        //     toDOM(node) { return ["h" + node.attrs.level, 0] }
-        // } as NodeSpec,
         chunk: {
             // Really should be nonempty, but ProseMirror doesn't like this:
             // https://discuss.prosemirror.net/t/why-only-non-generatable-nodes-in-a-required-position/6021
             content: 'line*',
             attrs: {
+                chunkType: { default: 'paragraph' },
                 // Just a hack / something to update when chunks join
                 numChildren: { default: null },
             },
             toDOM(node) {
                 const ret = document.createElement('div');
-                ret.classList.add('page');
+                ret.classList.add('chunk');
                 // console.assert(node.childCount > 0, node.childCount);
                 let pageRanges = combinedPageRanges(node);
                 for (let pageNum of Object.keys(pageRanges).map(Number).sort((a, b) => a - b)) {
                     const { y1, y2 } = pageRanges[pageNum];
                     // console.log(`Page ${pageNum}: y1=${y1}, y2=${y2}`);
                     const foreground = document.createElement('div');
-                    foreground.classList.add('page-image');
+                    foreground.classList.add('chunk-image');
                     foreground.dataset.pageNum = pageNum.toString();
                     console.assert(typeof pageImageUrl[pageNum] == 'string', pageNum, pageImageUrl[pageNum]);
                     foreground.style.backgroundImage = `url("${pageImageUrl[pageNum]}")`;
@@ -195,7 +183,7 @@ const schema = new Schema({
                     ret.appendChild(foreground);
                 }
                 const contentPlaceholder = document.createElement('div');
-                contentPlaceholder.classList.add('page-contents');
+                contentPlaceholder.classList.add('chunk-contents');
                 ret.appendChild(contentPlaceholder);
                 return { dom: ret, contentDOM: contentPlaceholder };
             },
@@ -266,6 +254,24 @@ const joinChunks: Command = (state, dispatch) => {
     return false;
 };
 
+const setChunkType: (chunkType: string) => Command = (chunkType: string) => ((state, dispatch) => {
+    // Avoid having to decide when selection spans multiple chunks.
+    // TODO: Replace with check for whether start and end are in the same chunk.
+    if (!state.selection.empty) return false;
+    const chunk = state.selection.$anchor.node(1);
+    // TODO: Is this safe? Seems to work (.start(1) is the position of the line, so -1).
+    const pos = state.selection.$anchor.start(1) - 1;
+    console.log(`Obtained a chunk node:`, chunk, 'at position', pos);
+    if (dispatch) {
+        console.log(`Setting chunkType to ${chunkType}`);
+        const tr = state.tr.setNodeAttribute(pos, 'chunkType', chunkType);
+        dispatch(tr);
+        return true;
+    }
+    return false;
+});
+
+
 function startPm(fileUrl, parentNode: HTMLElement) {
     let pageNodes: Node[] = [];
     const doc: Node = schema.nodes.doc.createChecked(
@@ -307,15 +313,15 @@ function startPm(fileUrl, parentNode: HTMLElement) {
 
     // TODO: Replace both of these with the setting of a CSS variable
     function hidePageImages() {
-        document.documentElement.style.setProperty('--page-image-display', 'none');
+        document.documentElement.style.setProperty('--chunk-image-display', 'none');
         document.documentElement.style.setProperty('--line-image-display', 'none');
     }
     function showChunkImages() {
-        document.documentElement.style.setProperty('--page-image-display', 'block');
+        document.documentElement.style.setProperty('--chunk-image-display', 'block');
         document.documentElement.style.setProperty('--line-image-display', 'none');
     }
     function showLineImages() {
-        document.documentElement.style.setProperty('--page-image-display', 'none');
+        document.documentElement.style.setProperty('--chunk-image-display', 'none');
         document.documentElement.style.setProperty('--line-image-display', 'block');
     }
 
@@ -340,6 +346,14 @@ function startPm(fileUrl, parentNode: HTMLElement) {
         title: 'Join selected chunks together',
         label: '⇥⇤'
     })]);
+    menu.push([new Dropdown(
+        [
+            new MenuItem({ label: 'Paragraph', run: setChunkType('paragraph') }),
+            new MenuItem({ label: 'Verse', run: setChunkType('verse') }),
+            new MenuItem({ label: 'Heading', run: setChunkType('heading') }),
+        ],
+        { label: "Region type" },
+    )]);
 
     const state = EditorState.create({
         doc,

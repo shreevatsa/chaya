@@ -170,40 +170,41 @@
     .ProseMirror {
       padding: 4px 8px;
       height: 100%;
-
+      font-size: calc(20px * var(--text-zoom-factor));
     }
 
-    .page {
+    .chunk {
       display: flex;
       flex-wrap: wrap;
       border: 3px solid black;
     }
 
     .line {
-      display: flex;
+      display: inline-flex;
       flex-wrap: wrap;
+      /* Padding between consecutive lines when they occur next to each other */
+      padding-right: 1ex;
     }
 
-    .page-image {
+    .chunk-image,
+    .line-image {
       outline: 1px dotted green;
     }
 
-    .page-contents {
-      /* outline: 1px dotted blue; */
+    .chunk-contents {
       margin: 5px;
       min-width: 30em;
-      /* flex-grow: 1; */
+      flex-grow: 1;
     }
-  </style>
-  <style>
+
     :root {
       --img-zoom-factor: 1;
       --text-zoom-factor: 1;
-      --page-image-display: block;
+      --chunk-image-display: block;
       --line-image-display: none;
     }
 
-    div.page-image,
+    div.chunk-image,
     div.line-image {
       width: calc(1000px * var(--img-zoom-factor));
       height: calc(var(--region-height) * var(--img-zoom-factor));
@@ -213,16 +214,12 @@
       transition: width 0.3s ease;
     }
 
-    div.page-image {
-      display: var(--page-image-display);
+    div.chunk-image {
+      display: var(--chunk-image-display);
     }
 
     div.line-image {
       display: var(--line-image-display);
-    }
-
-    .ProseMirror {
-      font-size: calc(20px * var(--text-zoom-factor));
     }
   </style>
 </head>
