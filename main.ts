@@ -1,6 +1,6 @@
 import { EditorState, Plugin, Command, Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { Node, Schema, NodeSpec } from 'prosemirror-model';
+import { Node, Schema, NodeSpec, NodeType, Attrs } from 'prosemirror-model';
 import { keymap } from 'prosemirror-keymap';
 import { history } from 'prosemirror-history';
 import { baseKeymap } from 'prosemirror-commands';
@@ -8,13 +8,29 @@ import { schema as basicSchema } from 'prosemirror-schema-basic';
 import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
 import { menuBar } from "prosemirror-menu";
-import { inputRules, textblockTypeInputRule, smartQuotes, emDash, ellipsis, undoInputRule } from "prosemirror-inputrules";
+import { inputRules, smartQuotes, emDash, ellipsis, undoInputRule, InputRule } from "prosemirror-inputrules";
 
 import { buildKeymap, buildMenuItems } from "prosemirror-example-setup";
 
 import 'prosemirror-view/style/prosemirror.css';
 import 'prosemirror-example-setup/style/style.css';
 import "prosemirror-menu/style/menu.css";
+
+// Based on https://github.com/ProseMirror/prosemirror-inputrules/blob/8433778a3ce4e45c0188341b72fd71da3a440b5b/src/rulebuilders.ts#L46
+function textblockTypeInputRule(
+    regexp: RegExp,
+    nodeType: NodeType,
+    getAttrs: Attrs | null | ((match: RegExpMatchArray) => Attrs | null) = null
+) {
+    return new InputRule(regexp, (state, match, start, end) => {
+        let $start = state.doc.resolve(start)
+        let attrs = getAttrs instanceof Function ? getAttrs(match) : getAttrs
+        if (!$start.node(-1).canReplaceWith($start.index(-1), $start.indexAfter(-1), nodeType)) return null
+        return state.tr
+            .delete(start, end)
+            .setBlockType(start, start, nodeType, attrs)
+    })
+}
 
 // // Based on https://github.com/ProseMirror/prosemirror-example-setup/blob/master/src/inputrules.ts
 // function buildInputRules(schema: Schema) {
@@ -384,14 +400,21 @@ saveChaya.addEventListener('click', () => {
 });
 // #endregion
 
+function zero() {
+    return new Promise(resolve => setTimeout(resolve, 0));
+}
+
 async function populateEditorFromChaya(file: File) {
-    saveChaya.innerText = 'Populating from saved file';
+    saveChaya.innerText = 'Parsing saved file...';
     const json = JSON.parse(await file.text());
+    saveChaya.innerText = 'Creating schema...';
     let doc = schema.nodeFromJSON(json);
+    await zero();
     const numChunks = doc.content.childCount;
 
     for (let i = 0; i < numChunks; ++i) {
         saveChaya.innerText = `Adding chunk ${i} of ${numChunks}`;
+        await zero();
         const chunk: Node = doc.content.child(i);
         // console.log(`Read child number ${i}: it is`, chunk);
         for (let j = 0; j < chunk.childCount; ++j) {
