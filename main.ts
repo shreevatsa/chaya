@@ -1,6 +1,6 @@
 import { EditorState, Plugin, Command, Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { Node, Schema, NodeSpec, NodeType, MarkType, Attrs } from 'prosemirror-model';
+import { Node, Schema, NodeSpec, NodeType, MarkType, Attrs, Fragment, Slice } from 'prosemirror-model';
 import { keymap } from 'prosemirror-keymap';
 import { history } from 'prosemirror-history';
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
@@ -174,8 +174,7 @@ const schema = new Schema({
             // https://discuss.prosemirror.net/t/why-only-non-generatable-nodes-in-a-required-position/6021
             content: 'line*',
             attrs: {
-                label: { default: null },
-                // Just a hack to 
+                // Just a hack / something to update when chunks join
                 numChildren: { default: null },
             },
             toDOM(node) {
@@ -185,7 +184,7 @@ const schema = new Schema({
                 let pageRanges = combinedPageRanges(node);
                 for (let pageNum of Object.keys(pageRanges).map(Number).sort((a, b) => a - b)) {
                     const { y1, y2 } = pageRanges[pageNum];
-                    console.log(`Page ${pageNum}: y1=${y1}, y2=${y2}`);
+                    // console.log(`Page ${pageNum}: y1=${y1}, y2=${y2}`);
                     const foreground = document.createElement('div');
                     foreground.classList.add('page-image');
                     foreground.dataset.pageNum = pageNum.toString();
@@ -239,6 +238,33 @@ function updateChunkAttrPlugin() {
         }
     });
 }
+
+const joinChunks: Command = (state, dispatch) => {
+    const { from, to } = state.selection;
+    let allLines: Node[] = [];
+    let firstChunkStart: number | null = null;
+    let lastChunkEnd: number | null = null;
+    state.doc.nodesBetween(from, to, (node, pos) => {
+        if (node.type.name === 'chunk') {
+            if (firstChunkStart === null) {
+                firstChunkStart = pos;
+            }
+            lastChunkEnd = pos + node.nodeSize;
+            for (let i = 0; i < node.childCount; ++i) {
+                allLines.push(node.child(i));
+            }
+        }
+    });
+    if (dispatch && firstChunkStart !== null && lastChunkEnd !== null) {
+        const newChunk = state.schema.nodes.chunk.create(null, allLines);
+        const fragment = Fragment.from(newChunk);
+        const slice = new Slice(fragment, 0, 0);  // a slice with no open start or end
+        const tr = state.tr.replaceRange(firstChunkStart, lastChunkEnd, slice);
+        dispatch(tr);
+        return true;
+    }
+    return false;
+};
 
 function startPm(fileUrl, parentNode: HTMLElement) {
     let pageNodes: Node[] = [];
@@ -309,6 +335,11 @@ function startPm(fileUrl, parentNode: HTMLElement) {
     )]);
     // Keep this at the end because the "selectParentNode" comes and goes.
     menu.push(...buildMenuItems(schema).fullMenu);
+    menu.push([new MenuItem({
+        run: joinChunks,
+        title: 'Join selected chunks together',
+        label: '⇥⇤'
+    })]);
 
     const state = EditorState.create({
         doc,
