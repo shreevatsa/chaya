@@ -138,7 +138,6 @@ const schema = new Schema({
                 y2: {},
             },
             isolating: true,
-            toDOM0: () => ["div", 0],
             toDOM(node) {
                 const ret = document.createElement('div');
                 ret.classList.add('line');
@@ -182,7 +181,7 @@ const schema = new Schema({
             toDOM(node) {
                 const ret = document.createElement('div');
                 ret.classList.add('page');
-                console.assert(node.childCount > 0, node.childCount);
+                // console.assert(node.childCount > 0, node.childCount);
                 let pageRanges = combinedPageRanges(node);
                 for (let pageNum of Object.keys(pageRanges).map(Number).sort((a, b) => a - b)) {
                     const { y1, y2 } = pageRanges[pageNum];
@@ -294,22 +293,22 @@ function startPm(fileUrl, parentNode: HTMLElement) {
         document.documentElement.style.setProperty('--line-image-display', 'block');
     }
 
-    const fooDropdown = new Dropdown(
+    const menu: MenuElement[][] = [];
+    menu.push([new MenuItem({
+        run: saveFile,
+        title: 'Save the current .chaya file',
+        label: '💾'
+    })]);
+    menu.push([new Dropdown(
         [
             new MenuItem({ label: 'No images (reading mode)', run: hidePageImages }),
             new MenuItem({ label: 'Chunk by chunk (default)', run: showChunkImages }),
             new MenuItem({ label: 'Line by line (for re-editing)', run: showLineImages }),
         ],
         { label: "Images" }
-    );
-    const menu: MenuElement[][] = [];
-    menu.push([fooDropdown]);
+    )]);
+    // Keep this at the end because the "selectParentNode" comes and goes.
     menu.push(...buildMenuItems(schema).fullMenu);
-    menu.push([new MenuItem({
-        run: saveFile,
-        title: 'Save the current .chaya file',
-        label: '💾'
-    })]);
 
     const state = EditorState.create({
         doc,
