@@ -263,7 +263,37 @@ function startPm(fileUrl, parentNode: HTMLElement) {
         }
     });
 
-    const menu = buildMenuItems(schema).fullMenu;
+    // TODO: Replace both of these with the setting of a CSS variable
+    function hidePageImages() {
+        showPageImages();
+        var stylesheet = document.styleSheets[0];
+        if (stylesheet) {
+            stylesheet.insertRule('.page-image { display: none; }');
+        }
+    }
+    function showPageImages() {
+        // Access the first stylesheet in the document
+        var stylesheet = document.styleSheets[0];
+        for (let index = 0; index < stylesheet.cssRules.length; ++index) {
+            const rule = stylesheet.cssRules[index];
+            if (rule.cssText == '.page-image { display: none; }') {
+                stylesheet.deleteRule(index);
+                --index;
+            }
+        }
+    }
+
+    const fooDropdown = new Dropdown(
+        [
+            new MenuItem({ label: 'No images (reading mode)', run: hidePageImages }),
+            new MenuItem({ label: 'Chunk by chunk (default)', run: showPageImages }),
+            new MenuItem({ label: 'Line by line (for re-editing) (not implemented)', run: () => { } }),
+        ],
+        { label: "Images" }
+    );
+    const menu: MenuElement[][] = [];
+    menu.push([fooDropdown]);
+    menu.push(...buildMenuItems(schema).fullMenu);
     menu.push([new MenuItem({
         run: saveFile,
         title: 'Save the current .chaya file',
