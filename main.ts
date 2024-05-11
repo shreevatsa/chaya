@@ -138,7 +138,24 @@ const schema = new Schema({
                 y2: {},
             },
             isolating: true,
-            toDOM: () => ["div", 0],
+            toDOM0: () => ["div", 0],
+            toDOM(node) {
+                const ret = document.createElement('div');
+                ret.classList.add('line');
+                const { pageNum, y1, y2 } = node.attrs;
+                const foreground = document.createElement('div');
+                foreground.classList.add('line-image');
+                foreground.dataset.pageNum = pageNum.toString();
+                console.assert(typeof pageImageUrl[pageNum] == 'string', pageNum, pageImageUrl[pageNum]);
+                foreground.style.backgroundImage = `url("${pageImageUrl[pageNum]}")`;
+                foreground.style.setProperty('--region-height', `${y2 - y1}px`);
+                foreground.style.setProperty('--position-y', `${y1}px`);
+                ret.appendChild(foreground);
+                const contentPlaceholder = document.createElement('div');
+                contentPlaceholder.classList.add('page-contents');
+                ret.appendChild(contentPlaceholder);
+                return { dom: ret, contentDOM: contentPlaceholder };
+            },
         },
         // heading: {
         //     attrs: { level: { default: 1 } },
@@ -266,16 +283,22 @@ function startPm(fileUrl, parentNode: HTMLElement) {
     // TODO: Replace both of these with the setting of a CSS variable
     function hidePageImages() {
         document.documentElement.style.setProperty('--page-image-display', 'none');
+        document.documentElement.style.setProperty('--line-image-display', 'none');
     }
-    function showPageImages() {
+    function showChunkImages() {
         document.documentElement.style.setProperty('--page-image-display', 'block');
+        document.documentElement.style.setProperty('--line-image-display', 'none');
+    }
+    function showLineImages() {
+        document.documentElement.style.setProperty('--page-image-display', 'none');
+        document.documentElement.style.setProperty('--line-image-display', 'block');
     }
 
     const fooDropdown = new Dropdown(
         [
             new MenuItem({ label: 'No images (reading mode)', run: hidePageImages }),
-            new MenuItem({ label: 'Chunk by chunk (default)', run: showPageImages }),
-            new MenuItem({ label: 'Line by line (for re-editing) (not implemented)', run: () => { } }),
+            new MenuItem({ label: 'Chunk by chunk (default)', run: showChunkImages }),
+            new MenuItem({ label: 'Line by line (for re-editing)', run: showLineImages }),
         ],
         { label: "Images" }
     );

@@ -179,6 +179,11 @@
       border: 3px solid black;
     }
 
+    .line {
+      display: flex;
+      flex-wrap: wrap;
+    }
+
     .page-image {
       outline: 1px dotted green;
     }
@@ -195,16 +200,25 @@
       --img-zoom-factor: 1;
       --text-zoom-factor: 1;
       --page-image-display: block;
+      --line-image-display: none;
     }
 
-    div.page-image {
-      display: var(--page-image-display);
+    div.page-image,
+    div.line-image {
       width: calc(1000px * var(--img-zoom-factor));
       height: calc(var(--region-height) * var(--img-zoom-factor));
       background-position-y: calc(var(--position-y) * var(--img-zoom-factor) * -1);
       background-size: calc(1000px * var(--img-zoom-factor)) auto;
       background-repeat: no-repeat;
       transition: width 0.3s ease;
+    }
+
+    div.page-image {
+      display: var(--page-image-display);
+    }
+
+    div.line-image {
+      display: var(--line-image-display);
     }
 
     .ProseMirror {
