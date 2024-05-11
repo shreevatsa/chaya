@@ -16,31 +16,31 @@ import 'prosemirror-view/style/prosemirror.css';
 import 'prosemirror-example-setup/style/style.css';
 import "prosemirror-menu/style/menu.css";
 
-// Based on https://github.com/ProseMirror/prosemirror-inputrules/blob/8433778a3ce4e45c0188341b72fd71da3a440b5b/src/rulebuilders.ts#L46
-function textblockTypeInputRule(
-    regexp: RegExp,
-    nodeType: NodeType,
-    getAttrs: Attrs | null | ((match: RegExpMatchArray) => Attrs | null) = null
-) {
-    return new InputRule(regexp, (state, match, start, end) => {
-        let $start = state.doc.resolve(start)
-        let attrs = getAttrs instanceof Function ? getAttrs(match) : getAttrs
-        if (!$start.node(-1).canReplaceWith($start.index(-1), $start.indexAfter(-1), nodeType)) return null
-        return state.tr
-            .delete(start, end)
-            .setBlockType(start, start, nodeType, attrs)
-    })
-}
-
-// // Based on https://github.com/ProseMirror/prosemirror-example-setup/blob/master/src/inputrules.ts
-// function buildInputRules(schema: Schema) {
-//     let rules = smartQuotes.concat(ellipsis, emDash);
-//     rules.push(textblockTypeInputRule(
-//         /*regexp*/new RegExp("^(#{1,6})\\s$"),
-//         /*nodeType*/schema.nodes.heading,
-//         /*getAttrs*/match => ({ level: match[1].length })));
-//     return inputRules({ rules });
+// // Based on https://github.com/ProseMirror/prosemirror-inputrules/blob/8433778a3ce4e45c0188341b72fd71da3a440b5b/src/rulebuilders.ts#L46
+// function textblockTypeInputRule(
+//     regexp: RegExp,
+//     nodeType: NodeType,
+//     getAttrs: Attrs | null | ((match: RegExpMatchArray) => Attrs | null) = null
+// ) {
+//     return new InputRule(regexp, (state, match, start, end) => {
+//         let $start = state.doc.resolve(start)
+//         let attrs = getAttrs instanceof Function ? getAttrs(match) : getAttrs
+//         if (!$start.node(-1).canReplaceWith($start.index(-1), $start.indexAfter(-1), nodeType)) return null
+//         return state.tr
+//             .delete(start, end)
+//             .setBlockType(start, start, nodeType, attrs)
+//     })
 // }
+
+// Based on https://github.com/ProseMirror/prosemirror-example-setup/blob/master/src/inputrules.ts
+function buildInputRules(schema: Schema) {
+    let rules = smartQuotes.concat(ellipsis, emDash);
+    // rules.push(textblockTypeInputRule(
+    //     /*regexp*/new RegExp("^(#{1,6})\\s$"),
+    //     /*nodeType*/schema.nodes.heading,
+    //     /*getAttrs*/match => ({ level: match[1].length })));
+    return inputRules({ rules });
+}
 
 
 import * as pdfjsLib from 'pdfjs-dist';
@@ -263,7 +263,7 @@ function startPm(fileUrl, parentNode: HTMLElement) {
     const state = EditorState.create({
         doc,
         plugins: [
-            // buildInputRules(schema),
+            buildInputRules(schema),
             keymap(buildKeymap(schema)),
             keymap(baseKeymap),
             dropCursor(),
