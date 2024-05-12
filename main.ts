@@ -168,6 +168,9 @@ const schema = new Schema({
             toDOM(node) {
                 const ret = document.createElement('div');
                 ret.classList.add('chunk');
+                const images = document.createElement('div');
+                images.classList.add('chunk-images');
+                ret.appendChild(images);
                 // console.assert(node.childCount > 0, node.childCount);
                 let pageRanges = combinedPageRanges(node);
                 for (let pageNum of Object.keys(pageRanges).map(Number).sort((a, b) => a - b)) {
@@ -180,7 +183,7 @@ const schema = new Schema({
                     foreground.style.backgroundImage = `url("${pageImageUrl[pageNum]}")`;
                     foreground.style.setProperty('--region-height', `${y2 - y1}px`);
                     foreground.style.setProperty('--position-y', `${y1}px`);
-                    ret.appendChild(foreground);
+                    images.appendChild(foreground);
                 }
                 const contentPlaceholder = document.createElement('div');
                 contentPlaceholder.classList.add('chunk-contents');
