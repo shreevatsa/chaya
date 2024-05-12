@@ -168,6 +168,7 @@ const schema = new Schema({
             toDOM(node) {
                 const ret = document.createElement('div');
                 ret.classList.add('chunk');
+                ret.classList.add(`chunk-type-${node.attrs.chunkType}`);
                 const images = document.createElement('div');
                 images.classList.add('chunk-images');
                 ret.appendChild(images);
