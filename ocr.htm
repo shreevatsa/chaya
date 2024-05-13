@@ -237,21 +237,24 @@
 
     .chunk-contents {
       margin: 5px;
-      min-width: 30em;
+      /* min-width makes it scroll too far to the right */
+      min-width: 0;
       flex-grow: 1;
     }
 
     :root {
-      --img-zoom-factor: 1;
+      --img-zoom-factor: 0.6;
       --text-zoom-factor: 1;
+      /* TODO: Any value other than 1000px doesn't work :-) */
+      --default-width: 1000px;
     }
 
     div.chunk-image,
     div.line-image {
-      width: calc(1000px * var(--img-zoom-factor));
+      width: calc(var(--default-width) * var(--img-zoom-factor));
       height: calc(var(--region-height) * var(--img-zoom-factor));
       background-position-y: calc(var(--position-y) * var(--img-zoom-factor) * -1);
-      background-size: calc(1000px * var(--img-zoom-factor)) auto;
+      background-size: calc(var(--default-width) * var(--img-zoom-factor)) auto;
       background-repeat: no-repeat;
       transition: width 0.3s ease;
     }

@@ -90,9 +90,13 @@ async function startPdfRendering(fileUrl: string) {
         // Render page onto canvas
         const viewport = page.getViewport({ scale: 1 });
         const canvas = document.createElement('canvas');
+        // const widthProperty = getComputedStyle(document.documentElement).getPropertyValue('--default-width');
+        // const desiredWidth = parseInt(widthProperty);
+        //console.log(`Got width ${widthProperty} parsed as ${desiredWidth}`);
         const desiredWidth = 1000;
         canvas.width = desiredWidth;
         canvas.height = (desiredWidth / viewport.width) * viewport.height;
+        // console.log(`canvas: ${canvas.width} x ${canvas.height}, viewport: ${viewport.width} x ${viewport.height}`);
         const renderContext = {
             canvasContext: canvas.getContext('2d')!,
             viewport: page.getViewport({ scale: desiredWidth / viewport.width }),
