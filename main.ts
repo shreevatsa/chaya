@@ -315,20 +315,9 @@ function startPm(fileUrl, parentNode: HTMLElement) {
         }
     });
 
-    // TODO: Replace both of these with the setting of a CSS variable
-    function hidePageImages() {
-        document.documentElement.style.setProperty('--chunk-image-display', 'none');
-        document.documentElement.style.setProperty('--line-image-display', 'none');
-    }
-    function showChunkImages() {
-        document.documentElement.style.setProperty('--chunk-image-display', 'block');
-        document.documentElement.style.setProperty('--line-image-display', 'none');
-    }
-    function showLineImages() {
-        document.documentElement.style.setProperty('--chunk-image-display', 'none');
-        document.documentElement.style.setProperty('--line-image-display', 'block');
-    }
-
+    const setImageViewOption = (value: number) => () => {
+        document.getElementById('docView')!.setAttribute('data-image-view-mode', value.toString());
+    };
     const menu: MenuElement[][] = [];
     menu.push([new MenuItem({
         run: saveFile,
@@ -337,9 +326,11 @@ function startPm(fileUrl, parentNode: HTMLElement) {
     })]);
     menu.push([new Dropdown(
         [
-            new MenuItem({ label: 'No images (reading mode)', run: hidePageImages }),
-            new MenuItem({ label: 'Chunk by chunk (default)', run: showChunkImages }),
-            new MenuItem({ label: 'Line by line (for re-editing)', run: showLineImages }),
+            new MenuItem({ label: 'None (reading mode)', run: setImageViewOption(0) }),
+            new MenuItem({ label: 'Beside text (chunk by chunk)', run: setImageViewOption(1) }),
+            new MenuItem({ label: 'Beside text (line by line)', run: setImageViewOption(2) }),
+            new MenuItem({ label: 'Above text (chunk by chunk)', run: setImageViewOption(3) }),
+            new MenuItem({ label: 'Above text (line by line)', run: setImageViewOption(4) }),
         ],
         { label: "Images" }
     )]);
