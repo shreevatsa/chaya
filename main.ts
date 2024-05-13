@@ -68,6 +68,8 @@ let pageCanvas: HTMLCanvasElement[] = [];
 let pageImageUrl: string[] = [];
 let pageHeight: number[] = [];
 
+let isDirty = false;
+
 function newUnresolved() {
     let resolve;
     let promise = new Promise((res, rej) => {
@@ -235,6 +237,24 @@ function updateChunkAttrPlugin() {
     });
 }
 
+const unsavedChangesPlugin = new Plugin({
+    appendTransaction(transactions, oldState, newState) {
+        for (let transaction of transactions) {
+            if (transaction.docChanged) {
+                isDirty = true;
+                break;
+            }
+        }
+        // Nothing to append
+        return null;
+    }
+});
+window.addEventListener("beforeunload", (event) => {
+    if (isDirty) {
+        event.preventDefault();
+    }
+});
+
 const joinChunks: Command = (state, dispatch) => {
     const { from, to } = state.selection;
     let allLines: Node[] = [];
@@ -374,6 +394,7 @@ function startPm(fileUrl, parentNode: HTMLElement) {
             }),
             // preventPagesDeletion,
             updateChunkAttrPlugin(),
+            unsavedChangesPlugin,
         ],
     });
     // Display the editor.
@@ -491,6 +512,7 @@ function saveFile() {
     a.download = `${pdfFileName}.chaya`;
     a.click();
     URL.revokeObjectURL(a.href);
+    isDirty = false;
 }
 saveChaya.addEventListener('click', saveFile);
 // #endregion
