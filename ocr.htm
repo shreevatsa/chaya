@@ -207,6 +207,7 @@
     #docView[data-image-view-mode="4"] .chunk-image { display: none; }
     #docView[data-image-view-mode="4"] .line-image { display: block; }
     #docView[data-image-view-mode="4"] .line { display: block; }
+    #docView[data-image-view-mode="4"] .chunk.chunk-type-verse .line { display: block; }
 
     .chunk {
       border: 3px solid black;
@@ -220,7 +221,11 @@
       flex-grow: 1;
     }
 
-    .chunk.chunk-type-verse .line {
+    #docView .chunk.chunk-type-verse .line {
+      display: flex;
+      justify-content: center;
+    }
+    #docView .chunk.chunk-type-verse .line-contents {
       display: flex;
       justify-content: center;
     }
@@ -240,6 +245,7 @@
       margin: 5px;
       /* min-width makes it scroll too far to the right */
       min-width: 0;
+      max-width: 60em;
       flex-grow: 1;
     }
 
