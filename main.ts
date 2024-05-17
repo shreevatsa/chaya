@@ -505,6 +505,10 @@ form.addEventListener("submit", async event => {
 // Area 3: the save button
 const saveChaya = document.getElementById('saveChaya') as HTMLButtonElement;
 function saveFile() {
+    if (saveChaya.classList.contains('disabled')) {
+        alert(`Cannot save yet. Current status is: ${saveChaya.innerText}`);
+        return;
+    }
     const content = JSON.stringify(window['view'].state.doc.toJSON(), null, 2);
     const a = document.createElement('a');
     const file = new Blob([content], { type: 'application/octet-stream' });
