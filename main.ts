@@ -611,7 +611,7 @@ function addLinesFromWords(words: Word[], pageNum: number) {
     }
     console.log('lines before merging', lines);
     // Whether any word in line i overlaps with line j.
-    function overlap(i, j) {
+    function overlap(i, j, before?) {
         const jmin = Math.min(...lines[j].map(word => word.ymin));
         const jmax = Math.max(...lines[j].map(word => word.ymax));
         for (let word of lines[i]) {
@@ -620,6 +620,12 @@ function addLinesFromWords(words: Word[], pageNum: number) {
                 return true;
             }
         }
+        // Does box j occur *above* box i?
+        if (before) {
+            const imin = Math.min(...lines[i].map(word => word.ymin));
+            const imax = Math.max(...lines[i].map(word => word.ymax));
+            if (jmin < imin || jmax < imax) return true;
+        }
     }
 
     // Merge lines that overlap
@@ -627,17 +633,9 @@ function addLinesFromWords(words: Word[], pageNum: number) {
         // Adjacent lines that overlap
         for (let j = 1; j < lines.length; ++j) {
             const i = j - 1;
-            if (overlap(i, j) || overlap(j, i)) {
+            if (overlap(i, j, true) || overlap(j, i)) {
                 lines = [...lines.slice(0, i), [...lines[i], ...lines[j]], ...lines.slice(j + 1)];
                 continue outerLoop; // goto
-            }
-        }
-        // Try two apart, just in case
-        for (let i = 0; i < lines.length - 2; ++i) {
-            const j = i + 2;
-            if (overlap(i, j) || overlap(j, i)) {
-                lines = [...lines.slice(0, i), [...lines[i], ...lines[i + 1], ...lines[j]], ...lines.slice(j + 1)];
-                continue outerLoop;
             }
         }
         break;
@@ -759,7 +757,7 @@ async function populateEditorFromGoogleOcr(pdf: pdfjsLib.PDFDocumentProxy, apiKe
                 ymax: Math.max(...box.vertices.map(({ y: v }) => v)),
             });
         }
-        const text = ocrResponse.fullTextAnnotation.text;
+        // const text = ocrResponse.fullTextAnnotation.text;
         addLinesFromWords(words, i);
     }
 }
