@@ -1,7 +1,7 @@
 node_modules/
-index.html
-main.js
-main.js.map
-main.css
-main.css.map
-meta.json
+/index.html
+/main.js
+/main.js.map
+/main.css
+/main.css.map
+/meta.json
