@@ -142,7 +142,9 @@ const schema = new Schema({
                 pageNum: {},
                 y1: {},
                 y2: {},
+                words: { default: [] },
             },
+            // Seems to help guard against accidental deletion, but need to think more.
             isolating: true,
             toDOM(node) {
                 const ret = document.createElement('div');
@@ -650,6 +652,7 @@ function addLinesFromWords(words: Word[], pageNum: number) {
         text: line.map(word => word.text).join(' '),
         y1: Math.min(...line.map(word => word.ymin)),
         y2: Math.max(...line.map(word => word.ymax)),
+        words: line
     }));
 
     // Distribute all the "missing" y-coordinates.
@@ -674,6 +677,7 @@ function addLinesFromWords(words: Word[], pageNum: number) {
         pageNum: pageNum,
         y1: line.y1,
         y2: line.y2,
+        words: line.words,
     }, schema.text(line.text)));
 
     // Insert each line.
