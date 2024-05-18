@@ -578,7 +578,7 @@ async function addLinesFromWords(words: Word[], pageNum: number) {
     highlightedCtx.fillRect(0, 0, highlightedCanvas.width, highlightedCanvas.height);
     highlightedCtx.globalAlpha = 1; // Reset opacity
     // Restore the original image in the regions corresponding to the words
-    const eps = 0; // Math.min(originalCanvas.width, originalCanvas.height) / 1e4;
+    const eps = Math.min(originalCanvas.width, originalCanvas.height) * 2e-3;
     words.forEach(word => {
         highlightedCtx.drawImage(
             originalCanvas,
