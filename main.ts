@@ -565,7 +565,36 @@ type Word = {
     ymax: number;
 };
 
-function addLinesFromWords(words: Word[], pageNum: number) {
+async function addLinesFromWords(words: Word[], pageNum: number) {
+    const originalCanvas = pageCanvas[pageNum];
+    const highlightedCanvas = document.createElement('canvas');
+    highlightedCanvas.width = originalCanvas.width;
+    highlightedCanvas.height = originalCanvas.height;
+    const highlightedCtx = highlightedCanvas.getContext('2d')!;
+    // Draw the dimmed original image on the highlighted canvas
+    highlightedCtx.drawImage(originalCanvas, 0, 0);
+    highlightedCtx.globalAlpha = 0.5; // Change opacity to dim the image
+    highlightedCtx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // Change color if needed
+    highlightedCtx.fillRect(0, 0, highlightedCanvas.width, highlightedCanvas.height);
+    highlightedCtx.globalAlpha = 1; // Reset opacity
+    // Restore the original image in the regions corresponding to the words
+    const eps = 0; // Math.min(originalCanvas.width, originalCanvas.height) / 1e4;
+    words.forEach(word => {
+        highlightedCtx.drawImage(
+            originalCanvas,
+            word.xmin - eps, word.ymin - eps, word.xmax - word.xmin + 2 * eps, word.ymax - word.ymin + 2 * eps, // source region
+            word.xmin - eps, word.ymin - eps, word.xmax - word.xmin + 2 * eps, word.ymax - word.ymin + 2 * eps  // destination region
+        );
+    });
+    pageCanvas[pageNum] = highlightedCanvas;
+    const promise = newUnresolved();
+    highlightedCanvas.toBlob(blob => {
+        pageImageUrl[pageNum] = URL.createObjectURL(blob!);
+        console.log(`Re-rendered page ${pageNum}`);
+        promise.resolve();
+    }, 'image/jpeg', 1.0);
+    await promise.promise;
+
     // Retaining the order of words in `words`, partition them into "lines" [y1..y2],
     // such that for every word in `words`,
     // the fraction of it which overlaps a "line" (i.e. ≥y1 or ≤y2) is either 1 or at most 0.4.
@@ -728,7 +757,7 @@ async function populateEditorFromTesseract(pdf: pdfjsLib.PDFDocumentProxy, langC
             ymin: word.bbox.y0,
             ymax: word.bbox.y1,
         }));
-        addLinesFromWords(words, i);
+        await addLinesFromWords(words, i);
     }
     worker.terminate();
 }
@@ -766,6 +795,6 @@ async function populateEditorFromGoogleOcr(pdf: pdfjsLib.PDFDocumentProxy, apiKe
             });
         }
         // const text = ocrResponse.fullTextAnnotation.text;
-        addLinesFromWords(words, i);
+        await addLinesFromWords(words, i);
     }
 }
