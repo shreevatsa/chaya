@@ -129,6 +129,7 @@ function combinedPageRanges(chunk: Node) {
     return ranges;
 }
 
+const chunkDepth = 1;
 const schema = new Schema({
     nodes: {
         // At the lowest level is text.
@@ -284,14 +285,46 @@ const joinChunks: Command = (state, dispatch) => {
     return false;
 };
 
+const splitChunkCommand: Command = (state, dispatch) => {
+    const { selection, doc } = state;
+    let rpos = selection.$anchor;
+    // Find the chunk node that contains the selection
+    let chunkPos = rpos.before(chunkDepth);
+    let chunkNode = rpos.node(chunkDepth);
+    console.log(`Node we got at position`, chunkPos, `is`, chunkNode, '=?=', doc.nodeAt(chunkPos));
+    if (chunkNode.type.name !== "chunk") {
+        console.log(`Node was: `, chunkNode);
+        return false;
+    }
+    // Prepare new chunks based on lines
+    let newChunks: Node[] = [];
+    chunkNode.forEach((lineNode, _offset) => {
+        const newChunk = schema.nodes.chunk.create(
+            { chunkType: chunkNode.attrs.chunkType, numChildren: 1 },
+            schema.nodes.line.create(lineNode.attrs, lineNode.content)
+        );
+        newChunks.push(newChunk);
+    });
+    const newContent = new Slice(Fragment.fromArray(newChunks), 0, 0);
+
+    if (dispatch) {
+        console.log(`Deleting one node with content`, chunkNode.textContent, `and inserting ${newChunks.length} nodes`);
+        dispatch(state.tr.replaceRange(chunkPos, chunkPos + chunkNode.nodeSize, newContent));
+        return true;
+    }
+    return false;
+};
+
+
+
 const setChunkType: (chunkType: string) => Command = (chunkType: string) => ((state, dispatch) => {
     // Avoid having to decide when selection spans multiple chunks.
     // TODO: Replace with check for whether start and end are in the same chunk.
     if (!state.selection.empty) return false;
-    const chunk = state.selection.$anchor.node(1);
+    const chunk = state.selection.$anchor.node(chunkDepth);
     // TODO: Is this safe? Seems to work (.start(1) is the position of the line, so -1).
-    const pos = state.selection.$anchor.start(1) - 1;
-    console.log(`Obtained a chunk node:`, chunk, 'at position', pos);
+    const pos = state.selection.$anchor.start(chunkDepth) - 1;
+    console.log(`Obtained a chunk node:`, chunk, 'at position', pos, ': ', state.doc.nodeAt(pos));
     if (dispatch) {
         console.log(`Setting chunkType to ${chunkType}`);
         const tr = state.tr.setNodeAttribute(pos, 'chunkType', chunkType);
@@ -362,11 +395,18 @@ function startPm(fileUrl, parentNode: HTMLElement) {
     )]);
     // Keep this at the end because the "selectParentNode" comes and goes.
     menu.push(...buildMenuItems(schema).fullMenu);
-    menu.push([new MenuItem({
+    menu.push([
+        new MenuItem({
         run: joinChunks,
         title: 'Join selected chunks together',
         label: '⇥⇤'
-    })]);
+        }),
+        new MenuItem({
+            run: splitChunkCommand,
+            title: 'Split into single-line chunks',
+            label: '⇤⇥',
+        }),
+    ]);
     menu.push([new Dropdown(
         [
             new MenuItem({ label: 'Paragraph', run: setChunkType('paragraph') }),
