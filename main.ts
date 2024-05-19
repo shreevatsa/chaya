@@ -143,7 +143,8 @@ const schema = new Schema({
                 pageNum: {},
                 y1: {},
                 y2: {},
-                words: { default: [] },
+                xmin: {},
+                xmax: {},
             },
             // Seems to help guard against accidental deletion, but need to think more.
             isolating: true,
@@ -721,7 +722,8 @@ async function addLinesFromWords(words: Word[], pageNum: number) {
         text: line.map(word => word.text).join(' '),
         y1: Math.min(...line.map(word => word.ymin)),
         y2: Math.max(...line.map(word => word.ymax)),
-        words: line
+        xmin: Math.min(...line.map(word => word.xmin)),
+        xmax: Math.max(...line.map(word => word.xmax)),
     }));
 
     // Distribute all the "missing" y-coordinates.
@@ -746,13 +748,33 @@ async function addLinesFromWords(words: Word[], pageNum: number) {
         pageNum: pageNum,
         y1: line.y1,
         y2: line.y2,
-        words: line.words,
+        xmin: line.xmin,
+        xmax: line.xmax,
     }, schema.text(line.text)));
 
-    // Insert each line.
+    // Insert lines into chunks.
+    const chunkLines: Node[][] = [];
+    let curChunkLines: Node[] = [];
+    const threshold = 10;
+    for (let i = 0; i < lineNodes.length; ++i) {
+        if (i == 0) {
+            curChunkLines.push(lineNodes[i]);
+            continue;
+        }
+        if (Math.abs(lineNodes[i].attrs.xmin - lineNodes[i - 1].attrs.xmin) < threshold &&
+            Math.abs(lineNodes[i].attrs.xmax - lineNodes[i - 1].attrs.xmax) < threshold) {
+            curChunkLines.push(lineNodes[i]);
+        } else {
+            chunkLines.push(curChunkLines);
+            curChunkLines = [];
+            curChunkLines = [lineNodes[i]];
+        }
+    }
+    chunkLines.push(curChunkLines);
+
     const view = window['view'];
-    for (let line of lineNodes) {
-        const chunk = schema.node('chunk', {}, [line]);
+    for (let lines of chunkLines) {
+        const chunk = schema.node('chunk', {}, lines);
         const tr = view.state.tr;
         const insertPos = view.state.doc.content.size;
         tr.insert(insertPos, chunk);
