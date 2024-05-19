@@ -298,6 +298,10 @@ const splitChunkCommand: Command = (state, dispatch) => {
         console.log(`Node was: `, chunkNode);
         return false;
     }
+    if (chunkNode.childCount == 1) {
+        // Nothing to do
+        return false;
+    }
     // Prepare new chunks based on lines
     let newChunks: Node[] = [];
     chunkNode.forEach((lineNode, _offset) => {
