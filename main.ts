@@ -143,6 +143,7 @@ const schema = new Schema({
                 pageNum: {},
                 y1: {},
                 y2: {},
+                words: {},
                 xmin: {},
                 xmax: {},
             },
@@ -744,6 +745,7 @@ async function addLinesFromWords(words: Word[], pageNum: number) {
         text: line.map(word => word.text).join(' '),
         y1: Math.min(...line.map(word => word.ymin)),
         y2: Math.max(...line.map(word => word.ymax)),
+        words: line,
         xmin: Math.min(...line.map(word => word.xmin)),
         xmax: Math.max(...line.map(word => word.xmax)),
     }));
@@ -770,6 +772,7 @@ async function addLinesFromWords(words: Word[], pageNum: number) {
         pageNum: pageNum,
         y1: line.y1,
         y2: line.y2,
+        words: line.words,
         xmin: line.xmin,
         xmax: line.xmax,
     }, schema.text(line.text)));
