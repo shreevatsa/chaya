@@ -316,6 +316,23 @@ const splitChunkCommand: Command = (state, dispatch) => {
     return false;
 };
 
+const deleteChunkCommand: Command = (state, dispatch) => {
+    const { selection } = state;
+    let rpos = selection.$anchor;
+    let chunkNode = rpos.node(chunkDepth);
+    let chunkPos = rpos.before(chunkDepth);
+    if (chunkNode.type.name == 'chunk') {
+        console.log(`Deleting node:`, chunkNode);
+    } else {
+        console.log(`Not chunk?`, chunkNode);
+        return false;
+    }
+    if (dispatch) {
+        dispatch(state.tr.deleteRange(chunkPos, chunkPos + chunkNode.nodeSize));
+        return true;
+    }
+    return false;
+};
 
 
 const setChunkType: (chunkType: string) => Command = (chunkType: string) => ((state, dispatch) => {
@@ -406,6 +423,11 @@ function startPm(fileUrl, parentNode: HTMLElement) {
             run: splitChunkCommand,
             title: 'Split into single-line chunks',
             label: '⇤⇥',
+        }),
+        new MenuItem({
+            run: deleteChunkCommand,
+            title: 'Delete chunk',
+            label: '❌', // '🗑️'
         }),
     ]);
     menu.push([new Dropdown(
