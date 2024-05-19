@@ -629,7 +629,7 @@ type Word = {
     ymax: number;
 };
 
-async function addLinesFromWords(words: Word[], pageNum: number) {
+async function repaintCanvasFromWords(words: Word[], pageNum: number) {
     const originalCanvas = pageCanvas[pageNum];
     const highlightedCanvas = document.createElement('canvas');
     highlightedCanvas.width = originalCanvas.width;
@@ -658,6 +658,10 @@ async function addLinesFromWords(words: Word[], pageNum: number) {
         promise.resolve();
     }, 'image/jpeg', 1.0);
     await promise.promise;
+}
+
+async function addLinesFromWords(words: Word[], pageNum: number) {
+    await repaintCanvasFromWords(words, pageNum);
 
     // Retaining the order of words in `words`, partition them into "lines" [y1..y2],
     // such that for every word in `words`,
