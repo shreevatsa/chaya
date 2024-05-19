@@ -599,26 +599,51 @@ async function populateEditorFromChaya(file: File) {
     await zero();
     const numChunks = doc.content.childCount;
 
-    for (let i = 0; i < numChunks; ++i) {
-        saveChaya.innerText = `Adding chunk ${i} of ${numChunks}`;
-        await zero();
-        const chunk: Node = doc.content.child(i);
-        // console.log(`Read child number ${i}: it is`, chunk);
-        for (let j = 0; j < chunk.childCount; ++j) {
-            const line = chunk.child(j);
-            console.log(`Chunk ${i} has page number ${line.attrs.pageNum}, currently ${saveChaya.innerText}`);
-            if (line.attrs.pageNum in pagePromise) {
-                await pagePromise[line.attrs.pageNum].promise;
-            } else {
-                console.error(`No page promise for pageNum`, line.attrs.pageNum, 'for', line, 'in', chunk);
-            }
-        }
+    function appendChunk(chunk: Node) {
         const view = window['view'];
         const tr = view.state.tr;
         const insertPos = view.state.doc.content.size;
         tr.insert(insertPos, chunk);
         view.dispatch(tr);
     }
+
+    let curPageNum = -1;
+    let curPageWords: Word[] = [];
+    let chunksToInsert: Node[] = [];
+    for (let i = 0; i < numChunks; ++i) {
+        saveChaya.innerText = `Adding chunk ${i} of ${numChunks}`;
+        await zero();
+        const chunk: Node = doc.content.child(i);
+        for (let j = 0; j < chunk.childCount; ++j) {
+            const line = chunk.child(j);
+            console.log(`Chunk ${i} line ${j} has page number ${line.attrs.pageNum}, currently ${saveChaya.innerText}`);
+            if (line.attrs.pageNum in pagePromise) {
+                await pagePromise[line.attrs.pageNum].promise;
+            } else {
+                console.error(`No page promise for pageNum`, line.attrs.pageNum, 'for', line, 'in', chunk);
+            }
+            const pageNum = line.attrs.pageNum;
+            if (curPageNum > -1 && pageNum > curPageNum) {
+                if (curPageWords.length > 0) {
+                    console.log(`Repainting page ${curPageNum} with ${curPageWords.length} words`);
+                    await repaintCanvasFromWords(curPageWords, curPageNum);
+                }
+                curPageWords = [];
+                for (let chunk of chunksToInsert) appendChunk(chunk);
+                chunksToInsert = [];
+            }
+            curPageNum = pageNum;
+            curPageWords.push(...line.attrs.words);
+        }
+        chunksToInsert.push(chunk);
+    }
+    if (curPageWords.length > 0) {
+        console.log(`Repainting page ${curPageNum} with ${curPageWords.length} words`);
+        await repaintCanvasFromWords(curPageWords, curPageNum);
+    }
+    console.log(`Inserting all remaining chunks`);
+    for (let chunk of chunksToInsert) appendChunk(chunk);
+    chunksToInsert = [];
 }
 
 type Word = {
