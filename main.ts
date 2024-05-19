@@ -206,7 +206,7 @@ const schema = new Schema({
             content: "chunk*",
             attrs: {
                 file: { default: null },
-                schemaVersion: { default: '2024.02' },
+                schemaVersion: { default: '2024.03' },
             }
         },
     },
