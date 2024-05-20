@@ -87,7 +87,7 @@ async function startPdfRendering(fileUrl: string) {
         pagePromise[i] = newUnresolved();
     }
     for (let i = 1; i <= pdf.numPages; ++i) {
-        console.log(`Rendering page ${i} of ${pdf.numPages}`);
+        console.log(`Rendering PDF page ${i} of ${pdf.numPages}`);
         const page = await pdf.getPage(i);
         // Render page onto canvas
         const viewport = page.getViewport({ scale: 1 });
@@ -109,7 +109,7 @@ async function startPdfRendering(fileUrl: string) {
         canvas.toBlob(blob => {
             pageImageUrl[i] = URL.createObjectURL(blob!);
             pagePromise[i].resolve();
-            console.log(`Rendered page ${i} of ${pdf.numPages}`);
+            console.log(`Rendered PDF page ${i} of ${pdf.numPages}`);
         }, 'image/jpeg', 1.0);
     }
 }
@@ -130,6 +130,7 @@ function combinedPageRanges(chunk: Node) {
 }
 
 const chunkDepth = 1;
+const SCHEMA_VERSION = '2024.03';
 const schema = new Schema({
     nodes: {
         // At the lowest level is text.
@@ -208,7 +209,7 @@ const schema = new Schema({
             content: "chunk*",
             attrs: {
                 file: { default: null },
-                schemaVersion: { default: '2024.03' },
+                schemaVersion: { default: SCHEMA_VERSION },
             }
         },
     },
@@ -598,7 +599,10 @@ function zero() {
 async function populateEditorFromChaya(file: File) {
     saveChaya.innerText = 'Parsing saved file...';
     const json = JSON.parse(await file.text());
-    saveChaya.innerText = 'Creating schema...';
+    saveChaya.innerText = 'Creating doc...';
+    if (json.attrs.schemaVersion != SCHEMA_VERSION) {
+        alert(`This file has schema version ${json.attrs.schemaVersion}, and will probably fail to load here.`);
+    }
     let doc = schema.nodeFromJSON(json);
     await zero();
     const numChunks = doc.content.childCount;
