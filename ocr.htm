@@ -352,6 +352,74 @@
       href="https://tools.simonwillison.net/ocr">Simon Willison's tools: OCR</a> (starting point for this project), <a
       href="https://scribeocr.com/">Scribe OCR</a> (future inspiration?).</p>
 
+      <style>
+        /* Modal container */
+        .modal {
+          /* Hidden by default */
+          display: none;
+          /* Stay in place */
+          position: fixed;
+          left: 0;
+          top: 0;
+          /* Sit on top */
+          z-index: 1;
+          /* Full width */
+          width: 100%;
+          /* Full height */
+          height: 100%;
+          /* Enable scroll if needed */
+          overflow: auto;
+          /* Black w/ opacity */
+          background-color: rgba(0, 0, 0, 0.4);
+        }
+      
+        /* Modal content */
+        .modal-content {
+          background-color: #fefefe;
+          /* 15% from the top and centered */
+          margin: 15% auto;
+          padding: 20px;
+          border: 1px solid #888;
+          /* Could be more or less, depending on screen size */
+          width: 80%;
+        }
+      
+        /* The close button */
+        .close {
+          color: #aaa;
+          font-weight: bold;
+          border: 1px;
+          cursor: pointer;
+        }
+      
+        .close:hover,
+        .close:focus {
+          color: black;
+          text-decoration: none;
+          cursor: pointer;
+        }
+      </style>
+      <button id="openModal">Open Modal</button>
+      <div id="myModal" class="modal" role="dialog" aria-labelledby="modalTitle" aria-describedby="modalDescription">
+        <div class="modal-content">
+          <h2 id="modalTitle">Modal Header</h2>
+          <p id="modalDescription">Some text in the Modal...</p>
+          <button id="closeModal" class="close" aria-label="Close modal">Close</button>
+        </div>
+      </div>
+      
+      <script>
+        const modal = document.getElementById("myModal");
+        // Clicking the button opens the modal
+        document.getElementById("openModal").onclick = function () {
+          modal.style.display = "block";
+        }
+        // Clicking the close button closes the modal
+        document.getElementById("closeModal").onclick = function () {
+          modal.style.display = "none";
+        }
+      </script>
+
   <!-- The rest of this file, except for closing </body> and </html>, is the main.js script. -->
   <script defer type="module" src="main.js"></script>
 </body>
