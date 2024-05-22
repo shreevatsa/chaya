@@ -428,7 +428,7 @@ function startPm(fileUrl, parentNode: HTMLElement) {
         new MenuItem({
             run: splitChunkCommand,
             title: 'Split into single-line chunks',
-            label: '⇤⇥',
+            label: '⟷',
         }),
         new MenuItem({
             run: deleteChunkCommand,

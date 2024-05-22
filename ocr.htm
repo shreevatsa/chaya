@@ -400,24 +400,25 @@
         }
       </style>
       <button id="openModal">Open Modal</button>
-      <div id="myModal" class="modal" role="dialog" aria-labelledby="modalTitle" aria-describedby="modalDescription">
+      <div id="myModal" class="modal" role="dialog">
         <div class="modal-content">
-          <h2 id="modalTitle">Modal Header</h2>
-          <p id="modalDescription">Some text in the Modal...</p>
-          <button id="closeModal" class="close" aria-label="Close modal">Close</button>
+          <h2 id="modalTitle">Split chunk</h2>
+          <p id="modalDescription">Drag one of the sliders below.</p>
+          <button id="splitChunkCancel" class="close">Cancel</button>
+          <button id="splitChunkDone" class="close">Done</button>
         </div>
       </div>
       
-      <script>
-        const modal = document.getElementById("myModal");
+      <script> // 
+        let modal = document.getElementById("myModal");
+        // Clicking the Cancel button closes the modal
+        document.getElementById("splitChunkCancel").onclick = function () {
+          modal.style.display = "none";
+        }
         // Clicking the button opens the modal
         document.getElementById("openModal").onclick = function () {
           modal.style.display = "block";
-        }
-        // Clicking the close button closes the modal
-        document.getElementById("closeModal").onclick = function () {
-          modal.style.display = "none";
-        }
+        };
       </script>
 
   <!-- The rest of this file, except for closing </body> and </html>, is the main.js script. -->
