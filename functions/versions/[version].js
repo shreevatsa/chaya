@@ -4,6 +4,7 @@ export function onRequest(context) {
         console.log(version);
         const versionMap = {
             'chaya-2024.01.html': 'v2024-01',
+            'chaya-2024.02.html': 'v2024-02',
         };
         const subdomain = versionMap[version];
         if (subdomain) {
