@@ -12,6 +12,7 @@ export function onRequest(context) {
             console.log(`Fetching from ${newUrl}`);
             return fetch(newUrl);
         }
+        return fetch('/404.html');
     } catch (error) {
         // https://stackoverflow.com/questions/18391212/is-it-not-possible-to-stringify-an-error-using-json-stringify
         return new Response(JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
