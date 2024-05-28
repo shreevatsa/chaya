@@ -11,7 +11,8 @@
             --base-width: 882px;
         }
         #splitChunkContainer {
-            transform: scale(0.8);
+            transform: scale(0.7);
+            transform-origin: top left;
         }
 
         #sliderLR {
@@ -71,8 +72,8 @@
         function updateImages(dir, value) {
             const percent1 = parseInt(value);
             const percent2 = 100 - percent1;
-            const baseWidth = getComputedStyle(document.documentElement).getPropertyValue('--base-width');
-            const baseHeight = getComputedStyle(document.documentElement).getPropertyValue('--base-height');
+            const baseWidth = `var(--base-width)`;
+            const baseHeight = `var(--base-height)`;
             console.log(baseWidth, baseHeight);
 
             const chunk1 = document.getElementById('chunk1');
