@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Slider</title>
+    <style>
+        .container {
+            transform: scale(0.8);
+        }
+
+        #sliderLR {
+            width: 882px;
+        }
+
+        #sliderUD {
+            writing-mode: vertical-lr;
+            height: 1300px;
+        }
+
+        #spacer {
+            min-width: 1em;
+            min-height: 1em;
+        }
+
+        #chunks {
+            display: flex;
+            width: 100%;
+        }
+
+        .image-div {
+            background-image: url('aliceinwonderlan00carriala_0026.jpg');
+            background-repeat: no-repeat;
+            /* TODO: how to choose this height? */
+            height: 1230px;
+            border: 3px solid blue;
+            border-radius: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <table>
+            <tr>
+                <td></td>
+                <td>
+                    <input type="range" id="sliderLR" min="0" max="100" value="50" oninput="updateImages('LR', this.value)">
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <input type="range" id="sliderUD" min="0" max="100" value="50" oninput="updateImages('UD', this.value)">
+                </td>
+                <td>
+                    <div id="chunks">
+                        <div id="chunk1" class="image-div"></div>
+                        <div id="spacer"></div>
+                        <div id="chunk2" class="image-div"></div>
+                    </div>            
+                </td>
+            </tr>
+        </table>
+    </div>
+    <script>
+        function updateImages(dir, value) {
+            const percent1 = parseInt(value);
+            const percent2 = 100 - percent1;
+            const baseWidth = 882;
+            const baseHeight = 1230;
+
+            const chunk1 = document.getElementById('chunk1');
+            const chunk2 = document.getElementById('chunk2');
+
+            if (dir == 'LR') {
+                document.getElementById('chunks').style.display = 'flex';
+                chunk1.style.height = chunk2.style.height = `${baseHeight}px`;
+                chunk1.style.width = `${baseWidth * (percent1 + 1) / 100}px`;
+                chunk2.style.width = `${baseWidth * (percent2 + 1) / 100}px`;
+                chunk1.style.backgroundPosition = `left top`;
+                chunk2.style.backgroundPosition = `right top`;
+            } else if (dir == 'UD') {
+                document.getElementById('chunks').style.display = 'block';
+                chunk1.style.width = chunk2.style.width = `${baseWidth}px`;
+                chunk1.style.height = `${baseHeight * (percent1 + 1) / 100}px`;
+                chunk2.style.height = `${baseHeight * (percent2 + 1) / 100}px`;
+                chunk1.style.backgroundPosition = `left top`;
+                chunk2.style.backgroundPosition = `right bottom`;
+            } else {
+                alert(dir);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const initialValue = document.getElementById('sliderLR').value;
+            updateImages('LR', initialValue);
+        });
+    </script>
+</body>
+
+</html>
