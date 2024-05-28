@@ -6,17 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Slider</title>
     <style>
-        .container {
+        :root {
+            --base-height: 1230px;
+            --base-width: 882px;
+        }
+        #splitChunkContainer {
             transform: scale(0.8);
         }
 
         #sliderLR {
-            width: 882px;
+            width: var(--base-width);
         }
 
         #sliderUD {
             writing-mode: vertical-lr;
-            height: 1300px;
+            height: var(--base-height);
         }
 
         #spacer {
@@ -33,7 +37,7 @@
             background-image: url('aliceinwonderlan00carriala_0026.jpg');
             background-repeat: no-repeat;
             /* TODO: how to choose this height? */
-            height: 1230px;
+            height: var(--base-height);
             border: 3px solid blue;
             border-radius: 20px;
         }
@@ -41,7 +45,7 @@
 </head>
 
 <body>
-    <div class="container">
+    <div id="splitChunkContainer">
         <table>
             <tr>
                 <td></td>
@@ -67,24 +71,25 @@
         function updateImages(dir, value) {
             const percent1 = parseInt(value);
             const percent2 = 100 - percent1;
-            const baseWidth = 882;
-            const baseHeight = 1230;
+            const baseWidth = getComputedStyle(document.documentElement).getPropertyValue('--base-width');
+            const baseHeight = getComputedStyle(document.documentElement).getPropertyValue('--base-height');
+            console.log(baseWidth, baseHeight);
 
             const chunk1 = document.getElementById('chunk1');
             const chunk2 = document.getElementById('chunk2');
 
             if (dir == 'LR') {
                 document.getElementById('chunks').style.display = 'flex';
-                chunk1.style.height = chunk2.style.height = `${baseHeight}px`;
-                chunk1.style.width = `${baseWidth * (percent1 + 1) / 100}px`;
-                chunk2.style.width = `${baseWidth * (percent2 + 1) / 100}px`;
+                chunk1.style.height = chunk2.style.height = baseHeight;
+                chunk1.style.width = `calc(var(--base-width) * (${percent1} + 1) / 100)`;
+                chunk2.style.width = `calc(var(--base-width) * (${percent2} + 1) / 100)`;
                 chunk1.style.backgroundPosition = `left top`;
                 chunk2.style.backgroundPosition = `right top`;
             } else if (dir == 'UD') {
                 document.getElementById('chunks').style.display = 'block';
-                chunk1.style.width = chunk2.style.width = `${baseWidth}px`;
-                chunk1.style.height = `${baseHeight * (percent1 + 1) / 100}px`;
-                chunk2.style.height = `${baseHeight * (percent2 + 1) / 100}px`;
+                chunk1.style.width = chunk2.style.width = baseWidth;
+                chunk1.style.height = `calc(var(--base-height) * (${percent1} + 1) / 100)`;
+                chunk2.style.height = `calc(var(--base-height) * (${percent2} + 1) / 100)`;
                 chunk1.style.backgroundPosition = `left top`;
                 chunk2.style.backgroundPosition = `right bottom`;
             } else {
