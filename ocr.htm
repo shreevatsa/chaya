@@ -401,7 +401,7 @@
 
         :root {
             --base-height: 1230px;
-            --base-width: 882px;
+            --base-width: 1000px;
         }
         #splitChunkContainer {
             transform: scale(0.7);
@@ -428,7 +428,7 @@
         }
 
         .image-div {
-            background-image: url('aliceinwonderlan00carriala_0026.jpg');
+            background-image: var(--split-chunk-url);
             background-repeat: no-repeat;
             /* TODO: how to choose this height? */
             height: var(--base-height);
@@ -468,23 +468,20 @@
             function updateImages(dir, value) {
                 const percent1 = parseInt(value);
                 const percent2 = 100 - percent1;
-                const baseWidth = `var(--base-width)`;
-                const baseHeight = `var(--base-height)`;
-                console.log(baseWidth, baseHeight);
     
                 const chunk1 = document.getElementById('chunk1');
                 const chunk2 = document.getElementById('chunk2');
     
                 if (dir == 'LR') {
                     document.getElementById('chunks').style.display = 'flex';
-                    chunk1.style.height = chunk2.style.height = baseHeight;
+                    chunk1.style.height = chunk2.style.height = `var(--base-height)`;
                     chunk1.style.width = `calc(var(--base-width) * (${percent1} + 1) / 100)`;
                     chunk2.style.width = `calc(var(--base-width) * (${percent2} + 1) / 100)`;
                     chunk1.style.backgroundPosition = `left top`;
                     chunk2.style.backgroundPosition = `right top`;
                 } else if (dir == 'UD') {
                     document.getElementById('chunks').style.display = 'block';
-                    chunk1.style.width = chunk2.style.width = baseWidth;
+                    chunk1.style.width = chunk2.style.width = `var(--base-width)`;
                     chunk1.style.height = `calc(var(--base-height) * (${percent1} + 1) / 100)`;
                     chunk2.style.height = `calc(var(--base-height) * (${percent2} + 1) / 100)`;
                     chunk1.style.backgroundPosition = `left top`;
@@ -512,44 +509,12 @@
           modal.style.display = "none";
         }
         // Clicking the button opens the modal
-        document.getElementById("openModal").onclick = function () {
+        function openModal(url, pageHeight, y1, y2) {
           modal.style.display = "block";
-        };
-      </script>
-      <script>
-    function updateImages(dir, value) {
-        const percent1 = parseInt(value);
-        const percent2 = 100 - percent1;
-        const baseWidth = `var(--base-width)`;
-        const baseHeight = `var(--base-height)`;
-        console.log(baseWidth, baseHeight);
-
-        const chunk1 = document.getElementById('chunk1');
-        const chunk2 = document.getElementById('chunk2');
-
-        if (dir == 'LR') {
-            document.getElementById('chunks').style.display = 'flex';
-            chunk1.style.height = chunk2.style.height = baseHeight;
-            chunk1.style.width = `calc(var(--base-width) * (${percent1} + 1) / 100)`;
-            chunk2.style.width = `calc(var(--base-width) * (${percent2} + 1) / 100)`;
-            chunk1.style.backgroundPosition = `left top`;
-            chunk2.style.backgroundPosition = `right top`;
-        } else if (dir == 'UD') {
-            document.getElementById('chunks').style.display = 'block';
-            chunk1.style.width = chunk2.style.width = baseWidth;
-            chunk1.style.height = `calc(var(--base-height) * (${percent1} + 1) / 100)`;
-            chunk2.style.height = `calc(var(--base-height) * (${percent2} + 1) / 100)`;
-            chunk1.style.backgroundPosition = `left top`;
-            chunk2.style.backgroundPosition = `right bottom`;
-        } else {
-            alert(dir);
+          document.documentElement.style.setProperty('--base-height', `${pageHeight}px`);
+          document.documentElement.style.setProperty('--split-chunk-url', `url("${url}")`);
         }
-    }
-
-    document.addEventListener("DOMContentLoaded", function () {
-        const initialValue = document.getElementById('sliderLR').value;
-        updateImages('LR', initialValue);
-    });
+        document.getElementById("openModal").onclick = openModal;
       </script>
 
   <!-- The rest of this file, except for closing </body> and </html>, is the main.js script. -->

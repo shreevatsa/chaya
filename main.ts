@@ -19,6 +19,9 @@ import 'prosemirror-view/style/prosemirror.css';
 import 'prosemirror-example-setup/style/style.css';
 import "prosemirror-menu/style/menu.css";
 
+// defined in the HTML page.
+declare function openModal(url: string, pageHeight: number, y1: number, y2: number): void;
+
 // // Based on https://github.com/ProseMirror/prosemirror-inputrules/blob/8433778a3ce4e45c0188341b72fd71da3a440b5b/src/rulebuilders.ts#L46
 // function textblockTypeInputRule(
 //     regexp: RegExp,
@@ -115,8 +118,8 @@ async function startPdfRendering(fileUrl: string) {
 }
 
 // Merge the ranges of each "line" in chunk
-function combinedPageRanges(chunk: Node) {
-    const ranges = {};
+function combinedPageRanges(chunk: Node): { [x: string]: { y1: number; y2: number; } } {
+    const ranges: { [x: string]: { y1: number; y2: number; }; } = {};
     for (let i = 0; i < chunk.childCount; ++i) {
         const line: Node = chunk.child(i);
         const pageNum = line.attrs.pageNum;
@@ -149,6 +152,7 @@ const schema = new Schema({
                 xmax: {},
             },
             // Seems to help guard against accidental deletion, but need to think more.
+            // Also doesn't seem to have this effect on Android Chrome
             isolating: true,
             toDOM(node) {
                 const ret = document.createElement('div');
@@ -327,17 +331,40 @@ const deleteChunkCommand: Command = (state, dispatch) => {
     let rpos = selection.$anchor;
     let chunkNode = rpos.node(chunkDepth);
     let chunkPos = rpos.before(chunkDepth);
-    if (chunkNode.type.name == 'chunk') {
-        console.log(`Deleting node:`, chunkNode);
-    } else {
+    if (chunkNode.type.name != 'chunk') {
         console.log(`Not chunk?`, chunkNode);
-        return false;
+        return false;        
     }
+    console.log(`Deleting node:`, chunkNode);
     if (dispatch) {
         dispatch(state.tr.deleteRange(chunkPos, chunkPos + chunkNode.nodeSize));
         return true;
     }
     return false;
+};
+
+const openSplitChunkModal: Command = (state, dispatch) => {
+    const { selection } = state;
+    let rpos = selection.$anchor;
+    let chunkNode = rpos.node(chunkDepth);
+    let chunkPos = rpos.before(chunkDepth);
+    if (chunkNode.type.name != 'chunk') {
+        console.log(`Not chunk?`, chunkNode);
+        return false;
+    }
+    console.log(`Splitting chunk:`, chunkNode);
+    let pageRanges = combinedPageRanges(chunkNode);
+    const pageNums = Object.keys(pageRanges);
+    if (pageNums.length != 1) {
+        alert(`Chunk spans ${pageNums.length} pages`);
+        return false;
+    }
+    // This "loop" will execute exactly once.
+    for (let pageNum of pageNums.map(Number)) {
+        const { y1, y2 } = pageRanges[pageNum];
+        openModal(pageImageUrl[pageNum], pageHeight[pageNum], y1, y2);
+    }
+    return true;
 };
 
 
@@ -428,12 +455,17 @@ function startPm(fileUrl, parentNode: HTMLElement) {
         new MenuItem({
             run: splitChunkCommand,
             title: 'Split into single-line chunks',
-            label: '⟷',
+            label: '⇤⇥',
         }),
         new MenuItem({
             run: deleteChunkCommand,
             title: 'Delete chunk',
             label: '❌', // '🗑️'
+        }),
+        new MenuItem({
+            run: openSplitChunkModal,
+            title: 'Split this chunk (horizontally or vertically)',
+            label: '¦',
         }),
     ]);
     menu.push([new Dropdown(
