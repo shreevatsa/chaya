@@ -400,7 +400,7 @@
         }
 
         :root {
-            --base-height: 1230px;
+            --split-chunk-height: 1230px;
             --base-width: 1000px;
         }
         #splitChunkContainer {
@@ -414,7 +414,7 @@
 
         #sliderUD {
             writing-mode: vertical-lr;
-            height: var(--base-height);
+            height: var(--split-chunk-height);
         }
 
         #spacer {
@@ -429,14 +429,13 @@
 
         .image-div {
             background-image: var(--split-chunk-url);
+            background-position-y: var(--split-chunk-y1);
             background-repeat: no-repeat;
-            /* TODO: how to choose this height? */
-            height: var(--base-height);
+            height: var(--split-chunk-height);
             border: 3px solid blue;
             border-radius: 20px;
         }
       </style>
-      <button id="openModal">Open Modal</button>
       <div id="myModal" class="modal" role="dialog">
         <div class="modal-content">
           <h2 id="modalTitle">Split chunk</h2>
@@ -474,18 +473,21 @@
     
                 if (dir == 'LR') {
                     document.getElementById('chunks').style.display = 'flex';
-                    chunk1.style.height = chunk2.style.height = `var(--base-height)`;
+                    chunk1.style.height = chunk2.style.height = `var(--split-chunk-height)`;
+                    chunk1.style.backgroundPositionY = chunk2.style.backgroundPositionY = `var(--split-chunk-y1)`;
                     chunk1.style.width = `calc(var(--base-width) * (${percent1} + 1) / 100)`;
                     chunk2.style.width = `calc(var(--base-width) * (${percent2} + 1) / 100)`;
-                    chunk1.style.backgroundPosition = `left top`;
-                    chunk2.style.backgroundPosition = `right top`;
+                    chunk1.style.backgroundPositionX = 0;
+                    chunk2.style.backgroundPositionX = `calc(-${percent1}/100 * var(--base-width) )`;
+
                 } else if (dir == 'UD') {
                     document.getElementById('chunks').style.display = 'block';
                     chunk1.style.width = chunk2.style.width = `var(--base-width)`;
-                    chunk1.style.height = `calc(var(--base-height) * (${percent1} + 1) / 100)`;
-                    chunk2.style.height = `calc(var(--base-height) * (${percent2} + 1) / 100)`;
-                    chunk1.style.backgroundPosition = `left top`;
-                    chunk2.style.backgroundPosition = `right bottom`;
+                    chunk1.style.backgroundPositionX = chunk2.style.backgroundPositionX = 0;
+                    chunk1.style.height = `calc(var(--split-chunk-height) * (${percent1} + 1) / 100)`;
+                    chunk2.style.height = `calc(var(--split-chunk-height) * (${percent2} + 1) / 100)`;
+                    chunk1.style.backgroundPositionY = `var(--split-chunk-y1)`;
+                    chunk2.style.backgroundPositionY = `calc( var(--split-chunk-y1) - ${percent1}/100 * var(--split-chunk-height) )`;
                 } else {
                     alert(dir);
                 }
@@ -511,10 +513,10 @@
         // Clicking the button opens the modal
         function openModal(url, pageHeight, y1, y2) {
           modal.style.display = "block";
-          document.documentElement.style.setProperty('--base-height', `${pageHeight}px`);
+          document.documentElement.style.setProperty('--split-chunk-height', `${y2 - y1}px`);
+          document.documentElement.style.setProperty('--split-chunk-y1', `-${y1}px`);
           document.documentElement.style.setProperty('--split-chunk-url', `url("${url}")`);
         }
-        document.getElementById("openModal").onclick = openModal;
       </script>
 
   <!-- The rest of this file, except for closing </body> and </html>, is the main.js script. -->

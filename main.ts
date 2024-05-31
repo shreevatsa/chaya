@@ -465,7 +465,7 @@ function startPm(fileUrl, parentNode: HTMLElement) {
         new MenuItem({
             run: openSplitChunkModal,
             title: 'Split this chunk (horizontally or vertically)',
-            label: '¦',
+            label: '•¦•',
         }),
     ]);
     menu.push([new Dropdown(
