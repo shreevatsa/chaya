@@ -5,6 +5,7 @@ export async function onRequest(context) {
         const versionMap = {
             'chaya-2024.01.html': 'v2024-01',
             'chaya-2024.02.html': 'v2024-02',
+            'chaya-2024.03.html': 'v2024-03',
         };
         const subdomain = versionMap[version];
         if (subdomain) {

@@ -7,6 +7,9 @@ all:
 	date
 
 snapshot: all
-	echo "VERSION='2024.??'"
-	echo 'cp index.html versions/chaya-${VERSION}.html'
-	echo 'Update schemaVersion default in main.ts'
+	echo "VERSION='2024.??'" "(Get from SCHEMA_VERSION in main.ts)"
+	echo "git switch -c v${VERSION}"
+	echo "git push --set-upstream origin "v${VERSION}"
+	echo "git switch main"
+	echo "Update schemaVersion default in main.ts"
+	echo "Update versions/index.html and functions/versions/[version].js"

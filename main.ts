@@ -130,7 +130,7 @@ function combinedPageRanges(chunk: Node) {
 }
 
 const chunkDepth = 1;
-const SCHEMA_VERSION = '2024.03';
+const SCHEMA_VERSION = '2024.04';
 const schema = new Schema({
     nodes: {
         // At the lowest level is text.
