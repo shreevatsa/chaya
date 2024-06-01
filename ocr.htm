@@ -510,12 +510,19 @@
         document.getElementById("splitChunkCancel").onclick = function () {
           modal.style.display = "none";
         }
-        // Clicking the button opens the modal
+        // Called from TS (when Prosemirror-menu button is clicked)
         function openModal(url, pageHeight, y1, y2) {
           modal.style.display = "block";
           document.documentElement.style.setProperty('--split-chunk-height', `${y2 - y1}px`);
           document.documentElement.style.setProperty('--split-chunk-y1', `-${y1}px`);
           document.documentElement.style.setProperty('--split-chunk-url', `url("${url}")`);
+        }
+        // Clicking the Done button passes control back to TS
+        document.getElementById("splitChunkDone").onclick = function () {
+          const dir = document.getElementById('chunks').style.display == 'block' ? 'UD' : 'LR';
+          const value = document.getElementById(`slider${dir}`).value;
+          alert(`Going to split in direction ${dir} by ${value}`);
+          modal.style.display = "none";
         }
       </script>
 
