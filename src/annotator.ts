@@ -296,6 +296,10 @@ saveAnnotationsBtn.addEventListener('click', () => {
         });
     });
 
+    // Generate filename based on PDF name
+    const baseFileName = fileName.replace(/\.pdf$/i, '');
+    const downloadFileName = `${baseFileName}.json`;
+
     // Download the JSON file
     const blob = new Blob([JSON.stringify(annotationsData, null, 2)], { 
         type: 'application/json' 
@@ -304,7 +308,7 @@ saveAnnotationsBtn.addEventListener('click', () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'annotations.json';
+    a.download = downloadFileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
