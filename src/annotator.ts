@@ -32,6 +32,9 @@ const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
 const annotationsUpload = document.getElementById('annotations-upload') as HTMLInputElement;
 const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
 const saveAnnotationsBtn = document.getElementById('save-annotations') as HTMLButtonElement;
+const annotationList = document.getElementById('annotation-list') as HTMLDivElement;
+const annotationCount = document.getElementById('annotation-count') as HTMLDivElement;
+const clearAllBtn = document.getElementById('clear-all-annotations') as HTMLButtonElement;
 
 // Store annotations data
 interface Annotation {
@@ -183,8 +186,14 @@ function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement
 
             annotations.push(annotation);
             
+            // Add data attribute for selection
+            currentAnnotation.dataset.annotationId = annotation.id;
+            
             // Make annotation interactive
             makeAnnotationInteractive(currentAnnotation, annotation, pageDiv);
+            
+            // Update the annotation list
+            updateAnnotationList();
 
             console.log('Created annotation:', annotation);
         } else {
@@ -243,6 +252,9 @@ function loadAnnotationsFromJson(jsonData: any): void {
             loadedAnnotations = jsonData;
         }
         
+        // Update the annotation list
+        updateAnnotationList();
+        
     } catch (error) {
         console.error('Error loading annotations:', error);
         alert('Error loading annotations: ' + error);
@@ -284,6 +296,7 @@ function createAnnotationBox(overlay: HTMLDivElement, pageDiv: HTMLDivElement, a
     annotationBox.style.height = `${height}px`;
     annotationBox.style.cursor = 'move';
     annotationBox.title = annotation.label;
+    annotationBox.dataset.annotationId = annotation.id;
     
     // Make annotation interactive
     makeAnnotationInteractive(annotationBox, annotation, pageDiv);
@@ -567,6 +580,172 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// Annotation Management Functions
+function updateAnnotationList(): void {
+    // Update count
+    const count = annotations.length;
+    annotationCount.textContent = count === 0 ? 'No annotations' : 
+        count === 1 ? '1 annotation' : `${count} annotations`;
+    
+    // Clear existing list
+    annotationList.innerHTML = '';
+    
+    // Group annotations by page
+    const annotationsByPage: { [key: number]: Annotation[] } = {};
+    annotations.forEach(annotation => {
+        if (!annotationsByPage[annotation.pageNumber]) {
+            annotationsByPage[annotation.pageNumber] = [];
+        }
+        annotationsByPage[annotation.pageNumber].push(annotation);
+    });
+    
+    // Create list items grouped by page
+    Object.keys(annotationsByPage).sort((a, b) => parseInt(a) - parseInt(b)).forEach(pageKey => {
+        const pageNumber = parseInt(pageKey);
+        const pageAnnotations = annotationsByPage[pageNumber];
+        
+        // Page header
+        const pageHeader = document.createElement('div');
+        pageHeader.className = 'text-xs font-medium text-gray-500 uppercase tracking-wide mb-1';
+        pageHeader.textContent = `Page ${pageNumber}`;
+        annotationList.appendChild(pageHeader);
+        
+        // Annotations for this page
+        pageAnnotations.forEach(annotation => {
+            const listItem = document.createElement('div');
+            listItem.className = 'bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 cursor-pointer transition-colors';
+            listItem.dataset.annotationId = annotation.id;
+            
+            listItem.innerHTML = `
+                <div class="flex items-start justify-between">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-gray-900 truncate">
+                            ${annotation.label}
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            Position: ${Math.round(annotation.x * 100)}%, ${Math.round(annotation.y * 100)}%
+                        </div>
+                    </div>
+                    <div class="ml-2 flex-shrink-0">
+                        <button class="delete-annotation-btn text-red-500 hover:text-red-700 p-1" 
+                                data-annotation-id="${annotation.id}" 
+                                title="Delete annotation">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Add click handler to select annotation
+            listItem.addEventListener('click', (e) => {
+                if (!(e.target as Element).closest('.delete-annotation-btn')) {
+                    selectAnnotationById(annotation.id);
+                }
+            });
+            
+            // Add hover effect for annotation highlighting
+            listItem.addEventListener('mouseenter', () => {
+                highlightAnnotationById(annotation.id, true);
+            });
+            
+            listItem.addEventListener('mouseleave', () => {
+                highlightAnnotationById(annotation.id, false);
+            });
+            
+            annotationList.appendChild(listItem);
+        });
+        
+        // Add some space between pages
+        if (Object.keys(annotationsByPage).length > 1) {
+            const spacer = document.createElement('div');
+            spacer.className = 'h-2';
+            annotationList.appendChild(spacer);
+        }
+    });
+}
+
+function selectAnnotationById(annotationId: string): void {
+    const annotation = annotations.find(a => a.id === annotationId);
+    if (!annotation) return;
+    
+    const annotationBox = document.querySelector(`[data-annotation-id="${annotationId}"]`) as HTMLDivElement;
+    if (annotationBox) {
+        selectAnnotation(annotationBox, annotation);
+        
+        // Scroll annotation into view
+        annotationBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+function highlightAnnotationById(annotationId: string, highlight: boolean): void {
+    const annotationBox = document.querySelector(`[data-annotation-id="${annotationId}"]`) as HTMLDivElement;
+    if (annotationBox) {
+        if (highlight) {
+            annotationBox.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.5)';
+        } else {
+            annotationBox.style.boxShadow = '';
+        }
+    }
+}
+
+function deleteAnnotationById(annotationId: string): void {
+    // Remove from annotations array
+    const index = annotations.findIndex(a => a.id === annotationId);
+    if (index === -1) return;
+    
+    annotations.splice(index, 1);
+    
+    // Remove visual annotation box from DOM
+    const annotationBox = document.querySelector(`[data-annotation-id="${annotationId}"]`) as HTMLDivElement;
+    if (annotationBox) {
+        annotationBox.remove();
+    }
+    
+    // Update the annotation list
+    updateAnnotationList();
+    
+    // If this was the selected annotation, clear selection
+    if (selectedAnnotationData && selectedAnnotationData.id === annotationId) {
+        selectedAnnotation = null;
+        selectedAnnotationData = null;
+    }
+}
+
+function clearAllAnnotations(): void {
+    if (annotations.length === 0) return;
+    
+    if (confirm(`Are you sure you want to delete all ${annotations.length} annotations? This cannot be undone.`)) {
+        // Clear annotations array
+        annotations.length = 0;
+        
+        // Remove all annotation boxes from DOM
+        document.querySelectorAll('.annotation-box').forEach(box => box.remove());
+        
+        // Clear selection
+        selectedAnnotation = null;
+        selectedAnnotationData = null;
+        
+        // Update the annotation list
+        updateAnnotationList();
+    }
+}
+
+// Add event listeners for annotation management
+document.addEventListener('click', (e) => {
+    const deleteBtn = (e.target as Element).closest('.delete-annotation-btn') as HTMLElement;
+    if (deleteBtn) {
+        e.stopPropagation();
+        const annotationId = deleteBtn.dataset.annotationId;
+        if (annotationId) {
+            deleteAnnotationById(annotationId);
+        }
+    }
+});
+
+clearAllBtn.addEventListener('click', clearAllAnnotations);
+
 // Listen for file selection
 pdfUpload.addEventListener('change', async (event) => {
     const target = event.target as HTMLInputElement;
@@ -615,6 +794,9 @@ pdfUpload.addEventListener('change', async (event) => {
                 console.log('Rendering loaded annotations...');
                 renderLoadedAnnotations();
                 loadedAnnotations = null; // Clear the loaded data
+                
+                // Update the annotation list
+                updateAnnotationList();
             }
         } catch (reason) {
             console.error(`Error during PDF loading or rendering: ${reason}`);

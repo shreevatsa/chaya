@@ -190,6 +190,28 @@ test.describe('Annotator', () => {
       await expect(handle).toBeAttached();
     }
   });
+
+  test('annotation management sidebar works', async ({ page }) => {
+    await page.goto('/annotator.html');
+    
+    // Check that the annotation management sidebar exists
+    await expect(page.locator('#annotation-list')).toBeAttached();
+    await expect(page.locator('#annotation-count')).toBeVisible();
+    await expect(page.locator('#clear-all-annotations')).toBeVisible();
+    
+    // Check initial state shows "No annotations"
+    await expect(page.locator('#annotation-count')).toContainText('No annotations');
+    
+    // Check that the clear all button exists
+    const clearAllBtn = page.locator('#clear-all-annotations');
+    await expect(clearAllBtn).toBeVisible();
+    await expect(clearAllBtn).toContainText('Clear All Annotations');
+    
+    // Check sidebar structure
+    const sidebar = page.locator('.w-80');
+    await expect(sidebar).toBeVisible();
+    await expect(sidebar.locator('h2')).toContainText('Annotations');
+  });
 });
 
 test.describe('Viewer', () => {

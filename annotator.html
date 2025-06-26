@@ -21,8 +21,29 @@
             <p class="mt-1 text-xs text-gray-500">Upload a .json file to load previously saved annotations</p>
         </div>
 
-        <div id="pdf-container" class="bg-white border border-gray-300 rounded-lg shadow-sm" style="position: relative;">
-            <!-- PDF pages will be rendered here -->
+        <div class="flex gap-4">
+            <!-- Main PDF Container -->
+            <div class="flex-1">
+                <div id="pdf-container" class="bg-white border border-gray-300 rounded-lg shadow-sm" style="position: relative;">
+                    <!-- PDF pages will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Annotation Management Sidebar -->
+            <div class="w-80 bg-white border border-gray-300 rounded-lg shadow-sm p-4">
+                <h2 class="text-lg font-bold mb-3 text-gray-900">Annotations</h2>
+                <div id="annotation-count" class="text-sm text-gray-500 mb-3">
+                    No annotations
+                </div>
+                <div id="annotation-list" class="space-y-2 max-h-96 overflow-y-auto">
+                    <!-- Annotation items will be added here -->
+                </div>
+                <div class="mt-4 pt-4 border-t border-gray-200">
+                    <button id="clear-all-annotations" class="w-full px-3 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50">
+                        Clear All Annotations
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div class="mt-4">
