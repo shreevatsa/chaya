@@ -7,11 +7,12 @@ test.describe('Annotator', () => {
     // Check page title
     await expect(page).toHaveTitle(/Annotator/);
     
-    // Check that PDF.js is loaded
-    await expect(page.locator('script[src*="pdf.mjs"]')).toBeAttached();
+    // Check that PDF.js is loaded from CDN
+    await expect(page.locator('script[src*="pdf.min.js"]')).toBeAttached();
     
     // Check for key UI elements
-    await expect(page.locator('input[type="file"]')).toBeVisible();
+    await expect(page.locator('#pdf-upload')).toBeVisible();
+    await expect(page.locator('#annotations-upload')).toBeVisible();
     await expect(page.locator('#pdf-container')).toBeVisible();
   });
 
@@ -51,7 +52,7 @@ test.describe('Annotator', () => {
     await page.goto('/annotator.html');
     
     // Upload a test file to ensure the file input handler works
-    const fileInput = page.locator('input[type="file"]');
+    const fileInput = page.locator('#pdf-upload');
     await fileInput.setInputFiles('./test.pdf');
     
     // Wait a moment for file processing to start
@@ -70,7 +71,7 @@ test.describe('Annotator', () => {
   test('file input accepts PDF files', async ({ page }) => {
     await page.goto('/annotator.html');
     
-    const fileInput = page.locator('input[type="file"]');
+    const fileInput = page.locator('#pdf-upload');
     
     // Check the accept attribute
     const acceptAttr = await fileInput.getAttribute('accept');
@@ -87,7 +88,7 @@ test.describe('Annotator', () => {
     });
     
     // Upload the test PDF file
-    const fileInput = page.locator('input[type="file"]');
+    const fileInput = page.locator('#pdf-upload');
     await fileInput.setInputFiles('./test.pdf');
     
     // Wait for PDF processing and check that a canvas element is created
