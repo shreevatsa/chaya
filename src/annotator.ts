@@ -1,32 +1,10 @@
+import { initializePdfjs, waitForPdfjs, parseAnnotationsFromJson, Annotation as SharedAnnotation } from './pdf-utils.js';
+
 // PDF.js is loaded globally via script tag in the HTML
 declare const pdfjsLib: any;
 
-// Wait for PDF.js to be available before using it
-function waitForPdfjs(): Promise<any> {
-    return new Promise((resolve) => {
-        if (typeof pdfjsLib !== 'undefined') {
-            resolve(pdfjsLib);
-        } else {
-            const check = () => {
-                if (typeof pdfjsLib !== 'undefined') {
-                    resolve(pdfjsLib);
-                } else {
-                    setTimeout(check, 10);
-                }
-            };
-            check();
-        }
-    });
-}
-
-// Initialize PDF.js when it's ready
-waitForPdfjs().then((pdfjsLib) => {
-    // Set the worker source for pdf.js. This is required for the library to work.
-    if (pdfjsLib?.GlobalWorkerOptions) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
-    console.log('PDF.js initialized, worker src set to:', pdfjsLib.GlobalWorkerOptions?.workerSrc);
-});
+// Initialize PDF.js
+initializePdfjs();
 
 const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
 const annotationsUpload = document.getElementById('annotations-upload') as HTMLInputElement;
@@ -36,16 +14,8 @@ const annotationList = document.getElementById('annotation-list') as HTMLDivElem
 const annotationCount = document.getElementById('annotation-count') as HTMLDivElement;
 const clearAllBtn = document.getElementById('clear-all-annotations') as HTMLButtonElement;
 
-// Store annotations data
-interface Annotation {
-    id: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    label: string;
-    pageNumber: number;
-}
+// Use shared annotation interface
+type Annotation = SharedAnnotation;
 
 let annotations: Annotation[] = [];
 let loadedAnnotations: any = null; // Store loaded annotations until PDF is ready
@@ -213,35 +183,12 @@ function generateId(): string {
 // Load annotations from JSON file
 function loadAnnotationsFromJson(jsonData: any): void {
     try {
-        // Validate the JSON structure
-        if (!jsonData.metadata || !jsonData.annotationsByPage) {
-            throw new Error('Invalid annotations JSON format');
-        }
-
-        console.log('Loading annotations from JSON:', jsonData);
+        // Use shared parsing function
+        const parsedAnnotations = parseAnnotationsFromJson(jsonData);
         
-        // Clear existing annotations
-        annotations = [];
+        // Clear existing annotations and use parsed ones
+        annotations = parsedAnnotations;
         
-        // Convert loaded annotations to our internal format
-        Object.keys(jsonData.annotationsByPage).forEach(pageKey => {
-            const pageNumber = parseInt(pageKey);
-            const pageAnnotations = jsonData.annotationsByPage[pageKey];
-            
-            pageAnnotations.forEach((ann: any) => {
-                const annotation: Annotation = {
-                    id: ann.id || generateId(),
-                    x: ann.x,
-                    y: ann.y,
-                    width: ann.width,
-                    height: ann.height,
-                    label: ann.label,
-                    pageNumber: pageNumber
-                };
-                annotations.push(annotation);
-            });
-        });
-
         console.log('Loaded annotations:', annotations);
         
         // If PDF is already loaded, render the annotations

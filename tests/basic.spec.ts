@@ -225,4 +225,128 @@ test.describe('Viewer', () => {
     await expect(page.locator('h1')).toContainText('Viewer');
     await expect(page.locator('script[src*="viewer.js"]')).toBeAttached();
   });
+
+  test('shows file upload interface', async ({ page }) => {
+    await page.goto('/viewer.html');
+    
+    // Check file upload elements
+    await expect(page.locator('#pdf-upload')).toBeVisible();
+    await expect(page.locator('#annotations-upload')).toBeVisible();
+    await expect(page.locator('#load-files')).toBeVisible();
+    
+    // Check file input attributes
+    const pdfInput = page.locator('#pdf-upload');
+    const annotationsInput = page.locator('#annotations-upload');
+    
+    await expect(pdfInput).toHaveAttribute('accept', '.pdf');
+    await expect(annotationsInput).toHaveAttribute('accept', '.json');
+    
+    // Load button should be disabled initially
+    await expect(page.locator('#load-files')).toBeDisabled();
+  });
+
+  test('load button enables when both files selected', async ({ page }) => {
+    await page.goto('/viewer.html');
+    
+    const loadButton = page.locator('#load-files');
+    const pdfInput = page.locator('#pdf-upload');
+    const annotationsInput = page.locator('#annotations-upload');
+    
+    // Initially disabled
+    await expect(loadButton).toBeDisabled();
+    
+    // Set PDF file
+    await pdfInput.setInputFiles('./test.pdf');
+    await expect(loadButton).toBeDisabled(); // Still disabled without annotations
+    
+    // Create a mock annotations file
+    const annotationsData = {
+      metadata: {
+        sourcePdf: "test.pdf",
+        annotationVersion: "1.1",
+        annotatedAt: new Date().toISOString()
+      },
+      annotationsByPage: {
+        "1": [
+          {
+            id: "test-annotation-1",
+            x: 0.1,
+            y: 0.2,
+            width: 0.3,
+            height: 0.1,
+            label: "Test Annotation"
+          }
+        ]
+      }
+    };
+    
+    // Create a temporary file
+    await page.evaluate((data) => {
+      const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+      const file = new File([blob], 'test-annotations.json', { type: 'application/json' });
+      
+      // Get the file input and simulate file selection
+      const input = document.querySelector('#annotations-upload') as HTMLInputElement;
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, annotationsData);
+    
+    // Now button should be enabled
+    await expect(loadButton).toBeEnabled();
+  });
+
+  test('displays annotation summary section', async ({ page }) => {
+    await page.goto('/viewer.html');
+    
+    // Check annotation summary elements
+    await expect(page.locator('#annotation-count')).toBeVisible();
+    await expect(page.locator('#annotation-list')).toBeVisible();
+    
+    // Initially shows no annotations
+    await expect(page.locator('#annotation-count')).toContainText('No annotations loaded');
+  });
+
+  test('no JavaScript errors on viewer page load', async ({ page }) => {
+    const errors: string[] = [];
+    
+    // Listen for all console errors
+    page.on('pageerror', (error) => {
+      errors.push(error.message);
+    });
+    
+    // Listen for console.error calls
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') {
+        errors.push(msg.text());
+      }
+    });
+
+    await page.goto('/viewer.html');
+    
+    // Wait for scripts to load and execute
+    await page.waitForTimeout(1000);
+    
+    // Check that no JavaScript errors occurred
+    expect(errors).toEqual([]);
+  });
+
+  test('viewer loads PDF.js correctly', async ({ page }) => {
+    await page.goto('/viewer.html');
+    
+    // Check that PDF.js is loaded from CDN
+    await expect(page.locator('script[src*="pdf.min.js"]')).toBeAttached();
+    
+    // Wait for PDF.js to be available
+    await page.waitForFunction(() => {
+      return typeof (window as any).pdfjsLib !== 'undefined';
+    }, { timeout: 5000 });
+    
+    const pdfjsAvailable = await page.evaluate(() => {
+      return typeof (window as any).pdfjsLib !== 'undefined';
+    });
+    
+    expect(pdfjsAvailable).toBe(true);
+  });
 });
