@@ -6,8 +6,54 @@
     <title>Bookchop - Viewer</title>
     <link href="./dist/output.css" rel="stylesheet">
 </head>
-<body>
-    <h1>Viewer</h1>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl font-bold mb-4">Bookchop Viewer</h1>
+
+        <div class="bg-white border border-gray-300 rounded-lg shadow-sm p-4 mb-4">
+            <h2 class="text-lg font-bold mb-3">Load Files</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="pdf-upload" class="block text-sm font-medium text-gray-700 mb-1">PDF File:</label>
+                    <input type="file" id="pdf-upload" accept=".pdf" 
+                           class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none">
+                </div>
+                
+                <div>
+                    <label for="annotations-upload" class="block text-sm font-medium text-gray-700 mb-1">Annotations File:</label>
+                    <input type="file" id="annotations-upload" accept=".json" 
+                           class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none">
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <button id="load-files" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-400" disabled>
+                    Load and View
+                </button>
+            </div>
+        </div>
+
+        <!-- Annotation Summary -->
+        <div class="bg-white border border-gray-300 rounded-lg shadow-sm p-4 mb-4">
+            <h2 class="text-lg font-bold mb-2 text-gray-900">Annotations</h2>
+            <div id="annotation-count" class="text-sm text-gray-500 mb-3">
+                No annotations loaded
+            </div>
+            <div id="annotation-list" class="flex flex-wrap gap-2">
+                <!-- Annotation navigation items will be added here -->
+            </div>
+        </div>
+
+        <!-- Annotated Regions Container -->
+        <div id="pdf-container" class="space-y-4">
+            <div id="loading-message" class="p-8 text-center text-gray-500">
+                Select PDF and annotations files to view annotated regions
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script type="module" src="./dist/viewer.js"></script>
 </body>
 </html>
