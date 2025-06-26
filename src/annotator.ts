@@ -12,7 +12,6 @@ const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
 const saveAnnotationsBtn = document.getElementById('save-annotations') as HTMLButtonElement;
 const annotationList = document.getElementById('annotation-list') as HTMLDivElement;
 const annotationCount = document.getElementById('annotation-count') as HTMLDivElement;
-const clearAllBtn = document.getElementById('clear-all-annotations') as HTMLButtonElement;
 
 // Use shared annotation interface
 type Annotation = SharedAnnotation;
@@ -660,24 +659,6 @@ function deleteAnnotationById(annotationId: string): void {
     }
 }
 
-function clearAllAnnotations(): void {
-    if (annotations.length === 0) return;
-    
-    if (confirm(`Are you sure you want to delete all ${annotations.length} annotations? This cannot be undone.`)) {
-        // Clear annotations array
-        annotations.length = 0;
-        
-        // Remove all annotation boxes from DOM
-        document.querySelectorAll('.annotation-box').forEach(box => box.remove());
-        
-        // Clear selection
-        selectedAnnotation = null;
-        selectedAnnotationData = null;
-        
-        // Update the annotation list
-        updateAnnotationList();
-    }
-}
 
 // Add event listeners for annotation management
 document.addEventListener('click', (e) => {
@@ -691,7 +672,6 @@ document.addEventListener('click', (e) => {
     }
 });
 
-clearAllBtn.addEventListener('click', clearAllAnnotations);
 
 // Listen for file selection
 pdfUpload.addEventListener('change', async (event) => {
