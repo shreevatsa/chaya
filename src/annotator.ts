@@ -29,6 +29,7 @@ waitForPdfjs().then((pdfjsLib) => {
 });
 
 const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
+const annotationsUpload = document.getElementById('annotations-upload') as HTMLInputElement;
 const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
 const saveAnnotationsBtn = document.getElementById('save-annotations') as HTMLButtonElement;
 
@@ -44,6 +45,7 @@ interface Annotation {
 }
 
 let annotations: Annotation[] = [];
+let loadedAnnotations: any = null; // Store loaded annotations until PDF is ready
 let isDrawing = false;
 let startX = 0;
 let startY = 0;
@@ -172,7 +174,7 @@ function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement
 
             annotations.push(annotation);
             
-            // Update the visual appearance
+            // Update the visual appearance to match loaded annotations
             currentAnnotation.style.pointerEvents = 'auto';
             currentAnnotation.style.cursor = 'pointer';
             currentAnnotation.title = annotation.label;
@@ -199,6 +201,102 @@ function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement
 // Generate unique ID for annotations
 function generateId(): string {
     return 'annotation_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Load annotations from JSON file
+function loadAnnotationsFromJson(jsonData: any): void {
+    try {
+        // Validate the JSON structure
+        if (!jsonData.metadata || !jsonData.annotationsByPage) {
+            throw new Error('Invalid annotations JSON format');
+        }
+
+        console.log('Loading annotations from JSON:', jsonData);
+        
+        // Clear existing annotations
+        annotations = [];
+        
+        // Convert loaded annotations to our internal format
+        Object.keys(jsonData.annotationsByPage).forEach(pageKey => {
+            const pageNumber = parseInt(pageKey);
+            const pageAnnotations = jsonData.annotationsByPage[pageKey];
+            
+            pageAnnotations.forEach((ann: any) => {
+                const annotation: Annotation = {
+                    id: ann.id || generateId(),
+                    x: ann.x,
+                    y: ann.y,
+                    width: ann.width,
+                    height: ann.height,
+                    label: ann.label,
+                    pageNumber: pageNumber
+                };
+                annotations.push(annotation);
+            });
+        });
+
+        console.log('Loaded annotations:', annotations);
+        
+        // If PDF is already loaded, render the annotations
+        if (pdfContainer.children.length > 0) {
+            renderLoadedAnnotations();
+        } else {
+            // Store for when PDF is loaded
+            loadedAnnotations = jsonData;
+        }
+        
+    } catch (error) {
+        console.error('Error loading annotations:', error);
+        alert('Error loading annotations: ' + error);
+    }
+}
+
+// Render loaded annotations on existing PDF pages
+function renderLoadedAnnotations(): void {
+    annotations.forEach(annotation => {
+        const pageDiv = pdfContainer.querySelector(`[data-page-number="${annotation.pageNumber}"]`) as HTMLDivElement;
+        if (pageDiv) {
+            const annotationLayer = pageDiv.querySelector('.annotation-layer') as HTMLDivElement;
+            if (annotationLayer) {
+                createAnnotationBox(annotationLayer, pageDiv, annotation);
+            }
+        }
+    });
+}
+
+// Create visual annotation box
+function createAnnotationBox(overlay: HTMLDivElement, pageDiv: HTMLDivElement, annotation: Annotation): void {
+    const pageWidth = pageDiv.offsetWidth;
+    const pageHeight = pageDiv.offsetHeight;
+    
+    // Convert fractional coordinates back to pixels
+    const left = annotation.x * pageWidth;
+    const top = annotation.y * pageHeight;
+    const width = annotation.width * pageWidth;
+    const height = annotation.height * pageHeight;
+
+    const annotationBox = document.createElement('div');
+    annotationBox.className = 'annotation-box';
+    annotationBox.style.position = 'absolute';
+    annotationBox.style.border = '2px solid #ff0000';
+    annotationBox.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+    annotationBox.style.left = `${left}px`;
+    annotationBox.style.top = `${top}px`;
+    annotationBox.style.width = `${width}px`;
+    annotationBox.style.height = `${height}px`;
+    annotationBox.style.cursor = 'pointer';
+    annotationBox.title = annotation.label;
+    
+    // Add click handler to edit label
+    annotationBox.addEventListener('click', () => {
+        const newLabel = prompt('Edit label:', annotation.label);
+        if (newLabel !== null) {
+            annotation.label = newLabel;
+            annotationBox.title = newLabel;
+        }
+    });
+
+    overlay.appendChild(annotationBox);
 }
 
 // Listen for file selection
@@ -243,12 +341,45 @@ pdfUpload.addEventListener('change', async (event) => {
                 console.log('Page', i, 'rendered');
             }
             console.log('All pages rendered successfully');
+            
+            // If we have loaded annotations waiting, render them now
+            if (loadedAnnotations || annotations.length > 0) {
+                console.log('Rendering loaded annotations...');
+                renderLoadedAnnotations();
+                loadedAnnotations = null; // Clear the loaded data
+            }
         } catch (reason) {
             console.error(`Error during PDF loading or rendering: ${reason}`);
         }
     };
 
     fileReader.readAsArrayBuffer(file);
+});
+
+// Listen for annotations file selection
+annotationsUpload.addEventListener('change', async (event) => {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+
+    if (!file) {
+        return;
+    }
+
+    console.log('Loading annotations file:', file.name);
+
+    const fileReader = new FileReader();
+    fileReader.onload = (e) => {
+        try {
+            const jsonText = e.target?.result as string;
+            const jsonData = JSON.parse(jsonText);
+            loadAnnotationsFromJson(jsonData);
+        } catch (error) {
+            console.error('Error parsing annotations JSON:', error);
+            alert('Error parsing annotations file: ' + error);
+        }
+    };
+
+    fileReader.readAsText(file);
 });
 
 // Save annotations functionality
