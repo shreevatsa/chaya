@@ -1,9 +1,31 @@
-import * as pdfjsLib from '../lib/pdf.mjs';
+// PDF.js is loaded globally via script tag in the HTML
+declare const pdfjsLib: any;
 
-// Set the worker source for pdf.js. This is required for the library to work.
-if (pdfjsLib.GlobalWorkerOptions) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '../lib/pdf.worker.mjs';
+// Wait for PDF.js to be available before using it
+function waitForPdfjs(): Promise<any> {
+    return new Promise((resolve) => {
+        if (typeof pdfjsLib !== 'undefined') {
+            resolve(pdfjsLib);
+        } else {
+            const check = () => {
+                if (typeof pdfjsLib !== 'undefined') {
+                    resolve(pdfjsLib);
+                } else {
+                    setTimeout(check, 10);
+                }
+            };
+            check();
+        }
+    });
 }
+
+// Initialize PDF.js when it's ready
+waitForPdfjs().then((pdfjsLib) => {
+    // Set the worker source for pdf.js. This is required for the library to work.
+    if (pdfjsLib?.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '../lib/pdf.worker.mjs';
+    }
+});
 
 const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
 const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
@@ -56,7 +78,9 @@ pdfUpload.addEventListener('change', async (event) => {
     const fileReader = new FileReader();
     fileReader.onload = async (e) => {
         const typedArray = new Uint8Array(e.target?.result as ArrayBuffer);
-        const loadingTask = pdfjsLib.getDocument(typedArray);
+        // Wait for PDF.js to be available
+        const pdfjs = await waitForPdfjs();
+        const loadingTask = pdfjs.getDocument(typedArray);
         
         try {
             const pdf = await loadingTask.promise;
