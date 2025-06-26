@@ -35,7 +35,12 @@ let selectedAnnotationData: Annotation | null = null;
 // Function to render a single page
 async function renderPage(pdf: any, pageNumber: number) {
     const page = await pdf.getPage(pageNumber);
-    const scale = 1.5;
+
+    // Calculate scale to limit maximum width while maintaining aspect ratio
+    const baseViewport = page.getViewport({ scale: 1.0 });
+    const maxWidth = 1200; // Maximum width in pixels - adjust this to control PDF size
+    const scale = baseViewport.width > maxWidth ? maxWidth / baseViewport.width : 1.5;
+
     const viewport = page.getViewport({ scale });
 
     // Create a div to hold the canvas and the annotation layer
@@ -100,7 +105,7 @@ function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement
         currentAnnotation.style.width = '0px';
         currentAnnotation.style.height = '0px';
         currentAnnotation.style.pointerEvents = 'none';
-        
+
         overlay.appendChild(currentAnnotation);
         e.preventDefault();
     });
@@ -138,11 +143,11 @@ function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement
         if (width > 5 && height > 5) {
             const left = Math.min(startX, endX);
             const top = Math.min(startY, endY);
-            
+
             // Convert to fractional coordinates
             const pageWidth = pageDiv.offsetWidth;
             const pageHeight = pageDiv.offsetHeight;
-            
+
             const annotation: Annotation = {
                 id: generateId(),
                 x: left / pageWidth,
@@ -154,13 +159,13 @@ function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement
             };
 
             annotations.push(annotation);
-            
+
             // Add data attribute for selection
             currentAnnotation.dataset.annotationId = annotation.id;
-            
+
             // Make annotation interactive
             makeAnnotationInteractive(currentAnnotation, annotation, pageDiv);
-            
+
             // Update the annotation list
             updateAnnotationList();
 
@@ -184,12 +189,12 @@ function loadAnnotationsFromJson(jsonData: any): void {
     try {
         // Use shared parsing function
         const parsedAnnotations = parseAnnotationsFromJson(jsonData);
-        
+
         // Clear existing annotations and use parsed ones
         annotations = parsedAnnotations;
-        
+
         console.log('Loaded annotations:', annotations);
-        
+
         // If PDF is already loaded, render the annotations
         if (pdfContainer.children.length > 0) {
             renderLoadedAnnotations();
@@ -197,10 +202,10 @@ function loadAnnotationsFromJson(jsonData: any): void {
             // Store for when PDF is loaded
             loadedAnnotations = jsonData;
         }
-        
+
         // Update the annotation list
         updateAnnotationList();
-        
+
     } catch (error) {
         console.error('Error loading annotations:', error);
         alert('Error loading annotations: ' + error);
@@ -224,7 +229,7 @@ function renderLoadedAnnotations(): void {
 function createAnnotationBox(overlay: HTMLDivElement, pageDiv: HTMLDivElement, annotation: Annotation): void {
     const pageWidth = pageDiv.offsetWidth;
     const pageHeight = pageDiv.offsetHeight;
-    
+
     // Convert fractional coordinates back to pixels
     const left = annotation.x * pageWidth;
     const top = annotation.y * pageHeight;
@@ -243,7 +248,7 @@ function createAnnotationBox(overlay: HTMLDivElement, pageDiv: HTMLDivElement, a
     annotationBox.style.cursor = 'move';
     annotationBox.title = annotation.label;
     annotationBox.dataset.annotationId = annotation.id;
-    
+
     // Make annotation interactive
     makeAnnotationInteractive(annotationBox, annotation, pageDiv);
 
@@ -263,7 +268,7 @@ function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: An
         handleElement.style.width = '8px';
         handleElement.style.height = '8px';
         handleElement.style.zIndex = '1000';
-        
+
         // Position handles
         switch (handle) {
             case 'nw':
@@ -311,19 +316,19 @@ function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: An
                 handleElement.style.cursor = 'w-resize';
                 break;
         }
-        
+
         // Initially hide handles
         handleElement.style.display = 'none';
-        
+
         // Add resize functionality
         handleElement.addEventListener('mousedown', (e) => {
             e.stopPropagation(); // Prevent triggering the drawing behavior on the overlay
             startResize(e, handle, annotationBox, annotation, pageDiv);
         });
-        
+
         annotationBox.appendChild(handleElement);
     });
-    
+
     // Add selection and drag functionality
     annotationBox.addEventListener('mousedown', (e) => {
         e.stopPropagation(); // Prevent triggering the drawing behavior on the overlay
@@ -338,13 +343,13 @@ function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: An
             startDrag(e, annotationBox, annotation, pageDiv);
         }
     });
-    
+
     // Add click handler to scroll to annotation in sidebar
     annotationBox.addEventListener('click', (e) => {
         e.stopPropagation();
         scrollToSidebarAnnotation(annotation.id);
     });
-    
+
     // Show/hide handles on hover + highlight sidebar annotation
     annotationBox.addEventListener('mouseenter', () => {
         if (selectedAnnotation === annotationBox) {
@@ -353,7 +358,7 @@ function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: An
         // Highlight corresponding annotation in sidebar
         highlightSidebarAnnotation(annotation.id, true);
     });
-    
+
     // Remove sidebar highlight on mouse leave
     annotationBox.addEventListener('mouseleave', () => {
         highlightSidebarAnnotation(annotation.id, false);
@@ -367,7 +372,7 @@ function selectAnnotation(annotationBox: HTMLDivElement, annotation: Annotation)
         hideResizeHandles(selectedAnnotation);
         selectedAnnotation.style.border = '2px solid #ff0000';
     }
-    
+
     // Select new annotation
     selectedAnnotation = annotationBox;
     selectedAnnotationData = annotation;
@@ -397,24 +402,24 @@ function startResize(e: MouseEvent, handle: string, annotationBox: HTMLDivElemen
     resizeHandle = handle;
     startX = e.clientX;
     startY = e.clientY;
-    
+
     const rect = annotationBox.getBoundingClientRect();
     const startWidth = rect.width;
     const startHeight = rect.height;
     const startLeft = parseFloat(annotationBox.style.left);
     const startTop = parseFloat(annotationBox.style.top);
-    
+
     const handleMouseMove = (e: MouseEvent) => {
         if (!isResizing) return;
-        
+
         const deltaX = e.clientX - startX;
         const deltaY = e.clientY - startY;
-        
+
         let newLeft = startLeft;
         let newTop = startTop;
         let newWidth = startWidth;
         let newHeight = startHeight;
-        
+
         switch (resizeHandle) {
             case 'nw':
                 newLeft = startLeft + deltaX;
@@ -451,34 +456,34 @@ function startResize(e: MouseEvent, handle: string, annotationBox: HTMLDivElemen
                 newWidth = startWidth - deltaX;
                 break;
         }
-        
+
         // Ensure minimum size
         if (newWidth < 10) newWidth = 10;
         if (newHeight < 10) newHeight = 10;
-        
+
         // Apply changes
         annotationBox.style.left = `${newLeft}px`;
         annotationBox.style.top = `${newTop}px`;
         annotationBox.style.width = `${newWidth}px`;
         annotationBox.style.height = `${newHeight}px`;
-        
+
         // Update annotation data with fractional coordinates
         const pageWidth = pageDiv.offsetWidth;
         const pageHeight = pageDiv.offsetHeight;
-        
+
         annotation.x = newLeft / pageWidth;
         annotation.y = newTop / pageHeight;
         annotation.width = newWidth / pageWidth;
         annotation.height = newHeight / pageHeight;
     };
-    
+
     const handleMouseUp = () => {
         isResizing = false;
         resizeHandle = null;
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
     };
-    
+
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
     e.preventDefault();
@@ -489,42 +494,42 @@ function startDrag(e: MouseEvent, annotationBox: HTMLDivElement, annotation: Ann
     isDragging = true;
     dragStartX = e.clientX;
     dragStartY = e.clientY;
-    
+
     const startLeft = parseFloat(annotationBox.style.left);
     const startTop = parseFloat(annotationBox.style.top);
-    
+
     const handleMouseMove = (e: MouseEvent) => {
         if (!isDragging) return;
-        
+
         const deltaX = e.clientX - dragStartX;
         const deltaY = e.clientY - dragStartY;
-        
+
         const newLeft = startLeft + deltaX;
         const newTop = startTop + deltaY;
-        
+
         // Keep annotation within page bounds
         const pageWidth = pageDiv.offsetWidth;
         const pageHeight = pageDiv.offsetHeight;
         const boxWidth = parseFloat(annotationBox.style.width);
         const boxHeight = parseFloat(annotationBox.style.height);
-        
+
         const clampedLeft = Math.max(0, Math.min(newLeft, pageWidth - boxWidth));
         const clampedTop = Math.max(0, Math.min(newTop, pageHeight - boxHeight));
-        
+
         annotationBox.style.left = `${clampedLeft}px`;
         annotationBox.style.top = `${clampedTop}px`;
-        
+
         // Update annotation data with fractional coordinates
         annotation.x = clampedLeft / pageWidth;
         annotation.y = clampedTop / pageHeight;
     };
-    
+
     const handleMouseUp = () => {
         isDragging = false;
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
     };
-    
+
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
     e.preventDefault();
@@ -544,12 +549,12 @@ document.addEventListener('click', (e) => {
 function updateAnnotationList(): void {
     // Update count
     const count = annotations.length;
-    annotationCount.textContent = count === 0 ? 'No annotations' : 
+    annotationCount.textContent = count === 0 ? 'No annotations' :
         count === 1 ? '1 annotation' : `${count} annotations`;
-    
+
     // Clear existing list
     annotationList.innerHTML = '';
-    
+
     // Group annotations by page
     const annotationsByPage: { [key: number]: Annotation[] } = {};
     annotations.forEach(annotation => {
@@ -558,24 +563,24 @@ function updateAnnotationList(): void {
         }
         annotationsByPage[annotation.pageNumber].push(annotation);
     });
-    
+
     // Create list items grouped by page
     Object.keys(annotationsByPage).sort((a, b) => parseInt(a) - parseInt(b)).forEach(pageKey => {
         const pageNumber = parseInt(pageKey);
         const pageAnnotations = annotationsByPage[pageNumber];
-        
+
         // Page header
         const pageHeader = document.createElement('div');
         pageHeader.className = 'text-xs font-medium text-gray-500 uppercase tracking-wide mb-1';
         pageHeader.textContent = `Page ${pageNumber}`;
         annotationList.appendChild(pageHeader);
-        
+
         // Annotations for this page
         pageAnnotations.forEach(annotation => {
             const listItem = document.createElement('div');
             listItem.className = 'bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 cursor-pointer transition-colors';
             listItem.dataset.annotationId = annotation.id;
-            
+
             listItem.innerHTML = `
                 <div class="flex items-start justify-between">
                     <div class="flex-1 min-w-0">
@@ -597,26 +602,26 @@ function updateAnnotationList(): void {
                     </div>
                 </div>
             `;
-            
+
             // Add click handler to select annotation
             listItem.addEventListener('click', (e) => {
                 if (!(e.target as Element).closest('.delete-annotation-btn')) {
                     selectAnnotationById(annotation.id);
                 }
             });
-            
+
             // Add hover effect for annotation highlighting
             listItem.addEventListener('mouseenter', () => {
                 highlightAnnotationById(annotation.id, true);
             });
-            
+
             listItem.addEventListener('mouseleave', () => {
                 highlightAnnotationById(annotation.id, false);
             });
-            
+
             annotationList.appendChild(listItem);
         });
-        
+
         // Add some space between pages
         if (Object.keys(annotationsByPage).length > 1) {
             const spacer = document.createElement('div');
@@ -629,11 +634,11 @@ function updateAnnotationList(): void {
 function selectAnnotationById(annotationId: string): void {
     const annotation = annotations.find(a => a.id === annotationId);
     if (!annotation) return;
-    
+
     const annotationBox = document.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`) as HTMLDivElement;
     if (annotationBox) {
         selectAnnotation(annotationBox, annotation);
-        
+
         // Scroll annotation into view
         annotationBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
@@ -670,7 +675,7 @@ function scrollToSidebarAnnotation(annotationId: string): void {
     const sidebarItem = document.querySelector(`#annotation-list [data-annotation-id="${annotationId}"]`) as HTMLDivElement;
     if (sidebarItem) {
         sidebarItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
+
         // Temporarily highlight the sidebar item
         highlightSidebarAnnotation(annotationId, true);
         setTimeout(() => highlightSidebarAnnotation(annotationId, false), 2000);
@@ -681,18 +686,18 @@ function deleteAnnotationById(annotationId: string): void {
     // Remove from annotations array
     const index = annotations.findIndex(a => a.id === annotationId);
     if (index === -1) return;
-    
+
     annotations.splice(index, 1);
-    
+
     // Remove visual annotation box from DOM - use more specific selector
     const annotationBoxes = document.querySelectorAll(`.annotation-box[data-annotation-id="${annotationId}"]`);
     annotationBoxes.forEach(box => {
         box.remove();
     });
-    
+
     // Update the annotation list
     updateAnnotationList();
-    
+
     // If this was the selected annotation, clear selection
     if (selectedAnnotationData && selectedAnnotationData.id === annotationId) {
         selectedAnnotation = null;
@@ -731,38 +736,38 @@ pdfUpload.addEventListener('change', async (event) => {
         console.log('File reader loaded, processing PDF...');
         const typedArray = new Uint8Array(e.target?.result as ArrayBuffer);
         console.log('Created typed array, length:', typedArray.length);
-        
+
         // Wait for PDF.js to be available
         const pdfjs = await waitForPdfjs();
         console.log('PDF.js available, creating document...');
         console.log('PDF.js object:', pdfjs);
         console.log('getDocument function available:', typeof pdfjs.getDocument);
-        
+
         if (!pdfjs.getDocument) {
             console.error('getDocument function not available on pdfjs object');
             return;
         }
-        
+
         const loadingTask = pdfjs.getDocument(typedArray);
         console.log('Loading task created:', loadingTask);
-        
+
         try {
             const pdf = await loadingTask.promise;
             console.log('PDF loaded successfully, pages:', pdf.numPages);
-            
+
             for (let i = 1; i <= pdf.numPages; i++) {
                 console.log('Rendering page', i);
                 await renderPage(pdf, i);
                 console.log('Page', i, 'rendered');
             }
             console.log('All pages rendered successfully');
-            
+
             // If we have loaded annotations waiting, render them now
             if (loadedAnnotations || annotations.length > 0) {
                 console.log('Rendering loaded annotations...');
                 renderLoadedAnnotations();
                 loadedAnnotations = null; // Clear the loaded data
-                
+
                 // Update the annotation list
                 updateAnnotationList();
             }
@@ -834,7 +839,7 @@ saveAnnotationsBtn.addEventListener('click', () => {
         if (!annotationsData.annotationsByPage[pageKey]) {
             annotationsData.annotationsByPage[pageKey] = [];
         }
-        
+
         annotationsData.annotationsByPage[pageKey].push({
             id: annotation.id,
             x: annotation.x,
@@ -850,10 +855,10 @@ saveAnnotationsBtn.addEventListener('click', () => {
     const downloadFileName = `${baseFileName}.json`;
 
     // Download the JSON file
-    const blob = new Blob([JSON.stringify(annotationsData, null, 2)], { 
-        type: 'application/json' 
+    const blob = new Blob([JSON.stringify(annotationsData, null, 2)], {
+        type: 'application/json'
     });
-    
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
