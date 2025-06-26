@@ -23,7 +23,7 @@ function waitForPdfjs(): Promise<any> {
 waitForPdfjs().then((pdfjsLib) => {
     // Set the worker source for pdf.js. This is required for the library to work.
     if (pdfjsLib?.GlobalWorkerOptions) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = './lib/pdf.worker.mjs';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
     console.log('PDF.js initialized, worker src set to:', pdfjsLib.GlobalWorkerOptions?.workerSrc);
 });
@@ -222,8 +222,16 @@ pdfUpload.addEventListener('change', async (event) => {
         // Wait for PDF.js to be available
         const pdfjs = await waitForPdfjs();
         console.log('PDF.js available, creating document...');
+        console.log('PDF.js object:', pdfjs);
+        console.log('getDocument function available:', typeof pdfjs.getDocument);
+        
+        if (!pdfjs.getDocument) {
+            console.error('getDocument function not available on pdfjs object');
+            return;
+        }
         
         const loadingTask = pdfjs.getDocument(typedArray);
+        console.log('Loading task created:', loadingTask);
         
         try {
             const pdf = await loadingTask.promise;
