@@ -317,7 +317,7 @@ function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: An
         
         // Add resize functionality
         handleElement.addEventListener('mousedown', (e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent triggering the drawing behavior on the overlay
             startResize(e, handle, annotationBox, annotation, pageDiv);
         });
         
@@ -326,6 +326,7 @@ function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: An
     
     // Add selection and drag functionality
     annotationBox.addEventListener('mousedown', (e) => {
+        e.stopPropagation(); // Prevent triggering the drawing behavior on the overlay
         selectAnnotation(annotationBox, annotation);
         if (e.detail === 2) { // Double click to edit label
             const newLabel = prompt('Edit label:', annotation.label);
