@@ -339,11 +339,24 @@ function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: An
         }
     });
     
-    // Show/hide handles on hover
+    // Add click handler to scroll to annotation in sidebar
+    annotationBox.addEventListener('click', (e) => {
+        e.stopPropagation();
+        scrollToSidebarAnnotation(annotation.id);
+    });
+    
+    // Show/hide handles on hover + highlight sidebar annotation
     annotationBox.addEventListener('mouseenter', () => {
         if (selectedAnnotation === annotationBox) {
             showResizeHandles(annotationBox);
         }
+        // Highlight corresponding annotation in sidebar
+        highlightSidebarAnnotation(annotation.id, true);
+    });
+    
+    // Remove sidebar highlight on mouse leave
+    annotationBox.addEventListener('mouseleave', () => {
+        highlightSidebarAnnotation(annotation.id, false);
     });
 }
 
@@ -634,6 +647,33 @@ function highlightAnnotationById(annotationId: string, highlight: boolean): void
         } else {
             annotationBox.style.boxShadow = '';
         }
+    }
+}
+
+// Highlight annotation in sidebar (bidirectional functionality)
+function highlightSidebarAnnotation(annotationId: string, highlight: boolean): void {
+    const sidebarItem = document.querySelector(`#annotation-list [data-annotation-id="${annotationId}"]`) as HTMLDivElement;
+    if (sidebarItem) {
+        if (highlight) {
+            sidebarItem.style.backgroundColor = '#dbeafe'; // bg-blue-100
+            sidebarItem.style.transform = 'scale(1.02)';
+            sidebarItem.style.transition = 'all 0.2s ease';
+        } else {
+            sidebarItem.style.backgroundColor = '';
+            sidebarItem.style.transform = '';
+        }
+    }
+}
+
+// Scroll to annotation in sidebar (bidirectional functionality)
+function scrollToSidebarAnnotation(annotationId: string): void {
+    const sidebarItem = document.querySelector(`#annotation-list [data-annotation-id="${annotationId}"]`) as HTMLDivElement;
+    if (sidebarItem) {
+        sidebarItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Temporarily highlight the sidebar item
+        highlightSidebarAnnotation(annotationId, true);
+        setTimeout(() => highlightSidebarAnnotation(annotationId, false), 2000);
     }
 }
 
