@@ -616,7 +616,7 @@ function selectAnnotationById(annotationId: string): void {
     const annotation = annotations.find(a => a.id === annotationId);
     if (!annotation) return;
     
-    const annotationBox = document.querySelector(`[data-annotation-id="${annotationId}"]`) as HTMLDivElement;
+    const annotationBox = document.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`) as HTMLDivElement;
     if (annotationBox) {
         selectAnnotation(annotationBox, annotation);
         
@@ -626,7 +626,7 @@ function selectAnnotationById(annotationId: string): void {
 }
 
 function highlightAnnotationById(annotationId: string, highlight: boolean): void {
-    const annotationBox = document.querySelector(`[data-annotation-id="${annotationId}"]`) as HTMLDivElement;
+    const annotationBox = document.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`) as HTMLDivElement;
     if (annotationBox) {
         if (highlight) {
             annotationBox.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.5)';
@@ -643,11 +643,11 @@ function deleteAnnotationById(annotationId: string): void {
     
     annotations.splice(index, 1);
     
-    // Remove visual annotation box from DOM
-    const annotationBox = document.querySelector(`[data-annotation-id="${annotationId}"]`) as HTMLDivElement;
-    if (annotationBox) {
-        annotationBox.remove();
-    }
+    // Remove visual annotation box from DOM - use more specific selector
+    const annotationBoxes = document.querySelectorAll(`.annotation-box[data-annotation-id="${annotationId}"]`);
+    annotationBoxes.forEach(box => {
+        box.remove();
+    });
     
     // Update the annotation list
     updateAnnotationList();

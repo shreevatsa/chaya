@@ -206,6 +206,7 @@ test.describe('Annotator', () => {
     await expect(sidebar).toBeVisible();
     await expect(sidebar.locator('h2')).toContainText('Annotations');
   });
+
 });
 
 test.describe('Viewer', () => {
