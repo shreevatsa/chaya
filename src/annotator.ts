@@ -51,6 +51,15 @@ let startX = 0;
 let startY = 0;
 let currentAnnotation: HTMLDivElement | null = null;
 
+// Resize/drag state
+let isResizing = false;
+let isDragging = false;
+let resizeHandle: string | null = null;
+let dragStartX = 0;
+let dragStartY = 0;
+let selectedAnnotation: HTMLDivElement | null = null;
+let selectedAnnotationData: Annotation | null = null;
+
 // Function to render a single page
 async function renderPage(pdf: any, pageNumber: number) {
     const page = await pdf.getPage(pageNumber);
@@ -174,19 +183,8 @@ function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement
 
             annotations.push(annotation);
             
-            // Update the visual appearance to match loaded annotations
-            currentAnnotation.style.pointerEvents = 'auto';
-            currentAnnotation.style.cursor = 'pointer';
-            currentAnnotation.title = annotation.label;
-            
-            // Add click handler to edit label
-            currentAnnotation.addEventListener('click', () => {
-                const newLabel = prompt('Edit label:', annotation.label);
-                if (newLabel !== null) {
-                    annotation.label = newLabel;
-                    currentAnnotation!.title = newLabel;
-                }
-            });
+            // Make annotation interactive
+            makeAnnotationInteractive(currentAnnotation, annotation, pageDiv);
 
             console.log('Created annotation:', annotation);
         } else {
@@ -284,20 +282,290 @@ function createAnnotationBox(overlay: HTMLDivElement, pageDiv: HTMLDivElement, a
     annotationBox.style.top = `${top}px`;
     annotationBox.style.width = `${width}px`;
     annotationBox.style.height = `${height}px`;
-    annotationBox.style.cursor = 'pointer';
+    annotationBox.style.cursor = 'move';
     annotationBox.title = annotation.label;
     
-    // Add click handler to edit label
-    annotationBox.addEventListener('click', () => {
-        const newLabel = prompt('Edit label:', annotation.label);
-        if (newLabel !== null) {
-            annotation.label = newLabel;
-            annotationBox.title = newLabel;
-        }
-    });
+    // Make annotation interactive
+    makeAnnotationInteractive(annotationBox, annotation, pageDiv);
 
     overlay.appendChild(annotationBox);
 }
+
+// Make annotation box interactive with resize handles and drag functionality
+function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: Annotation, pageDiv: HTMLDivElement): void {
+    // Add resize handles
+    const handles = ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'];
+    handles.forEach(handle => {
+        const handleElement = document.createElement('div');
+        handleElement.className = `resize-handle resize-${handle}`;
+        handleElement.style.position = 'absolute';
+        handleElement.style.backgroundColor = '#fff';
+        handleElement.style.border = '1px solid #000';
+        handleElement.style.width = '8px';
+        handleElement.style.height = '8px';
+        handleElement.style.zIndex = '1000';
+        
+        // Position handles
+        switch (handle) {
+            case 'nw':
+                handleElement.style.top = '-4px';
+                handleElement.style.left = '-4px';
+                handleElement.style.cursor = 'nw-resize';
+                break;
+            case 'ne':
+                handleElement.style.top = '-4px';
+                handleElement.style.right = '-4px';
+                handleElement.style.cursor = 'ne-resize';
+                break;
+            case 'sw':
+                handleElement.style.bottom = '-4px';
+                handleElement.style.left = '-4px';
+                handleElement.style.cursor = 'sw-resize';
+                break;
+            case 'se':
+                handleElement.style.bottom = '-4px';
+                handleElement.style.right = '-4px';
+                handleElement.style.cursor = 'se-resize';
+                break;
+            case 'n':
+                handleElement.style.top = '-4px';
+                handleElement.style.left = '50%';
+                handleElement.style.transform = 'translateX(-50%)';
+                handleElement.style.cursor = 'n-resize';
+                break;
+            case 's':
+                handleElement.style.bottom = '-4px';
+                handleElement.style.left = '50%';
+                handleElement.style.transform = 'translateX(-50%)';
+                handleElement.style.cursor = 's-resize';
+                break;
+            case 'e':
+                handleElement.style.right = '-4px';
+                handleElement.style.top = '50%';
+                handleElement.style.transform = 'translateY(-50%)';
+                handleElement.style.cursor = 'e-resize';
+                break;
+            case 'w':
+                handleElement.style.left = '-4px';
+                handleElement.style.top = '50%';
+                handleElement.style.transform = 'translateY(-50%)';
+                handleElement.style.cursor = 'w-resize';
+                break;
+        }
+        
+        // Initially hide handles
+        handleElement.style.display = 'none';
+        
+        // Add resize functionality
+        handleElement.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            startResize(e, handle, annotationBox, annotation, pageDiv);
+        });
+        
+        annotationBox.appendChild(handleElement);
+    });
+    
+    // Add selection and drag functionality
+    annotationBox.addEventListener('mousedown', (e) => {
+        selectAnnotation(annotationBox, annotation);
+        if (e.detail === 2) { // Double click to edit label
+            const newLabel = prompt('Edit label:', annotation.label);
+            if (newLabel !== null) {
+                annotation.label = newLabel;
+                annotationBox.title = newLabel;
+            }
+        } else {
+            startDrag(e, annotationBox, annotation, pageDiv);
+        }
+    });
+    
+    // Show/hide handles on hover
+    annotationBox.addEventListener('mouseenter', () => {
+        if (selectedAnnotation === annotationBox) {
+            showResizeHandles(annotationBox);
+        }
+    });
+}
+
+// Select annotation and show resize handles
+function selectAnnotation(annotationBox: HTMLDivElement, annotation: Annotation): void {
+    // Hide handles from previously selected annotation
+    if (selectedAnnotation && selectedAnnotation !== annotationBox) {
+        hideResizeHandles(selectedAnnotation);
+        selectedAnnotation.style.border = '2px solid #ff0000';
+    }
+    
+    // Select new annotation
+    selectedAnnotation = annotationBox;
+    selectedAnnotationData = annotation;
+    annotationBox.style.border = '2px solid #0066ff';
+    showResizeHandles(annotationBox);
+}
+
+// Show resize handles
+function showResizeHandles(annotationBox: HTMLDivElement): void {
+    const handles = annotationBox.querySelectorAll('.resize-handle');
+    handles.forEach(handle => {
+        (handle as HTMLElement).style.display = 'block';
+    });
+}
+
+// Hide resize handles
+function hideResizeHandles(annotationBox: HTMLDivElement): void {
+    const handles = annotationBox.querySelectorAll('.resize-handle');
+    handles.forEach(handle => {
+        (handle as HTMLElement).style.display = 'none';
+    });
+}
+
+// Start resizing
+function startResize(e: MouseEvent, handle: string, annotationBox: HTMLDivElement, annotation: Annotation, pageDiv: HTMLDivElement): void {
+    isResizing = true;
+    resizeHandle = handle;
+    startX = e.clientX;
+    startY = e.clientY;
+    
+    const rect = annotationBox.getBoundingClientRect();
+    const startWidth = rect.width;
+    const startHeight = rect.height;
+    const startLeft = parseFloat(annotationBox.style.left);
+    const startTop = parseFloat(annotationBox.style.top);
+    
+    const handleMouseMove = (e: MouseEvent) => {
+        if (!isResizing) return;
+        
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        
+        let newLeft = startLeft;
+        let newTop = startTop;
+        let newWidth = startWidth;
+        let newHeight = startHeight;
+        
+        switch (resizeHandle) {
+            case 'nw':
+                newLeft = startLeft + deltaX;
+                newTop = startTop + deltaY;
+                newWidth = startWidth - deltaX;
+                newHeight = startHeight - deltaY;
+                break;
+            case 'ne':
+                newTop = startTop + deltaY;
+                newWidth = startWidth + deltaX;
+                newHeight = startHeight - deltaY;
+                break;
+            case 'sw':
+                newLeft = startLeft + deltaX;
+                newWidth = startWidth - deltaX;
+                newHeight = startHeight + deltaY;
+                break;
+            case 'se':
+                newWidth = startWidth + deltaX;
+                newHeight = startHeight + deltaY;
+                break;
+            case 'n':
+                newTop = startTop + deltaY;
+                newHeight = startHeight - deltaY;
+                break;
+            case 's':
+                newHeight = startHeight + deltaY;
+                break;
+            case 'e':
+                newWidth = startWidth + deltaX;
+                break;
+            case 'w':
+                newLeft = startLeft + deltaX;
+                newWidth = startWidth - deltaX;
+                break;
+        }
+        
+        // Ensure minimum size
+        if (newWidth < 10) newWidth = 10;
+        if (newHeight < 10) newHeight = 10;
+        
+        // Apply changes
+        annotationBox.style.left = `${newLeft}px`;
+        annotationBox.style.top = `${newTop}px`;
+        annotationBox.style.width = `${newWidth}px`;
+        annotationBox.style.height = `${newHeight}px`;
+        
+        // Update annotation data with fractional coordinates
+        const pageWidth = pageDiv.offsetWidth;
+        const pageHeight = pageDiv.offsetHeight;
+        
+        annotation.x = newLeft / pageWidth;
+        annotation.y = newTop / pageHeight;
+        annotation.width = newWidth / pageWidth;
+        annotation.height = newHeight / pageHeight;
+    };
+    
+    const handleMouseUp = () => {
+        isResizing = false;
+        resizeHandle = null;
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    e.preventDefault();
+}
+
+// Start dragging
+function startDrag(e: MouseEvent, annotationBox: HTMLDivElement, annotation: Annotation, pageDiv: HTMLDivElement): void {
+    isDragging = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    
+    const startLeft = parseFloat(annotationBox.style.left);
+    const startTop = parseFloat(annotationBox.style.top);
+    
+    const handleMouseMove = (e: MouseEvent) => {
+        if (!isDragging) return;
+        
+        const deltaX = e.clientX - dragStartX;
+        const deltaY = e.clientY - dragStartY;
+        
+        const newLeft = startLeft + deltaX;
+        const newTop = startTop + deltaY;
+        
+        // Keep annotation within page bounds
+        const pageWidth = pageDiv.offsetWidth;
+        const pageHeight = pageDiv.offsetHeight;
+        const boxWidth = parseFloat(annotationBox.style.width);
+        const boxHeight = parseFloat(annotationBox.style.height);
+        
+        const clampedLeft = Math.max(0, Math.min(newLeft, pageWidth - boxWidth));
+        const clampedTop = Math.max(0, Math.min(newTop, pageHeight - boxHeight));
+        
+        annotationBox.style.left = `${clampedLeft}px`;
+        annotationBox.style.top = `${clampedTop}px`;
+        
+        // Update annotation data with fractional coordinates
+        annotation.x = clampedLeft / pageWidth;
+        annotation.y = clampedTop / pageHeight;
+    };
+    
+    const handleMouseUp = () => {
+        isDragging = false;
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    e.preventDefault();
+}
+
+// Click outside to deselect
+document.addEventListener('click', (e) => {
+    if (selectedAnnotation && !selectedAnnotation.contains(e.target as Node)) {
+        hideResizeHandles(selectedAnnotation);
+        selectedAnnotation.style.border = '2px solid #ff0000';
+        selectedAnnotation = null;
+        selectedAnnotationData = null;
+    }
+});
 
 // Listen for file selection
 pdfUpload.addEventListener('change', async (event) => {

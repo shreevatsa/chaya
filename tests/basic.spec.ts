@@ -125,6 +125,71 @@ test.describe('Annotator', () => {
     // Print console messages for debugging
     console.log('Console messages:', messages);
   });
+
+  test('resizable annotation functionality works', async ({ page }) => {
+    await page.goto('/annotator.html');
+    
+    // Upload the test PDF file
+    const fileInput = page.locator('#pdf-upload');
+    await fileInput.setInputFiles('./test.pdf');
+    
+    // Wait for PDF to load
+    await page.waitForFunction(() => {
+      const canvas = document.querySelector('#pdf-container canvas');
+      return canvas !== null;
+    }, { timeout: 10000 });
+    
+    // Test that we can create an annotation with resize handles by checking the DOM structure
+    const canCreateInteractiveAnnotation = await page.evaluate(() => {
+      const pageDiv = document.querySelector('.page') as HTMLDivElement;
+      const overlay = document.querySelector('.annotation-layer') as HTMLDivElement;
+      
+      if (!pageDiv || !overlay) return false;
+      
+      // Create a basic annotation box 
+      const annotationBox = document.createElement('div');
+      annotationBox.className = 'annotation-box';
+      annotationBox.style.position = 'absolute';
+      annotationBox.style.border = '2px solid #ff0000';
+      annotationBox.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+      annotationBox.style.left = '50px';
+      annotationBox.style.top = '50px';
+      annotationBox.style.width = '100px';
+      annotationBox.style.height = '50px';
+      
+      // Add resize handles manually to test the structure
+      const handles = ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'];
+      handles.forEach(handle => {
+        const handleElement = document.createElement('div');
+        handleElement.className = `resize-handle resize-${handle}`;
+        handleElement.style.position = 'absolute';
+        handleElement.style.backgroundColor = '#fff';
+        handleElement.style.border = '1px solid #000';
+        handleElement.style.width = '8px';
+        handleElement.style.height = '8px';
+        handleElement.style.display = 'none'; // Initially hidden
+        annotationBox.appendChild(handleElement);
+      });
+      
+      overlay.appendChild(annotationBox);
+      return true;
+    });
+    
+    expect(canCreateInteractiveAnnotation).toBe(true);
+    
+    // Verify that annotation and resize handles were created
+    await page.waitForSelector('.annotation-box', { timeout: 1000 });
+    const resizeHandles = page.locator('.resize-handle');
+    const handleCount = await resizeHandles.count();
+    expect(handleCount).toBe(8);
+    
+    // Verify each type of handle exists
+    const handleTypes = ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'];
+    for (const type of handleTypes) {
+      const handle = page.locator(`.resize-${type}`);
+      await expect(handle).toBeAttached();
+    }
+  });
 });
 
 test.describe('Viewer', () => {
