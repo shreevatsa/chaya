@@ -302,7 +302,7 @@ test.describe('Viewer', () => {
     
     // Check annotation summary elements
     await expect(page.locator('#annotation-count')).toBeVisible();
-    await expect(page.locator('#annotation-list')).toBeVisible();
+    await expect(page.locator('#annotation-list')).toBeAttached(); // Empty flex container may not be "visible"
     
     // Initially shows no annotations
     await expect(page.locator('#annotation-count')).toContainText('No annotations loaded');
