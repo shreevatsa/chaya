@@ -950,6 +950,8 @@ function showAIPromptDialog(pageDiv: HTMLDivElement, pageNumber: number): void {
         </label>
         <textarea id="ai-prompt" style="width: 100%; height: 120px; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: sans-serif; font-size: 14px; resize: vertical; box-sizing: border-box;">Break this document page into "regions" (paragraphs etc), and for each region, provide coordinates (as percentages of page width/height) and a descriptive label.
 
+Perform this task purely visually, as if you could not read the script/language: I just want the regions to match the visual layout of the page (headings, paragraphs, etc), rather than any semantic regions based on understanding what is written.
+
 Return response as an array in JSON, with each array element having fields (x, y, width, height, label) — the first four are numbers between 0 and 1, and the last one is a string.</textarea>
         <div style="margin-top: 16px; display: flex; gap: 12px; justify-content: flex-end;">
             <button id="ai-cancel" style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; cursor: pointer; font-family: sans-serif;">Cancel</button>
@@ -1088,6 +1090,9 @@ async function callGeminiAPIWithExamples(
 ): Promise<string> {
     let enhancedPrompt = prompt;
     
+    // Add visual-only instruction
+    enhancedPrompt += '\n\nIMPORTANT: Perform this task purely visually, as if you could not read the script/language: I just want the regions to match the visual layout of the page (headings, paragraphs, etc), rather than any semantic regions based on understanding what is written.';
+    
     // Add information about examples if available
     if (examples.length > 0) {
         enhancedPrompt += `\n\nI'm providing ${examples.length} example${examples.length === 1 ? '' : 's'} from OTHER pages that I have already annotated, to help you understand the annotation style and quality expected. These are NOT for the current page you're annotating - they're just examples to show you what good annotations look like. Each example includes both the visual representation (page with red rectangles overlaid) and the corresponding JSON coordinates.`;
@@ -1152,7 +1157,7 @@ async function callGeminiAPIAdvanced(imageParts: any[], apiKey: string): Promise
         }
     };
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-06-17:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1186,7 +1191,9 @@ async function callGeminiAPIForReview(
     
     let reviewPrompt = `ROUND 2: REVIEW AND REFINEMENT
 
-This is the second round of a two-round annotation process. In Round 1, I asked you to annotate this page based on the prompt: "${originalPrompt}"`;
+This is the second round of a two-round annotation process. In Round 1, I asked you to annotate this page based on the prompt: "${originalPrompt}"
+
+IMPORTANT: Continue to perform this task purely visually, as if you could not read the script/language: I just want the regions to match the visual layout of the page (headings, paragraphs, etc), rather than any semantic regions based on understanding what is written.`;
     
     // Add examples context if available
     if (examples.length > 0) {
@@ -1354,7 +1361,7 @@ Only return the JSON array, nothing else.`;
         }
     };
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-06-17:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
