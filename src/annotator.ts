@@ -89,14 +89,17 @@ async function renderPage(pdf: any, pageNumber: number) {
 // Setup annotation drawing functionality
 function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement, pageNumber: number) {
     overlay.addEventListener('mousedown', (e) => {
+        // Only start drawing on left mouse button (button 0)
+        if (e.button !== 0) return;
+
         isDrawing = true;
         const rect = overlay.getBoundingClientRect();
         startX = e.clientX - rect.left;
         startY = e.clientY - rect.top;
 
-        // Create a new annotation box
+        // Create a new temporary annotation box
         currentAnnotation = document.createElement('div');
-        currentAnnotation.className = 'annotation-box';
+        currentAnnotation.className = 'annotation-box-tmp';
         currentAnnotation.style.position = 'absolute';
         currentAnnotation.style.border = '2px solid #ff0000';
         currentAnnotation.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
@@ -160,6 +163,8 @@ function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement
 
             annotations.push(annotation);
 
+            // Convert temporary annotation to permanent annotation
+            currentAnnotation.className = 'annotation-box';
             // Add data attribute for selection
             currentAnnotation.dataset.annotationId = annotation.id;
 
@@ -177,6 +182,11 @@ function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement
 
         currentAnnotation = null;
     });
+
+    // // Prevent context menu on right-click to avoid interference
+    // overlay.addEventListener('contextmenu', (e) => {
+    //     e.preventDefault();
+    // });
 }
 
 // Generate unique ID for annotations
@@ -535,8 +545,17 @@ function startDrag(e: MouseEvent, annotationBox: HTMLDivElement, annotation: Ann
     e.preventDefault();
 }
 
-// Click outside to deselect
+// Clean up temporary annotations on any click and handle deselection
 document.addEventListener('click', (e) => {
+    // Remove all temporary annotation rectangles
+    const tempAnnotations = document.querySelectorAll('.annotation-box-tmp');
+    tempAnnotations.forEach(temp => temp.remove());
+
+    // Reset drawing state if interrupted
+    isDrawing = false;
+    currentAnnotation = null;
+
+    // Handle deselection
     if (selectedAnnotation && !selectedAnnotation.contains(e.target as Node)) {
         hideResizeHandles(selectedAnnotation);
         selectedAnnotation.style.border = '2px solid #ff0000';
@@ -689,7 +708,7 @@ function deleteAnnotationById(annotationId: string): void {
 
     annotations.splice(index, 1);
 
-    // Remove visual annotation box from DOM - use more specific selector
+    // Remove visual annotation box from DOM
     const annotationBoxes = document.querySelectorAll(`.annotation-box[data-annotation-id="${annotationId}"]`);
     annotationBoxes.forEach(box => {
         box.remove();
