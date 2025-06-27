@@ -371,10 +371,12 @@ function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: An
         e.stopPropagation(); // Prevent triggering the drawing behavior on the overlay
         selectAnnotation(annotationBox, annotation);
         if (e.detail === 2) { // Double click to edit label
-            const newLabel = prompt('Edit label:', annotation.label);
-            if (newLabel !== null) {
-                annotation.label = newLabel;
-                annotationBox.title = newLabel;
+            const newLabel = window.prompt('Edit label:', annotation.label);
+            if (newLabel !== null && newLabel.trim() !== '') {
+                annotation.label = newLabel.trim();
+                annotationBox.title = newLabel.trim();
+                // Update the sidebar to reflect the label change
+                updateAnnotationList();
             }
         } else {
             startDrag(e, annotationBox, annotation, pageDiv);
