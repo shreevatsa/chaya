@@ -1088,7 +1088,7 @@ async function callGeminiAPIWithExamples(
     
     // Add information about examples if available
     if (examples.length > 0) {
-        enhancedPrompt += `\n\nI'm providing ${examples.length} example${examples.length === 1 ? '' : 's'} from previously annotated pages to help you understand the annotation style and quality expected. Each example includes both the visual representation (page with red rectangles overlaid) and the corresponding JSON coordinates.`;
+        enhancedPrompt += `\n\nI'm providing ${examples.length} example${examples.length === 1 ? '' : 's'} from OTHER pages that I have already annotated, to help you understand the annotation style and quality expected. These are NOT for the current page you're annotating - they're just examples to show you what good annotations look like. Each example includes both the visual representation (page with red rectangles overlaid) and the corresponding JSON coordinates.`;
     }
     
     const imageParts: any[] = [{ text: enhancedPrompt }];
@@ -1103,7 +1103,7 @@ async function callGeminiAPIWithExamples(
     
     // Add examples if available
     if (examples.length > 0) {
-        let exampleText = '\n\nEXAMPLES FROM PREVIOUS PAGES:\n';
+        let exampleText = '\n\nEXAMPLES FROM OTHER PAGES (for style reference only):\n';
         
         for (const example of examples) {
             exampleText += `\n--- Example: Page ${example.pageNumber} ---\n`;
@@ -1129,7 +1129,7 @@ async function callGeminiAPIWithExamples(
             exampleText += '\n';
         }
         
-        exampleText += '\nPlease follow a similar annotation style, level of detail, and coordinate precision for the current page (first image above).';
+        exampleText += '\nPlease follow a similar annotation style, level of detail, and coordinate precision for the current page (first image above). Remember: these examples are from OTHER pages - do NOT copy these exact annotations, but use them as a guide for the style and quality of annotations to create for the current page.';
         
         // Update the first text part with the enhanced prompt
         imageParts[0] = { text: enhancedPrompt + exampleText };
@@ -1150,7 +1150,7 @@ async function callGeminiAPIAdvanced(imageParts: any[], apiKey: string): Promise
         }
     };
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-06-17:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1188,7 +1188,7 @@ This is the second round of a two-round annotation process. In Round 1, I asked 
     
     // Add examples context if available
     if (examples.length > 0) {
-        reviewPrompt += ` I also provided ${examples.length} example${examples.length === 1 ? '' : 's'} from previously annotated pages.`;
+        reviewPrompt += ` I also provided ${examples.length} example${examples.length === 1 ? '' : 's'} from OTHER previously annotated pages as style guides.`;
     }
     
     reviewPrompt += `\n\nYour Round 1 annotations were:\n${JSON.stringify(initialAnnotations.map(ann => ({
@@ -1222,7 +1222,7 @@ Return your final, improved annotations as a JSON array with the same format (x,
     
     // Add all the examples from Round 1
     if (examples.length > 0) {
-        let exampleText = '\n\nSAME EXAMPLES FROM ROUND 1:\n';
+        let exampleText = '\n\nSAME EXAMPLES FROM ROUND 1 (from OTHER pages, for style reference):\n';
         
         for (const example of examples) {
             exampleText += `\n--- Example: Page ${example.pageNumber} ---\n`;
@@ -1352,7 +1352,7 @@ Only return the JSON array, nothing else.`;
         }
     };
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-06-17:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
