@@ -163,13 +163,17 @@ function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement
 
             annotations.push(annotation);
 
-            // Convert temporary annotation to permanent annotation
-            currentAnnotation.className = 'annotation-box';
-            // Add data attribute for selection
-            currentAnnotation.dataset.annotationId = annotation.id;
-
-            // Make annotation interactive
-            makeAnnotationInteractive(currentAnnotation, annotation, pageDiv);
+            // Remove the temporary annotation
+            overlay.removeChild(currentAnnotation);
+            
+            // Create proper annotation box using the same path as loaded annotations
+            createAnnotationBox(overlay, pageDiv, annotation);
+            
+            // Auto-select the newly created annotation so user can resize it immediately
+            const newAnnotationBox = overlay.querySelector(`[data-annotation-id="${annotation.id}"]`) as HTMLDivElement;
+            if (newAnnotationBox) {
+                selectAnnotation(newAnnotationBox, annotation);
+            }
 
             // Update the annotation list
             updateAnnotationList();
