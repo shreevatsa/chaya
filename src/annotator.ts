@@ -71,8 +71,31 @@ async function renderPage(pdf: any, pageNumber: number) {
     pageDiv.style.width = `${viewport.width}px`;
     pageDiv.style.height = `${viewport.height}px`;
 
+    // Create AI annotate button
+    const aiButton = document.createElement('button');
+    aiButton.className = 'ai-annotate-btn';
+    aiButton.style.position = 'absolute';
+    aiButton.style.top = '8px';
+    aiButton.style.right = '8px';
+    aiButton.style.backgroundColor = '#3b82f6';
+    aiButton.style.color = 'white';
+    aiButton.style.border = 'none';
+    aiButton.style.borderRadius = '6px';
+    aiButton.style.padding = '6px 12px';
+    aiButton.style.fontSize = '12px';
+    aiButton.style.cursor = 'pointer';
+    aiButton.style.zIndex = '1000';
+    aiButton.style.fontFamily = 'sans-serif';
+    aiButton.textContent = '🤖 AI Annotate';
+    aiButton.title = 'Use AI to automatically annotate this page';
+    
+    aiButton.addEventListener('click', () => {
+        showAIPromptDialog(pageDiv, pageNumber);
+    });
+
     pageDiv.appendChild(canvas);
     pageDiv.appendChild(annotationLayer);
+    pageDiv.appendChild(aiButton);
     pdfContainer.appendChild(pageDiv);
 
     const renderContext = {
@@ -893,3 +916,502 @@ saveAnnotationsBtn.addEventListener('click', () => {
 
     console.log('Saved annotations:', annotationsData);
 });
+
+// AI Annotation Functions
+function showAIPromptDialog(pageDiv: HTMLDivElement, pageNumber: number): void {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    overlay.style.zIndex = '2000';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+
+    // Create dialog
+    const dialog = document.createElement('div');
+    dialog.style.backgroundColor = 'white';
+    dialog.style.borderRadius = '8px';
+    dialog.style.padding = '24px';
+    dialog.style.maxWidth = '500px';
+    dialog.style.width = '90%';
+    dialog.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.2)';
+
+    dialog.innerHTML = `
+        <h3 style="margin: 0 0 16px 0; font-family: sans-serif; color: #1f2937;">AI Annotate Page ${pageNumber}</h3>
+        <label style="display: block; margin-bottom: 8px; font-family: sans-serif; font-size: 14px; color: #374151;">
+            Prompt for AI:
+        </label>
+        <textarea id="ai-prompt" style="width: 100%; height: 120px; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; font-family: sans-serif; font-size: 14px; resize: vertical; box-sizing: border-box;">Break this document page into "regions" (paragraphs etc), and for each region, provide coordinates (as percentages of page width/height) and a descriptive label.
+
+Return response as an array in JSON, with each array element having fields (x, y, width, height, label) — the first four are numbers between 0 and 1, and the last one is a string.</textarea>
+        <div style="margin-top: 16px; display: flex; gap: 12px; justify-content: flex-end;">
+            <button id="ai-cancel" style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; cursor: pointer; font-family: sans-serif;">Cancel</button>
+            <button id="ai-submit" style="padding: 8px 16px; border: none; background: #3b82f6; color: white; border-radius: 6px; cursor: pointer; font-family: sans-serif;">🤖 Annotate with AI</button>
+        </div>
+    `;
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // Focus the textarea
+    const textarea = dialog.querySelector('#ai-prompt') as HTMLTextAreaElement;
+    textarea.focus();
+
+    // Handle cancel
+    const cancelBtn = dialog.querySelector('#ai-cancel') as HTMLButtonElement;
+    cancelBtn.addEventListener('click', () => {
+        document.body.removeChild(overlay);
+    });
+
+    // Handle submit
+    const submitBtn = dialog.querySelector('#ai-submit') as HTMLButtonElement;
+    submitBtn.addEventListener('click', async () => {
+        const prompt = textarea.value.trim();
+        if (!prompt) {
+            alert('Please enter a prompt for the AI');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = '🔄 Round 1/2...';
+        
+        try {
+            await processPageWithAI(pageDiv, pageNumber, prompt, submitBtn);
+            document.body.removeChild(overlay);
+        } catch (error) {
+            console.error('AI processing failed:', error);
+            alert('AI processing failed: ' + error);
+            submitBtn.disabled = false;
+            submitBtn.textContent = '🤖 Annotate with AI';
+        }
+    });
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            document.body.removeChild(overlay);
+        }
+    });
+}
+
+// Create an image with annotation rectangles overlaid on top
+function createPageImageWithAnnotations(sourceCanvas: HTMLCanvasElement, annotations: Annotation[]): string {
+    // Create a new canvas with the same dimensions
+    const overlayCanvas = document.createElement('canvas');
+    const ctx = overlayCanvas.getContext('2d')!;
+    overlayCanvas.width = sourceCanvas.width;
+    overlayCanvas.height = sourceCanvas.height;
+    
+    // Draw the original page image
+    ctx.drawImage(sourceCanvas, 0, 0);
+    
+    // Draw annotation rectangles on top
+    annotations.forEach(annotation => {
+        const x = annotation.x * sourceCanvas.width;
+        const y = annotation.y * sourceCanvas.height;
+        const width = annotation.width * sourceCanvas.width;
+        const height = annotation.height * sourceCanvas.height;
+        
+        // Draw rectangle border
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, width, height);
+        
+        // Draw semi-transparent fill
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+        ctx.fillRect(x, y, width, height);
+        
+        // Draw label if there's space
+        if (width > 50 && height > 20) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(x, y - 20, Math.min(width, ctx.measureText(annotation.label).width + 8), 20);
+            ctx.fillStyle = '#000000';
+            ctx.font = '12px sans-serif';
+            ctx.fillText(annotation.label, x + 4, y - 6);
+        }
+    });
+    
+    // Return as base64
+    return overlayCanvas.toDataURL('image/png').split(',')[1];
+}
+
+// Get examples from up to 2 most recent pages that have annotations
+function getExamplesFromRecentPages(currentPageNumber: number): Array<{pageNumber: number, annotations: Annotation[], imageWithAnnotations?: string}> {
+    const examples: Array<{pageNumber: number, annotations: Annotation[], imageWithAnnotations?: string}> = [];
+    
+    // Get unique page numbers with annotations, excluding current page
+    const annotatedPages = [...new Set(
+        annotations
+            .filter(ann => ann.pageNumber !== currentPageNumber)
+            .map(ann => ann.pageNumber)
+    )].sort((a, b) => b - a); // Sort descending to get most recent first
+    
+    // Take up to 2 most recent pages
+    for (const pageNum of annotatedPages.slice(0, 2)) {
+        const pageAnnotations = annotations.filter(ann => ann.pageNumber === pageNum);
+        if (pageAnnotations.length > 0) {
+            // Find the canvas for this page
+            const pageDiv = pdfContainer.querySelector(`[data-page-number="${pageNum}"]`) as HTMLDivElement;
+            let imageWithAnnotations: string | undefined;
+            
+            if (pageDiv) {
+                const canvas = pageDiv.querySelector('canvas') as HTMLCanvasElement;
+                if (canvas) {
+                    imageWithAnnotations = createPageImageWithAnnotations(canvas, pageAnnotations);
+                }
+            }
+            
+            examples.push({
+                pageNumber: pageNum,
+                annotations: pageAnnotations,
+                imageWithAnnotations
+            });
+        }
+    }
+    
+    return examples;
+}
+
+// Round 1: Call AI with examples from previous pages
+async function callGeminiAPIWithExamples(
+    base64Image: string, 
+    prompt: string, 
+    examples: Array<{pageNumber: number, annotations: Annotation[], imageWithAnnotations?: string}>, 
+    apiKey: string
+): Promise<string> {
+    let enhancedPrompt = prompt;
+    
+    // Add information about examples if available
+    if (examples.length > 0) {
+        enhancedPrompt += `\n\nI'm providing ${examples.length} example${examples.length === 1 ? '' : 's'} from previously annotated pages to help you understand the annotation style and quality expected. Each example includes both the visual representation (page with red rectangles overlaid) and the corresponding JSON coordinates.`;
+    }
+    
+    const imageParts: any[] = [{ text: enhancedPrompt }];
+    
+    // Add the current page image first
+    imageParts.push({
+        inline_data: {
+            mime_type: "image/png",
+            data: base64Image
+        }
+    });
+    
+    // Add examples if available
+    if (examples.length > 0) {
+        let exampleText = '\n\nEXAMPLES FROM PREVIOUS PAGES:\n';
+        
+        for (const example of examples) {
+            exampleText += `\n--- Example: Page ${example.pageNumber} ---\n`;
+            exampleText += 'Annotations (JSON coordinates):\n';
+            exampleText += JSON.stringify(example.annotations.map(ann => ({
+                x: ann.x,
+                y: ann.y,
+                width: ann.width,
+                height: ann.height,
+                label: ann.label
+            })), null, 2);
+            exampleText += '\n\nVisual representation (see image below with red rectangles overlaid):\n';
+            
+            // Add the example image with annotations overlaid if available
+            if (example.imageWithAnnotations) {
+                imageParts.push({
+                    inline_data: {
+                        mime_type: "image/png",
+                        data: example.imageWithAnnotations
+                    }
+                });
+            }
+            exampleText += '\n';
+        }
+        
+        exampleText += '\nPlease follow a similar annotation style, level of detail, and coordinate precision for the current page (first image above).';
+        
+        // Update the first text part with the enhanced prompt
+        imageParts[0] = { text: enhancedPrompt + exampleText };
+    }
+    
+    return callGeminiAPIAdvanced(imageParts, apiKey);
+}
+
+// Advanced API call that can handle multiple images
+async function callGeminiAPIAdvanced(imageParts: any[], apiKey: string): Promise<string> {
+    const requestBody = {
+        contents: [{
+            parts: imageParts
+        }],
+        generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 2048,
+        }
+    };
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Gemini API error: ${response.status} - ${errorData}`);
+    }
+
+    const data = await response.json();
+    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        throw new Error('Invalid response from Gemini API');
+    }
+
+    return data.candidates[0].content.parts[0].text;
+}
+
+// Round 2: Ask AI to review and refine its own annotations
+async function callGeminiAPIForReview(
+    pageCanvas: HTMLCanvasElement,
+    originalPrompt: string,
+    examples: Array<{pageNumber: number, annotations: Annotation[], imageWithAnnotations?: string}>,
+    initialAnnotations: Annotation[], 
+    apiKey: string
+): Promise<string> {
+    // Create image with initial annotations overlaid
+    const imageWithAnnotations = createPageImageWithAnnotations(pageCanvas, initialAnnotations);
+    
+    let reviewPrompt = `ROUND 2: REVIEW AND REFINEMENT
+
+This is the second round of a two-round annotation process. In Round 1, I asked you to annotate this page based on the prompt: "${originalPrompt}"`;
+    
+    // Add examples context if available
+    if (examples.length > 0) {
+        reviewPrompt += ` I also provided ${examples.length} example${examples.length === 1 ? '' : 's'} from previously annotated pages.`;
+    }
+    
+    reviewPrompt += `\n\nYour Round 1 annotations were:\n${JSON.stringify(initialAnnotations.map(ann => ({
+        x: ann.x,
+        y: ann.y, 
+        width: ann.width,
+        height: ann.height,
+        label: ann.label
+    })), null, 2)}`;
+    
+    reviewPrompt += `\n\nNow I'm providing you with ALL the same context from Round 1 (original page, examples, and prompt), PLUS an image showing your Round 1 annotations overlaid as red rectangles.\n\nPlease review and refine your annotations. Consider:
+- Are there any regions you missed?
+- Are the coordinates accurate and well-positioned?
+- Are the labels descriptive and consistent with the examples?
+- Should any regions be split or merged?
+- Do the rectangles properly capture the content boundaries?
+- How do your annotations compare to the quality and style of the examples?
+
+Return your final, improved annotations as a JSON array with the same format (x, y, width, height, label).`;
+    
+    const imageParts: any[] = [{ text: reviewPrompt }];
+    
+    // Add the original page image first
+    const originalImage = pageCanvas.toDataURL('image/png').split(',')[1];
+    imageParts.push({
+        inline_data: {
+            mime_type: "image/png",
+            data: originalImage
+        }
+    });
+    
+    // Add all the examples from Round 1
+    if (examples.length > 0) {
+        let exampleText = '\n\nSAME EXAMPLES FROM ROUND 1:\n';
+        
+        for (const example of examples) {
+            exampleText += `\n--- Example: Page ${example.pageNumber} ---\n`;
+            exampleText += 'Annotations (JSON coordinates):\n';
+            exampleText += JSON.stringify(example.annotations.map(ann => ({
+                x: ann.x,
+                y: ann.y,
+                width: ann.width,
+                height: ann.height,
+                label: ann.label
+            })), null, 2);
+            exampleText += '\n\nVisual representation (see image below):\n';
+            
+            // Add the example image with annotations overlaid if available
+            if (example.imageWithAnnotations) {
+                imageParts.push({
+                    inline_data: {
+                        mime_type: "image/png",
+                        data: example.imageWithAnnotations
+                    }
+                });
+            }
+        }
+        
+        // Update the first text part to include examples
+        imageParts[0] = { text: reviewPrompt + exampleText };
+    }
+    
+    // Add the current page with Round 1 annotations overlaid
+    imageParts.push({
+        inline_data: {
+            mime_type: "image/png",
+            data: imageWithAnnotations
+        }
+    });
+    
+    // Add final instruction
+    const finalText = '\n\nABOVE: Current page with your Round 1 annotations shown as red rectangles. Please provide your final, refined annotations.';
+    if (examples.length > 0) {
+        imageParts[0] = { text: imageParts[0].text + finalText };
+    } else {
+        imageParts[0] = { text: reviewPrompt + finalText };
+    }
+    
+    return callGeminiAPIAdvanced(imageParts, apiKey);
+}
+
+async function processPageWithAI(pageDiv: HTMLDivElement, pageNumber: number, prompt: string, submitBtn?: HTMLButtonElement): Promise<void> {
+    // Get the canvas from the page
+    const canvas = pageDiv.querySelector('canvas') as HTMLCanvasElement;
+    if (!canvas) {
+        throw new Error('Could not find canvas for page');
+    }
+
+    // Convert canvas to base64 image
+    const imageDataUrl = canvas.toDataURL('image/png');
+    const base64Image = imageDataUrl.split(',')[1]; // Remove data:image/png;base64, prefix
+
+    // Get Gemini API key from environment or prompt user
+    let apiKey = localStorage.getItem('gemini-api-key');
+    if (!apiKey) {
+        apiKey = window.prompt('Please enter your Gemini API key (will be saved for this session):');
+        if (!apiKey) {
+            throw new Error('API key is required');
+        }
+        localStorage.setItem('gemini-api-key', apiKey);
+    }
+
+    // Get examples from up to 2 most recent annotated pages
+    const examples = getExamplesFromRecentPages(pageNumber);
+    
+    // Round 1: Initial annotation with examples
+    console.log('AI Round 1: Initial annotation with examples');
+    const round1Response = await callGeminiAPIWithExamples(base64Image, prompt, examples, apiKey);
+    const initialAnnotations = parseAIResponse(round1Response, pageNumber);
+    
+    // Round 2: Self-review and refinement
+    if (submitBtn) {
+        submitBtn.textContent = '🔄 Round 2/2...';
+    }
+    console.log('AI Round 2: Self-review and refinement');
+    const round2Response = await callGeminiAPIForReview(canvas, prompt, examples, initialAnnotations, apiKey);
+    const finalAnnotations = parseAIResponse(round2Response, pageNumber);
+    
+    // Create annotation boxes using our existing system
+    const annotationLayer = pageDiv.querySelector('.annotation-layer') as HTMLDivElement;
+    for (const annotation of finalAnnotations) {
+        annotations.push(annotation);
+        createAnnotationBox(annotationLayer, pageDiv, annotation);
+    }
+    
+    // Update the annotation list
+    updateAnnotationList();
+    
+    console.log(`Created ${finalAnnotations.length} AI annotations for page ${pageNumber} after 2 rounds`);
+}
+
+async function callGeminiAPI(base64Image: string, prompt: string, apiKey: string): Promise<string> {
+    const enhancedPrompt = `${prompt}
+
+Please respond with a JSON array of annotations. Each annotation should have this exact format:
+{
+  "x": 0.1,        // X position as percentage (0.0 to 1.0)
+  "y": 0.2,        // Y position as percentage (0.0 to 1.0) 
+  "width": 0.3,    // Width as percentage (0.0 to 1.0)
+  "height": 0.1,   // Height as percentage (0.0 to 1.0)
+  "label": "Table showing sales data"  // Descriptive label
+}
+
+Only return the JSON array, nothing else.`;
+
+    const requestBody = {
+        contents: [{
+            parts: [
+                { text: enhancedPrompt },
+                {
+                    inline_data: {
+                        mime_type: "image/png",
+                        data: base64Image
+                    }
+                }
+            ]
+        }],
+        generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 2048,
+        }
+    };
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Gemini API error: ${response.status} - ${errorData}`);
+    }
+
+    const data = await response.json();
+    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        throw new Error('Invalid response from Gemini API');
+    }
+
+    return data.candidates[0].content.parts[0].text;
+}
+
+function parseAIResponse(response: string, pageNumber: number): Annotation[] {
+    try {
+        // Extract JSON from response (in case there's extra text)
+        const jsonMatch = response.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+            throw new Error('No JSON array found in AI response');
+        }
+
+        const aiRegions = JSON.parse(jsonMatch[0]);
+        if (!Array.isArray(aiRegions)) {
+            throw new Error('AI response is not an array');
+        }
+
+        return aiRegions.map((region: any, index: number) => {
+            // Validate the region format
+            if (typeof region.x !== 'number' || typeof region.y !== 'number' ||
+                typeof region.width !== 'number' || typeof region.height !== 'number' ||
+                typeof region.label !== 'string') {
+                console.warn('Invalid region format from AI:', region);
+                return null;
+            }
+
+            // Clamp values to valid ranges
+            const annotation: Annotation = {
+                id: generateId(),
+                x: Math.max(0, Math.min(1, region.x)),
+                y: Math.max(0, Math.min(1, region.y)),
+                width: Math.max(0.01, Math.min(1 - region.x, region.width)),
+                height: Math.max(0.01, Math.min(1 - region.y, region.height)),
+                label: region.label || `AI Region ${index + 1}`,
+                pageNumber: pageNumber
+            };
+
+            return annotation;
+        }).filter(Boolean) as Annotation[];
+
+    } catch (error) {
+        console.error('Failed to parse AI response:', error);
+        console.log('Raw AI response:', response);
+        throw new Error('Failed to parse AI response. Please check the console for details.');
+    }
+}
