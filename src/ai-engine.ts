@@ -1,5 +1,3 @@
-
-
 // In src/ai-engine.ts
 
 // This file is completely headless and has no browser dependencies.
@@ -28,7 +26,9 @@ export interface AIAnnotationResponse {
 
 export interface AIEngine {
     /**
+     *
      * Takes an image and a prompt, and returns structured annotation data.
+     *
      * This method can implement various strategies, like multi-round refinement.
      */
     annotate(request: AIAnnotationRequest): Promise<AIAnnotationResponse>;
@@ -46,21 +46,17 @@ export class GeminiEngine implements AIEngine {
     }
 
     public async annotate(request: AIAnnotationRequest): Promise<AIAnnotationResponse> {
-        // This implementation uses a two-round refinement process.
-        console.log("Gemini Engine: Starting 2-round annotation process.");
+        // This implementation uses a single-round annotation process.
+        console.log("Gemini Engine: Starting 1-round annotation process.");
 
         // Round 1: Initial annotation generation.
         const round1ResponseText = await this.runRound1(request);
-        const round1Annotations = this.parseAIResponse(round1ResponseText);
-
-        // Round 2: Self-review and refinement.
-        const round2ResponseText = await this.runRound2(request, round1Annotations);
-        const finalAnnotations = this.parseAIResponse(round2ResponseText);
+        const finalAnnotations = this.parseAIResponse(round1ResponseText);
 
         console.log(`Gemini Engine: Completed. Found ${finalAnnotations.length} annotations.`);
 
         return {
-            rawResponse: round2ResponseText,
+            rawResponse: round1ResponseText,
             parsedAnnotations: finalAnnotations,
         };
     }
@@ -68,7 +64,6 @@ export class GeminiEngine implements AIEngine {
     private async runRound1(request: AIAnnotationRequest): Promise<string> {
         console.log("Gemini Engine: Round 1 - Generating initial annotations.");
         let prompt = request.prompt;
-        prompt += '\n\nIMPORTANT: Perform this task purely visually, as if you could not read the script/language. I want regions matching the visual layout (headings, paragraphs, etc), not semantic meaning.';
 
         const imageParts: any[] = [{ text: prompt }];
 
@@ -89,19 +84,6 @@ export class GeminiEngine implements AIEngine {
             }
             imageParts[0] = { text: prompt + exampleText };
         }
-
-        return this.callApi(imageParts);
-    }
-
-    private async runRound2(request: AIAnnotationRequest, round1Annotations: any[]): Promise<string> {
-        console.log("Gemini Engine: Round 2 - Refining annotations.");
-        
-        const reviewPrompt = `ROUND 2: REVIEW AND REFINEMENT\nIn Round 1, you generated the following annotations:\n${JSON.stringify(round1Annotations, null, 2)}\n\nNow, review your work. I am providing the original image again.\n- Are there any regions you missed?\n- Are the coordinates accurate?\n- Should any regions be split or merged?\n- Do they match the visual layout well?\n\nReturn your final, improved annotations as a JSON array. The original prompt was: "${request.prompt}"`;
-
-        const imageParts: any[] = [
-            { text: reviewPrompt },
-            { inline_data: { mime_type: "image/png", data: request.base64Image } }
-        ];
 
         return this.callApi(imageParts);
     }
