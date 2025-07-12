@@ -24,6 +24,18 @@
         <div class="flex gap-4" style="height: 70vh;">
             <!-- Main PDF Container -->
             <div class="flex-1">
+                <!-- Loading Progress -->
+                <div id="pdf-loading" class="bg-white border border-gray-300 rounded-lg shadow-sm p-6 mb-4 hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <span id="loading-text" class="text-sm font-medium text-gray-700">Loading PDF...</span>
+                        <span id="loading-percent" class="text-sm text-gray-500">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <div id="loading-details" class="text-xs text-gray-500 mt-2">Preparing to load PDF...</div>
+                </div>
+                
                 <div id="pdf-container" class="bg-white border border-gray-300 rounded-lg shadow-sm h-full overflow-y-auto p-4" style="position: relative;">
                     <!-- PDF pages will be rendered here -->
                 </div>

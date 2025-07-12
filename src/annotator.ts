@@ -14,6 +14,13 @@ const saveAnnotationsBtn = document.getElementById('save-annotations') as HTMLBu
 const annotationList = document.getElementById('annotation-list') as HTMLDivElement;
 const annotationCount = document.getElementById('annotation-count') as HTMLDivElement;
 
+// Progress bar elements
+const pdfLoading = document.getElementById('pdf-loading') as HTMLDivElement;
+const loadingText = document.getElementById('loading-text') as HTMLSpanElement;
+const loadingPercent = document.getElementById('loading-percent') as HTMLSpanElement;
+const progressBar = document.getElementById('progress-bar') as HTMLDivElement;
+const loadingDetails = document.getElementById('loading-details') as HTMLDivElement;
+
 // Use shared annotation interface
 type Annotation = SharedAnnotation;
 
@@ -798,41 +805,55 @@ pdfUpload.addEventListener('change', async (event) => {
 
     // Clear any previously rendered PDF
     pdfContainer.innerHTML = '';
+    
+    // Show progress bar
+    showLoadingProgress();
 
     const fileReader = new FileReader();
     fileReader.onload = async (e) => {
-        console.log('File reader loaded, processing PDF...');
-        const typedArray = new Uint8Array(e.target?.result as ArrayBuffer);
-        console.log('Created typed array, length:', typedArray.length);
-
-        // Wait for PDF.js to be available
-        const pdfjs = await waitForPdfjs();
-        console.log('PDF.js available, creating document...');
-        console.log('PDF.js object:', pdfjs);
-        console.log('getDocument function available:', typeof pdfjs.getDocument);
-
-        if (!pdfjs.getDocument) {
-            console.error('getDocument function not available on pdfjs object');
-            return;
-        }
-
-        const loadingTask = pdfjs.getDocument(typedArray);
-        console.log('Loading task created:', loadingTask);
-
         try {
+            updateLoadingProgress(10, 'Reading PDF file...', 'File loaded successfully');
+            console.log('File reader loaded, processing PDF...');
+            const typedArray = new Uint8Array(e.target?.result as ArrayBuffer);
+            console.log('Created typed array, length:', typedArray.length);
+
+            updateLoadingProgress(20, 'Initializing PDF.js...', 'Loading PDF processing library');
+            // Wait for PDF.js to be available
+            const pdfjs = await waitForPdfjs();
+            console.log('PDF.js available, creating document...');
+            console.log('PDF.js object:', pdfjs);
+            console.log('getDocument function available:', typeof pdfjs.getDocument);
+
+            if (!pdfjs.getDocument) {
+                console.error('getDocument function not available on pdfjs object');
+                hideLoadingProgress();
+                return;
+            }
+
+            updateLoadingProgress(30, 'Parsing PDF document...', 'Analyzing PDF structure');
+            const loadingTask = pdfjs.getDocument(typedArray);
+            console.log('Loading task created:', loadingTask);
+
             const pdf = await loadingTask.promise;
             console.log('PDF loaded successfully, pages:', pdf.numPages);
 
+            updateLoadingProgress(40, 'Rendering pages...', `Found ${pdf.numPages} page(s) to render`);
             const containerWidth = pdfContainer.offsetWidth;
+            
             for (let i = 1; i <= pdf.numPages; i++) {
+                const pageProgress = 40 + (50 * i / pdf.numPages);
+                updateLoadingProgress(pageProgress, `Rendering page ${i} of ${pdf.numPages}...`, `Processing page ${i}`);
                 console.log('Rendering page', i);
                 await renderPage(pdf, i, containerWidth);
                 console.log('Page', i, 'rendered');
             }
+            
+            updateLoadingProgress(90, 'Finalizing...', 'Setting up annotation features');
             console.log('All pages rendered successfully');
 
             // If we have loaded annotations waiting, render them now
             if (loadedAnnotations || annotations.length > 0) {
+                updateLoadingProgress(95, 'Loading annotations...', 'Restoring saved annotations');
                 console.log('Rendering loaded annotations...');
                 renderLoadedAnnotations();
                 loadedAnnotations = null; // Clear the loaded data
@@ -840,8 +861,17 @@ pdfUpload.addEventListener('change', async (event) => {
                 // Update the annotation list
                 updateAnnotationList();
             }
+
+            updateLoadingProgress(100, 'Complete!', 'PDF ready for annotation');
+            setTimeout(() => {
+                hideLoadingProgress();
+            }, 500);
         } catch (reason) {
             console.error(`Error during PDF loading or rendering: ${reason}`);
+            updateLoadingProgress(0, 'Error loading PDF', `Failed: ${reason}`);
+            setTimeout(() => {
+                hideLoadingProgress();
+            }, 3000);
         }
     };
 
@@ -963,4 +993,32 @@ function getCanvasForPage(pageNumber: number): HTMLCanvasElement | null {
         return pageDiv.querySelector('canvas');
     }
     return null;
+}
+
+// Progress bar functions
+function showLoadingProgress(): void {
+    pdfLoading.classList.remove('hidden');
+    updateLoadingProgress(0, 'Loading PDF...', 'Preparing to load PDF...');
+}
+
+function hideLoadingProgress(): void {
+    pdfLoading.classList.add('hidden');
+}
+
+function updateLoadingProgress(percent: number, text: string, details: string): void {
+    const clampedPercent = Math.max(0, Math.min(100, percent));
+    
+    progressBar.style.width = `${clampedPercent}%`;
+    loadingPercent.textContent = `${Math.round(clampedPercent)}%`;
+    loadingText.textContent = text;
+    loadingDetails.textContent = details;
+    
+    // Update progress bar color based on status
+    if (clampedPercent === 100) {
+        progressBar.className = 'bg-green-600 h-2 rounded-full transition-all duration-300';
+    } else if (clampedPercent === 0 && text.includes('Error')) {
+        progressBar.className = 'bg-red-600 h-2 rounded-full transition-all duration-300';
+    } else {
+        progressBar.className = 'bg-blue-600 h-2 rounded-full transition-all duration-300';
+    }
 }
