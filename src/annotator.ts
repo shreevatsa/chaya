@@ -23,6 +23,7 @@ let isDrawing = false;
 let startX = 0;
 let startY = 0;
 let currentAnnotation: HTMLDivElement | null = null;
+let hasUnsavedChanges = false;
 
 // Resize/drag state
 let isResizing = false;
@@ -96,6 +97,7 @@ async function renderPage(pdf: any, pageNumber: number, containerWidth: number) 
         if (newAnnotations) {
             // Add the new annotations to the main list
             annotations.push(...newAnnotations);
+            hasUnsavedChanges = true;
 
             // Render the new annotation boxes
             const annotationLayer = pageDiv.querySelector('.annotation-layer') as HTMLDivElement;
@@ -203,6 +205,7 @@ function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement
             };
 
             annotations.push(annotation);
+            hasUnsavedChanges = true;
 
             // Remove the temporary annotation
             overlay.removeChild(currentAnnotation);
@@ -388,6 +391,7 @@ function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: An
             if (newLabel !== null && newLabel.trim() !== '') {
                 annotation.label = newLabel.trim();
                 annotationBox.title = newLabel.trim();
+                hasUnsavedChanges = true;
                 // Update the sidebar to reflect the label change
                 updateAnnotationList();
             }
@@ -527,6 +531,7 @@ function startResize(e: MouseEvent, handle: string, annotationBox: HTMLDivElemen
         annotation.y = newTop / pageHeight;
         annotation.width = newWidth / pageWidth;
         annotation.height = newHeight / pageHeight;
+        hasUnsavedChanges = true;
     };
 
     const handleMouseUp = () => {
@@ -574,6 +579,7 @@ function startDrag(e: MouseEvent, annotationBox: HTMLDivElement, annotation: Ann
         // Update annotation data with fractional coordinates
         annotation.x = clampedLeft / pageWidth;
         annotation.y = clampedTop / pageHeight;
+        hasUnsavedChanges = true;
     };
 
     const handleMouseUp = () => {
@@ -749,6 +755,7 @@ function deleteAnnotationById(annotationId: string): void {
     if (index === -1) return;
 
     annotations.splice(index, 1);
+    hasUnsavedChanges = true;
 
     // Remove visual annotation box from DOM
     const annotationBoxes = document.querySelectorAll(`.annotation-box[data-annotation-id="${annotationId}"]`);
@@ -931,6 +938,19 @@ saveAnnotationsBtn.addEventListener('click', () => {
     URL.revokeObjectURL(url);
 
     console.log('Saved annotations:', annotationsData);
+    
+    // Mark as saved
+    hasUnsavedChanges = false;
+});
+
+// Warn user about unsaved changes when leaving the page
+window.addEventListener('beforeunload', (e) => {
+    if (hasUnsavedChanges && annotations.length > 0) {
+        const message = 'You have unsaved annotations. Are you sure you want to leave?';
+        e.preventDefault();
+        e.returnValue = message;
+        return message;
+    }
 });
 
 /**

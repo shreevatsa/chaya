@@ -656,6 +656,188 @@ shreevatsa@shreevatsa-personal ~/w/bookchop (main)> claude
 
 ⏺ Removed all mentions of "Clear All" functionality from both README.md and ARCHITECTURE.md to accurately reflect the actual implementation which only supports individual annotation deletion.
 
+> Can the user be warned if leaving/closing the annotator page with unsaved annotations?
+
+⏺ Looking at the current code, there's no warning when users leave the page with unsaved annotations. This would be a useful feature to prevent accidental data loss.
+
+⏺ Update Todos
+  ⎿  ☐ Add beforeunload warning for unsaved annotations
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 20 lines (ctrl+r to expand)
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 1 addition                    
+       23    let startX = 0;
+       24    let startY = 0;
+       25    let currentAnnotation: HTMLDivElement | null = null;
+       26 +  let hasUnsavedChanges = false;
+       27    
+       28    // Resize/drag state
+       29    let isResizing = false;
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 1 addition                    
+       204                };
+       205    
+       206                annotations.push(annotation);
+       207 +              hasUnsavedChanges = true;
+       208    
+       209                // Remove the temporary annotation
+       210                overlay.removeChild(currentAnnotation);
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 1 addition                                  
+       390                if (newLabel !== null && newLabel.trim() !== '') {
+       391                    annotation.label = newLabel.trim();
+       392                    annotationBox.title = newLabel.trim();
+       393 +                  hasUnsavedChanges = true;
+       394                    // Update the sidebar to reflect the label change
+       395                    updateAnnotationList();
+       396                }
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 1 addition                    
+       530            annotation.y = newTop / pageHeight;
+       531            annotation.width = newWidth / pageWidth;
+       532            annotation.height = newHeight / pageHeight;
+       533 +          hasUnsavedChanges = true;
+       534        };
+       535    
+       536        const handleMouseUp = () => {
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 1 addition                              
+       578            // Update annotation data with fractional coordinates
+       579            annotation.x = clampedLeft / pageWidth;
+       580            annotation.y = clampedTop / pageHeight;
+       581 +          hasUnsavedChanges = true;
+       582        };
+       583    
+       584        const handleMouseUp = () => {
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 1 addition                                                                                
+       754        if (index === -1) return;
+       755    
+       756        annotations.splice(index, 1);
+       757 +      hasUnsavedChanges = true;
+       758    
+       759        // Remove visual annotation box from DOM
+       760        const annotationBoxes = document.querySelectorAll(`.annotation-box[data-annotation-id="${annotationId}"]`);
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 1 addition                                                                  
+        97            if (newAnnotations) {
+        98                // Add the new annotations to the main list
+        99                annotations.push(...newAnnotations);
+       100 +              hasUnsavedChanges = true;
+       101    
+       102                // Render the new annotation boxes
+       103                const annotationLayer = pageDiv.querySelector('.annotation-layer') as HTMLDivElement;
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 13 additions                                                       
+       938        URL.revokeObjectURL(url);
+       939    
+       940        console.log('Saved annotations:', annotationsData);
+       941 +      
+       942 +      // Mark as saved
+       943 +      hasUnsavedChanges = false;
+       944    });
+       945    
+       946 +  // Warn user about unsaved changes when leaving the page
+       947 +  window.addEventListener('beforeunload', (e) => {
+       948 +      if (hasUnsavedChanges && annotations.length > 0) {
+       949 +          const message = 'You have unsaved annotations. Are you sure you want to leave?';
+       950 +          e.preventDefault();
+       951 +          e.returnValue = message;
+       952 +          return message;
+       953 +      }
+       954 +  });
+       955 +  
+       956    /**
+       957     * Helper function passed to the orchestrator to allow it to get canvases
+       958     * for other pages to generate few-shot examples.
+
+⏺ Update Todos
+  ⎿  ☒ Add beforeunload warning for unsaved annotations
+
+⏺ Yes! I've added unsaved changes warning functionality to the annotator. Here's what I implemented:
+
+  Changes Made:
+
+  1. Added State Tracking
+
+  - New hasUnsavedChanges boolean variable to track when annotations are modified
+
+  2. Mark Changes as Unsaved
+
+  Updated all annotation modification points:
+  - ✅ Creating new annotations (manual & AI)
+  - ✅ Editing annotation labels (double-click)
+  - ✅ Resizing annotations
+  - ✅ Moving/dragging annotations
+  - ✅ Deleting annotations
+
+  3. Mark Changes as Saved
+
+  - ✅ Reset hasUnsavedChanges = false when annotations are successfully saved
+
+  4. Added beforeunload Warning
+
+  window.addEventListener('beforeunload', (e) => {
+      if (hasUnsavedChanges && annotations.length > 0) {
+          const message = 'You have unsaved annotations. Are you sure you want to leave?';
+          e.preventDefault();
+          e.returnValue = message;
+          return message;
+      }
+  });
+
+  Behavior:
+
+  - No warning if no annotations exist or all changes are saved
+  - Shows browser warning when user tries to:
+    - Close tab/window
+    - Navigate to different page
+    - Refresh the page
+  - Warning clears after successfully saving annotations
+  - Works across manual annotations, AI-generated annotations, edits, moves, resizes, and deletions
+
+  This prevents accidental loss of annotation work and follows standard web application patterns for unsaved changes.
+
+> Can you build and run tests after every change?
+
+⏺ Bash(npm run build)
+  ⎿  > bookchop@1.0.0 build                                                   
+     > tsc && ./node_modules/.bin/postcss ./src/input.css -o ./dist/output.css
+
+⏺ Bash(npm test)
+  ⎿  > bookchop@1.0.0 test          
+     > playwright test
+
+     … +178 lines (ctrl+r to expand)
+
+⏺ Excellent! ✅ Build and tests passed successfully
+
+  Results:
+
+  - Build: ✅ TypeScript compilation and CSS build completed without errors
+  - Tests: ✅ All 14 Playwright tests passed (3.2s runtime)
+  - Coverage: Tests verified both annotator and viewer functionality
+  - No Errors: No JavaScript console errors detected during testing
+
+  Test Coverage Verified:
+
+  - ✅ Annotator interface loading
+  - ✅ PDF file processing and canvas creation
+  - ✅ Annotation functionality (resizable, management)
+  - ✅ Viewer interface and file uploads
+  - ✅ PDF.js integration working correctly
+
+  The unsaved changes warning feature has been successfully integrated without breaking any existing functionality. Going forward, I'll run build and tests after every significant change to ensure code quality and prevent regressions.
+
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                                                                                                                                                 │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
