@@ -34,13 +34,14 @@ let selectedAnnotation: HTMLDivElement | null = null;
 let selectedAnnotationData: Annotation | null = null;
 
 // Function to render a single page
-async function renderPage(pdf: any, pageNumber: number) {
+async function renderPage(pdf: any, pageNumber: number, containerWidth: number) {
     const page = await pdf.getPage(pageNumber);
 
-    // Calculate scale to limit maximum width while maintaining aspect ratio
+    // Calculate scale to fit the container width, up to a maximum.
     const baseViewport = page.getViewport({ scale: 1.0 });
-    const maxWidth = 1200; // Maximum width in pixels - adjust this to control PDF size
-    const scale = baseViewport.width > maxWidth ? maxWidth / baseViewport.width : 1.5;
+    const maxWidth = 1200; // Maximum width in pixels
+    const targetWidth = Math.min(containerWidth, maxWidth);
+    const scale = targetWidth / baseViewport.width;
 
     const viewport = page.getViewport({ scale });
 
@@ -815,9 +816,10 @@ pdfUpload.addEventListener('change', async (event) => {
             const pdf = await loadingTask.promise;
             console.log('PDF loaded successfully, pages:', pdf.numPages);
 
+            const containerWidth = pdfContainer.offsetWidth;
             for (let i = 1; i <= pdf.numPages; i++) {
                 console.log('Rendering page', i);
-                await renderPage(pdf, i);
+                await renderPage(pdf, i, containerWidth);
                 console.log('Page', i, 'rendered');
             }
             console.log('All pages rendered successfully');
