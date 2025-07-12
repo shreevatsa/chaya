@@ -5,40 +5,72 @@
 ### Main Components
 
 #### 1. PDF Rendering System
-- **Entry Point**: `renderPage()` function
+- **Entry Point**: `renderPage()` function in `annotator.ts`
 - **Dependencies**: PDF.js (loaded via CDN)
 - **Key Concepts**:
   - Each PDF page becomes a `<div class="page">` container
   - Canvas element for PDF rendering
   - Annotation overlay layer for interactive elements
+  - AI annotation button per page
   - Fractional coordinate system (0.0-1.0) for resolution independence
 
 #### 2. Annotation Creation Pipeline  
 ```
-User mouse events → Drawing overlay → Prompt for label → Create annotation object → Update visual + data
+Manual: User mouse events → Drawing overlay → Prompt for label → Create annotation object → Update visual + data
+AI: User clicks AI button → Prompt dialog → API call → Parse response → Create annotations → Update UI
 ```
 
-- **Mouse Events**: `mousedown` → `mousemove` → `mouseup` sequence
-- **Visual Feedback**: Real-time box drawing during mouse drag
-- **Data Storage**: Annotation object with fractional coordinates
-- **Side Effects**: Updates annotation list, adds resize/drag functionality
+- **Manual Creation**:
+  - **Mouse Events**: `mousedown` → `mousemove` → `mouseup` sequence
+  - **Visual Feedback**: Real-time box drawing during mouse drag
+  - **Data Storage**: Annotation object with fractional coordinates
+  - **Auto-selection**: Newly created annotations automatically selected for editing
+
+- **AI-Assisted Creation**:
+  - **User Prompt**: Customizable instruction for AI annotation behavior
+  - **Few-shot Learning**: AI learns from existing annotations on other pages
+  - **API Integration**: Gemini API with structured JSON response format
+  - **Batch Creation**: Multiple annotations generated and rendered simultaneously
 
 #### 3. Interactive Editing System
 - **Selection State**: Global variables track currently selected annotation
 - **Resize Handles**: 8 handles (corners + edges) added to selected annotations  
 - **Visual Feedback**: Blue border for selected, red for unselected
 - **Coordinate Updates**: Real-time fractional coordinate updates during resize/drag
+- **Label Editing**: Double-click to edit annotation labels
+- **Bidirectional Highlighting**: Hover effects between PDF and sidebar
 
 #### 4. Annotation Management
 - **Reactive UI**: List automatically rebuilds when annotations change
 - **Organization**: Annotations grouped by page number
 - **Interactions**: Click to select, hover to highlight, delete buttons
-- **Bulk Operations**: "Clear All" with confirmation dialog
+- **Navigation**: Click sidebar items to scroll to annotations
+- **Individual Operations**: Delete buttons for removing specific annotations
 
-#### 5. Serialization System
+#### 5. AI Engine Architecture
+- **Pluggable Design**: Abstract `AIEngine` interface allows different AI providers
+- **Current Implementation**: `GeminiEngine` with Google Gemini API
+- **Request Structure**: Base64 images, prompts, optional few-shot examples
+- **Response Parsing**: Structured JSON with fallback to markdown extraction
+- **Error Handling**: User-friendly error messages and retry logic
+
+#### 6. AI Orchestrator
+- **Browser Integration**: Bridges UI interactions with headless AI engine
+- **State Management**: API key persistence, prompt dialogs, loading states
+- **Few-shot Examples**: Automatically gathers examples from previously annotated pages
+- **Coordinate Validation**: Ensures AI-generated coordinates are within valid bounds
+
+#### 7. Viewer System
+- **Cropped Extraction**: `extractAnnotationRegion()` creates canvas crops of annotations
+- **Region Display**: Shows only annotated portions with labels and page info
+- **Navigation**: Quick-jump buttons with hover highlighting
+- **File Loading**: Separate interface for PDF + JSON file pairs
+
+#### 8. Serialization System
 - **Save Format**: JSON with metadata + annotations grouped by page
 - **Load Process**: Validation → data extraction → visual rendering
 - **Filename Convention**: Uses original PDF filename with `.json` extension
+- **Shared Utilities**: `pdf-utils.ts` provides parsing and validation functions
 
 ### State Management
 
@@ -82,7 +114,9 @@ interface Annotation {
 - **Data Layer**: Annotation objects with fractional coordinates
 - **Presentation Layer**: DOM elements with pixel coordinates  
 - **Interaction Layer**: Event handlers for user input
+- **AI Layer**: Pluggable engine architecture with orchestration
 - **Persistence Layer**: JSON serialization/deserialization
+- **Utility Layer**: Shared PDF.js and coordinate utilities
 
 ### Performance Considerations
 
@@ -100,6 +134,7 @@ interface Annotation {
 - **Event Listeners**: Properly cleaned up when annotations deleted
 - **DOM References**: Cleared when annotations removed
 - **File Handling**: Large PDF files processed incrementally by PDF.js
+- **AI Resources**: Base64 images and API responses cleaned up after processing
 
 ### Error Handling Strategy
 
@@ -107,6 +142,8 @@ interface Annotation {
 - **File Upload**: Validation with user-friendly messages
 - **JSON Loading**: Parse errors caught and displayed
 - **PDF Rendering**: PDF.js errors logged and gracefully handled
+- **AI Failures**: API errors, network issues, and parsing failures handled gracefully
+- **API Key Management**: Clear prompts for missing or invalid API keys
 
 #### Developer Errors  
 - **Type Safety**: TypeScript catches most issues at compile time
@@ -127,11 +164,17 @@ interface Annotation {
 3. Update file input accept attributes
 4. Add tests for new format
 
-#### Adding Viewer Functionality
-1. Implement `src/viewer.ts` following annotator patterns
-2. Focus on read-only display of existing annotations
-3. Reuse coordinate conversion and rendering logic
-4. Add viewer-specific tests
+#### Adding New AI Engines
+1. Implement `AIEngine` interface in new engine class
+2. Add engine-specific configuration and error handling
+3. Update orchestrator to support engine selection
+4. Add tests for new engine integration
+
+#### Adding New AI Features
+1. Extend `AIAnnotationRequest` interface for new capabilities
+2. Update orchestrator prompt handling and example generation
+3. Modify response parsing for new annotation types
+4. Add UI controls for new features
 
 ### Testing Strategy
 

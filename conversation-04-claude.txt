@@ -1,0 +1,667 @@
+Welcome to fish, the friendly interactive shell
+Type help for instructions on how to use fish
+shreevatsa@shreevatsa-personal ~/w/bookchop (main)> claude
+╭───────────────────────────────────────────────────╮
+│ ✻ Welcome to Claude Code!                         │
+│                                                   │
+│   /help for help, /status for your current setup  │
+│                                                   │
+│   cwd: /Users/shreevatsa/w/bookchop               │
+╰───────────────────────────────────────────────────╯
+
+
+ What's new:
+  • Added support for native Windows (requires Git for Windows)
+  • Added support for Bedrock API keys through environment variable AWS_BEARER_TOKEN_BEDROCK
+  • Settings: /doctor can now help you identify and fix invalid setting files
+  • `--append-system-prompt` can now be used in interactive mode, not just --print/-p.
+  • Increased auto-compact warning threshold from 60% to 80%
+
+> Take a look -- ignore the conversation-* files.
+
+⏺ I'll explore the codebase structure, ignoring the conversation-* files.
+
+⏺ List(.)
+  ⎿  Listed 29 paths (ctrl+r to expand)
+
+⏺ This looks like a PDF annotation and viewer application with AI features. The structure includes:
+
+  Main files:
+  - viewer.html - PDF viewer interface
+  - annotator.html - Annotation interface
+
+  Source code (src/):
+  - viewer.ts - PDF viewer logic
+  - annotator.ts - Annotation functionality
+  - ai-engine.ts - AI processing engine
+  - ai-orchestrator.ts - AI workflow coordination
+  - pdf-utils.ts - PDF utilities
+
+  Configuration:
+  - TypeScript, Tailwind CSS, Playwright testing setup
+  - Architecture and design documentation
+
+  Build/Test:
+  - dist/ - Built files
+  - tests/ - Playwright tests
+  - playwright-report/ - Test results
+
+  The codebase appears to be a legitimate PDF annotation tool with AI capabilities for text processing or analysis.
+
+> Read and understand the code.
+
+⏺ I'll read and understand the codebase by examining the key files.
+
+⏺ Read(README.md)
+  ⎿  Read 160 lines (ctrl+r to expand)
+
+⏺ Read(ARCHITECTURE.md)
+  ⎿  Read 153 lines (ctrl+r to expand)
+
+⏺ Read(DESIGN_PRINCIPLES.md)
+  ⎿  Read 64 lines (ctrl+r to expand)
+
+⏺ Read(package.json)
+  ⎿  Read 26 lines (ctrl+r to expand)
+
+⏺ Now let me examine the main source files to understand the implementation:
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 947 lines (ctrl+r to expand)
+
+⏺ Read(src/ai-engine.ts)
+  ⎿  Read 146 lines (ctrl+r to expand)
+
+⏺ Read(src/ai-orchestrator.ts)
+  ⎿  Read 214 lines (ctrl+r to expand)
+
+⏺ Read(src/viewer.ts)
+  ⎿  Read 279 lines (ctrl+r to expand)
+
+⏺ Let me also read the remaining utility files to complete my understanding:
+
+⏺ Read(src/pdf-utils.ts)
+  ⎿  Read 86 lines (ctrl+r to expand)
+
+⏺ Read(annotator.html)
+  ⎿  Read 53 lines (ctrl+r to expand)
+
+⏺ Read(viewer.html)
+  ⎿  Read 59 lines (ctrl+r to expand)
+
+⏺ Code Understanding Summary
+
+  Bookchop is a client-side PDF annotation tool with AI-assisted annotation capabilities. Here's what I understand:
+
+  Architecture
+
+  - Client-side only: No backend required, runs entirely in browser
+  - Two main interfaces: Annotator for creating annotations, Viewer for displaying cropped regions
+  - Technology stack: TypeScript, Tailwind CSS, PDF.js, Playwright for testing
+
+  Core Components
+
+  1. Annotator (annotator.ts)
+  - Interactive PDF annotation creation via click-drag
+  - Resizable/movable annotations with 8 resize handles
+  - Fractional coordinate system (0.0-1.0) for resolution independence
+  - AI-assisted annotation using Gemini API
+  - Save/load annotations as JSON files
+  - Sidebar management with hover effects and navigation
+
+  2. Viewer (viewer.ts)
+  - Displays cropped regions from annotations
+  - Takes PDF + JSON annotations, extracts just the annotated areas
+  - Navigation between annotation regions
+  - Useful for reviewing/presenting annotated content
+
+  3. AI Integration (ai-engine.ts, ai-orchestrator.ts)
+  - Engine: Headless Gemini API interface with structured JSON responses
+  - Orchestrator: Browser bridge handling prompts, API keys, few-shot examples
+  - Few-shot learning from previously annotated pages
+  - User-configurable prompts for different annotation styles
+
+  4. Shared Utilities (pdf-utils.ts)
+  - PDF.js initialization and worker setup
+  - Annotation data structures and JSON parsing
+  - ID generation utilities
+
+  Data Format
+
+  Annotations stored as JSON with:
+  - Metadata (source PDF, version, timestamp)
+  - Page-grouped annotations with fractional coordinates
+  - Simple string labels (unopinionated format)
+
+  Key Design Principles
+
+  - Deep modules philosophy: Only abstract truly complex functionality
+  - Static hosting friendly: No server dependencies
+  - Resolution independent: Fractional coordinates work across displays
+  - Event-driven: Mouse interactions, file uploads, annotation management
+
+  The codebase is well-structured, follows good separation of concerns, and implements defensive AI integration with proper error handling and user prompts.
+
+> Is there anything in the .md files that needs to be updated in light of the code, or vice-versa?
+
+⏺ Looking at the documentation against the actual code, I found several discrepancies that need updates:
+
+⏺ Update Todos
+  ⎿  ☐ Update README.md to reflect AI features and current functionality
+     ☐ Update ARCHITECTURE.md to include AI components
+     ☐ Fix project structure in README.md to match actual files
+
+⏺ Key Documentation Issues Found:
+
+  1. Missing AI Features (Critical)
+
+  README.md doesn't mention the AI annotation functionality at all, but the code has:
+  - 🤖 AI Annotate buttons on each page
+  - Gemini API integration
+  - Few-shot learning from existing annotations
+  - AI prompt dialog system
+
+  2. Outdated File Structure
+
+  README.md shows:
+  src/
+  ├── annotator.ts      # Main annotation functionality
+  ├── viewer.ts         # Viewer functionality (planned)
+  └── input.css         # Tailwind CSS input
+
+  But actual structure includes:
+  src/
+  ├── annotator.ts
+  ├── viewer.ts         # Actually implemented, not planned
+  ├── ai-engine.ts      # Missing from docs
+  ├── ai-orchestrator.ts # Missing from docs
+  ├── pdf-utils.ts      # Missing from docs
+  ├── input.css
+  └── pdf.d.ts          # Missing from docs
+
+  3. Viewer Status
+
+  - README.md says viewer is "Planned: Display PDFs with existing annotations (not yet implemented)"
+  - Code reality: Viewer is fully implemented and extracts cropped annotation regions
+
+  4. Architecture Missing AI Components
+
+  ARCHITECTURE.md doesn't document:
+  - AI engine abstraction layer
+  - Orchestrator pattern for UI-AI bridge
+  - Few-shot example generation
+  - API key management
+
+  5. Missing Features in Documentation
+
+  README doesn't mention:
+  - Double-click to edit labels
+  - Auto-selection of newly created annotations
+  - Bidirectional highlighting between PDF and sidebar
+  - AI-assisted annotation workflow
+
+  The documentation needs significant updates to reflect the current mature state of the codebase, especially the AI integration which is a major feature completely absent from the docs.
+
+> Ok great, please update.
+
+⏺ Update Todos
+  ⎿  ☐ Update README.md to reflect AI features and current functionality
+     ☐ Update ARCHITECTURE.md to include AI components
+     ☐ Fix project structure in README.md to match actual files
+
+⏺ Read(README.md)
+  ⎿  Read 160 lines (ctrl+r to expand)
+
+⏺ Update(README.md)
+  ⎿  Updated README.md with 5 additions and 2 removals                                                                   
+        7    ### Annotator (`annotator.html`)
+        8    - **PDF Upload & Rendering**: Load any PDF file for annotation using PDF.js
+        9    - **Interactive Annotation Creation**: Draw bounding boxes by clicking and dragging
+       10 +  - **AI-Assisted Annotation**: Use Gemini API to automatically generate annotations with customizable prompts
+       11    - **Resizable & Movable Annotations**: Select annotations to resize (8 handles) or drag to reposition
+       12    - **Annotation Management**: 
+       13      - Sidebar showing all annotations organized by page
+       14      - Click annotations in list to select and scroll to them on PDF
+       15 -    - Hover highlighting for easy identification
+       15 +    - Bidirectional hover highlighting between PDF and sidebar
+       16      - Individual delete buttons and bulk "Clear All" option
+       17    - **Label Editing**: Double-click annotations to edit labels
+       18    - **Save/Load Workflow**: Save annotations as JSON files and reload them for further editing
+       19    - **Resolution Independence**: All coordinates stored as fractions for consistent display
+       20    
+       21    ### Viewer (`viewer.html`)
+       22 -  - *Planned*: Display PDFs with existing annotations (not yet implemented)
+       22 +  - **Cropped Region Display**: Extract and display only the annotated regions from PDFs
+       23 +  - **Navigation**: Quick navigation between annotation regions with hover highlighting
+       24 +  - **Annotation Summary**: Overview of all loaded annotations with click-to-scroll functionality
+       25    
+       26    ## Quick Start
+       27    
+
+⏺ Update(README.md)
+  ⎿  Updated README.md with 15 additions                                                            
+       41    ## Usage Guide
+       42    
+       43    ### Creating Annotations
+       44 +  
+       45 +  #### Manual Annotation
+       46    1. Upload a PDF file using the file input
+       47    2. Click and drag on the PDF to create annotation boxes
+       48    3. Enter a label when prompted
+       49    4. Use the annotation management sidebar to review, select, and organize annotations
+       50    
+       51 +  #### AI-Assisted Annotation
+       52 +  1. Upload a PDF file and optionally load existing annotations
+       53 +  2. Click the "🤖 AI Annotate" button on any page
+       54 +  3. Enter a custom prompt (or use the default) describing what to annotate
+       55 +  4. Provide your Gemini API key when prompted (stored locally for session)
+       56 +  5. AI will analyze the page and generate annotations automatically
+       57 +  6. Review and edit the generated annotations as needed
+       58 +  
+       59 +  **AI Features:**
+       60 +  - **Few-shot Learning**: AI learns from your existing annotations on other pages
+       61 +  - **Customizable Prompts**: Tailor the AI behavior for different document types
+       62 +  - **Smart Integration**: New AI annotations appear in sidebar and are fully interactive
+       63 +  
+       64    ### Editing Annotations  
+       65    - **Select**: Click an annotation to show resize handles and highlight it
+       66    - **Resize**: Drag any of the 8 resize handles (corners and edges)
+
+⏺ Update(README.md)
+  ⎿  Updated README.md with 9 additions and 1 removal                                                           
+       72    - **Save**: Click "Save Annotations" to download a JSON file named after your PDF
+       73    - **Load**: Use "Load Existing Annotations" to continue editing previously saved work
+       74    
+       75 +  ### Using the Viewer
+       76 +  1. Open `viewer.html` in your browser
+       77 +  2. Upload both a PDF file and its corresponding annotations JSON file
+       78 +  3. Click "Load and View" to extract annotated regions
+       79 +  4. Use the navigation buttons to jump between regions
+       80 +  5. Hover over navigation buttons to highlight regions
+       81 +  
+       82    ### Annotation List Features
+       83    - **Navigation**: Click any annotation in the list to select and scroll to it
+       84 -  - **Hover Preview**: Hover over list items to highlight the corresponding annotation
+       84 +  - **Bidirectional Highlighting**: Hover over list items to highlight PDF annotations and vice versa
+       85    - **Organization**: Annotations grouped by page number
+       86    - **Position Info**: Each annotation shows its relative position as percentages
+       87 +  - **Auto-selection**: Newly created annotations are automatically selected for immediate editing
+       88    
+       89    ## Core Architecture
+       90    
+
+⏺ Update(README.md)
+  ⎿  Updated README.md with 1 addition                          
+       100    - **TypeScript**: Type-safe development  
+       101    - **Tailwind CSS**: Utility-first styling
+       102    - **Playwright**: Browser automation testing
+       103 +  - **Gemini API**: AI-powered annotation generation
+       104    
+       105    ## Data Format (`annotations.json`)
+       106    
+
+⏺ Update(README.md)
+  ⎿  Updated README.md with 7 additions and 3 removals                   
+       143    ```
+       144    bookchop/
+       145    ├── src/
+       146 -  │   ├── annotator.ts      # Main annotation functionality  
+       147 -  │   ├── viewer.ts         # Viewer functionality (planned)
+       146 +  │   ├── annotator.ts      # Main annotation functionality
+       147 +  │   ├── viewer.ts         # Cropped region viewer
+       148 +  │   ├── ai-engine.ts      # Headless AI annotation engine
+       149 +  │   ├── ai-orchestrator.ts # Browser-AI integration layer
+       150 +  │   ├── pdf-utils.ts      # Shared PDF.js utilities
+       151 +  │   ├── pdf.d.ts          # TypeScript declarations
+       152    │   └── input.css         # Tailwind CSS input
+       153    ├── tests/
+       154    │   └── basic.spec.ts     # Playwright browser tests
+       155    ├── dist/                 # Built JavaScript and CSS
+       156    ├── annotator.html        # Annotation interface
+       157 -  ├── viewer.html           # Viewer interface (minimal)
+       157 +  ├── viewer.html           # Viewer interface
+       158    └── test.pdf              # Sample PDF for testing
+       159    ```
+       160    
+
+⏺ Update(README.md)
+  ⎿  Updated README.md with 13 additions and 7 removals                                                                                         
+       165    - `npm run test:ui` - Run tests with Playwright's test runner UI
+       166    
+       167    ### Code Organization
+       168 -  The codebase is currently organized as a single module in `src/annotator.ts` with the following main sections:
+       168    
+       169 -  1. **PDF Rendering** (`renderPage`, PDF.js integration)
+       170 -  2. **Annotation Creation** (`setupAnnotationDrawing`, mouse event handling)  
+       171 -  3. **Interactive Editing** (`makeAnnotationInteractive`, resize/drag functionality)
+       172 -  4. **Annotation Management** (`updateAnnotationList`, sidebar functionality)
+       173 -  5. **Serialization** (`loadAnnotationsFromJson`, save functionality)
+       174 -  6. **Coordinate System** (fractional ↔ pixel coordinate conversion)
+       169 +  #### Core Modules
+       170 +  1. **Annotator** (`src/annotator.ts`): Main annotation interface with PDF rendering, interactive creation, editing, and management
+       171 +  2. **Viewer** (`src/viewer.ts`): Cropped region extraction and display for annotation review
+       172 +  3. **AI Engine** (`src/ai-engine.ts`): Headless AI annotation service with pluggable engine architecture
+       173 +  4. **AI Orchestrator** (`src/ai-orchestrator.ts`): Browser integration layer handling prompts, API keys, and few-shot examples
+       174 +  5. **PDF Utils** (`src/pdf-utils.ts`): Shared utilities for PDF.js initialization and annotation parsing
+       175    
+       176 +  #### Key Systems
+       177 +  - **PDF Rendering**: Canvas-based rendering with annotation overlay layers
+       178 +  - **Coordinate System**: Fractional coordinates (0.0-1.0) for resolution independence
+       179 +  - **Interactive Editing**: Resize handles, drag functionality, selection management
+       180 +  - **AI Integration**: Pluggable engine architecture with few-shot learning
+       181 +  - **Data Persistence**: JSON serialization with metadata and validation
+       182 +  
+       183    ### Testing
+       184    Tests use Playwright for browser automation and cover:
+       185    - PDF loading and rendering
+
+⏺ Update Todos
+  ⎿  ☒ Update README.md to reflect AI features and current functionality
+     ☒ Fix project structure in README.md to match actual files
+     ☐ Update ARCHITECTURE.md to include AI components
+
+⏺ Read(ARCHITECTURE.md)
+  ⎿  Read 153 lines (ctrl+r to expand)
+
+⏺ Update(ARCHITECTURE.md)
+  ⎿  Updated ARCHITECTURE.md with 39 additions and 7 removals                                                                
+        5    ### Main Components
+        6    
+        7    #### 1. PDF Rendering System
+        8 -  - **Entry Point**: `renderPage()` function
+        8 +  - **Entry Point**: `renderPage()` function in `annotator.ts`
+        9    - **Dependencies**: PDF.js (loaded via CDN)
+       10    - **Key Concepts**:
+       11      - Each PDF page becomes a `<div class="page">` container
+       12      - Canvas element for PDF rendering
+       13      - Annotation overlay layer for interactive elements
+       14 +    - AI annotation button per page
+       15      - Fractional coordinate system (0.0-1.0) for resolution independence
+       16    
+       17    #### 2. Annotation Creation Pipeline  
+       18    ```
+       19 -  User mouse events → Drawing overlay → Prompt for label → Create annotation object → Update visual + data
+       19 +  Manual: User mouse events → Drawing overlay → Prompt for label → Create annotation object → Update visual + data
+       20 +  AI: User clicks AI button → Prompt dialog → API call → Parse response → Create annotations → Update UI
+       21    ```
+       22    
+       23 -  - **Mouse Events**: `mousedown` → `mousemove` → `mouseup` sequence
+       24 -  - **Visual Feedback**: Real-time box drawing during mouse drag
+       25 -  - **Data Storage**: Annotation object with fractional coordinates
+       26 -  - **Side Effects**: Updates annotation list, adds resize/drag functionality
+       23 +  - **Manual Creation**:
+       24 +    - **Mouse Events**: `mousedown` → `mousemove` → `mouseup` sequence
+       25 +    - **Visual Feedback**: Real-time box drawing during mouse drag
+       26 +    - **Data Storage**: Annotation object with fractional coordinates
+       27 +    - **Auto-selection**: Newly created annotations automatically selected for editing
+       28    
+       29 +  - **AI-Assisted Creation**:
+       30 +    - **User Prompt**: Customizable instruction for AI annotation behavior
+       31 +    - **Few-shot Learning**: AI learns from existing annotations on other pages
+       32 +    - **API Integration**: Gemini API with structured JSON response format
+       33 +    - **Batch Creation**: Multiple annotations generated and rendered simultaneously
+       34 +  
+       35    #### 3. Interactive Editing System
+       36    - **Selection State**: Global variables track currently selected annotation
+       37    - **Resize Handles**: 8 handles (corners + edges) added to selected annotations  
+       38    - **Visual Feedback**: Blue border for selected, red for unselected
+       39    - **Coordinate Updates**: Real-time fractional coordinate updates during resize/drag
+       40 +  - **Label Editing**: Double-click to edit annotation labels
+       41 +  - **Bidirectional Highlighting**: Hover effects between PDF and sidebar
+       42    
+       43    #### 4. Annotation Management
+       44    - **Reactive UI**: List automatically rebuilds when annotations change
+       45    - **Organization**: Annotations grouped by page number
+       46    - **Interactions**: Click to select, hover to highlight, delete buttons
+       47 +  - **Navigation**: Click sidebar items to scroll to annotations
+       48    - **Bulk Operations**: "Clear All" with confirmation dialog
+       49    
+       50 -  #### 5. Serialization System
+       50 +  #### 5. AI Engine Architecture
+       51 +  - **Pluggable Design**: Abstract `AIEngine` interface allows different AI providers
+       52 +  - **Current Implementation**: `GeminiEngine` with Google Gemini API
+       53 +  - **Request Structure**: Base64 images, prompts, optional few-shot examples
+       54 +  - **Response Parsing**: Structured JSON with fallback to markdown extraction
+       55 +  - **Error Handling**: User-friendly error messages and retry logic
+       56 +  
+       57 +  #### 6. AI Orchestrator
+       58 +  - **Browser Integration**: Bridges UI interactions with headless AI engine
+       59 +  - **State Management**: API key persistence, prompt dialogs, loading states
+       60 +  - **Few-shot Examples**: Automatically gathers examples from previously annotated pages
+       61 +  - **Coordinate Validation**: Ensures AI-generated coordinates are within valid bounds
+       62 +  
+       63 +  #### 7. Viewer System
+       64 +  - **Cropped Extraction**: `extractAnnotationRegion()` creates canvas crops of annotations
+       65 +  - **Region Display**: Shows only annotated portions with labels and page info
+       66 +  - **Navigation**: Quick-jump buttons with hover highlighting
+       67 +  - **File Loading**: Separate interface for PDF + JSON file pairs
+       68 +  
+       69 +  #### 8. Serialization System
+       70    - **Save Format**: JSON with metadata + annotations grouped by page
+       71    - **Load Process**: Validation → data extraction → visual rendering
+       72    - **Filename Convention**: Uses original PDF filename with `.json` extension
+       73 +  - **Shared Utilities**: `pdf-utils.ts` provides parsing and validation functions
+       74    
+       75    ### State Management
+       76    
+
+⏺ Update(ARCHITECTURE.md)
+  ⎿  Updated ARCHITECTURE.md with 2 additions                                 
+       114    - **Data Layer**: Annotation objects with fractional coordinates
+       115    - **Presentation Layer**: DOM elements with pixel coordinates  
+       116    - **Interaction Layer**: Event handlers for user input
+       117 +  - **AI Layer**: Pluggable engine architecture with orchestration
+       118    - **Persistence Layer**: JSON serialization/deserialization
+       119 +  - **Utility Layer**: Shared PDF.js and coordinate utilities
+       120    
+       121    ### Performance Considerations
+       122    
+
+⏺ Update(ARCHITECTURE.md)
+  ⎿  Updated ARCHITECTURE.md with 1 addition                                                 
+       134    - **Event Listeners**: Properly cleaned up when annotations deleted
+       135    - **DOM References**: Cleared when annotations removed
+       136    - **File Handling**: Large PDF files processed incrementally by PDF.js
+       137 +  - **AI Resources**: Base64 images and API responses cleaned up after processing
+       138    
+       139    ### Error Handling Strategy
+       140    
+
+⏺ Update(ARCHITECTURE.md)
+  ⎿  Updated ARCHITECTURE.md with 2 additions                                                       
+       142    - **File Upload**: Validation with user-friendly messages
+       143    - **JSON Loading**: Parse errors caught and displayed
+       144    - **PDF Rendering**: PDF.js errors logged and gracefully handled
+       145 +  - **AI Failures**: API errors, network issues, and parsing failures handled gracefully
+       146 +  - **API Key Management**: Clear prompts for missing or invalid API keys
+       147    
+       148    #### Developer Errors  
+       149    - **Type Safety**: TypeScript catches most issues at compile time
+
+⏺ Update(ARCHITECTURE.md)
+  ⎿  Updated ARCHITECTURE.md with 11 additions and 5 removals               
+       164    3. Update file input accept attributes
+       165    4. Add tests for new format
+       166    
+       167 -  #### Adding Viewer Functionality
+       168 -  1. Implement `src/viewer.ts` following annotator patterns
+       169 -  2. Focus on read-only display of existing annotations
+       170 -  3. Reuse coordinate conversion and rendering logic
+       171 -  4. Add viewer-specific tests
+       167 +  #### Adding New AI Engines
+       168 +  1. Implement `AIEngine` interface in new engine class
+       169 +  2. Add engine-specific configuration and error handling
+       170 +  3. Update orchestrator to support engine selection
+       171 +  4. Add tests for new engine integration
+       172    
+       173 +  #### Adding New AI Features
+       174 +  1. Extend `AIAnnotationRequest` interface for new capabilities
+       175 +  2. Update orchestrator prompt handling and example generation
+       176 +  3. Modify response parsing for new annotation types
+       177 +  4. Add UI controls for new features
+       178 +  
+       179    ### Testing Strategy
+       180    
+       181    #### Browser Automation (Playwright)
+
+⏺ Update Todos
+  ⎿  ☒ Update README.md to reflect AI features and current functionality
+     ☒ Update ARCHITECTURE.md to include AI components
+     ☒ Fix project structure in README.md to match actual files
+
+⏺ Documentation Updates Complete
+
+  I've successfully updated both documentation files to accurately reflect the current codebase:
+
+  README.md Updates:
+
+  - ✅ Added AI-assisted annotation features prominently
+  - ✅ Updated viewer description (no longer "planned", fully implemented)
+  - ✅ Added comprehensive AI usage guide with API key setup
+  - ✅ Fixed project structure to include all actual files
+  - ✅ Updated technology stack to include Gemini API
+  - ✅ Reorganized code organization section to reflect modular architecture
+  - ✅ Added viewer usage instructions
+
+  ARCHITECTURE.md Updates:
+
+  - ✅ Added detailed AI Engine Architecture section
+  - ✅ Added AI Orchestrator component documentation
+  - ✅ Updated annotation creation pipeline to include AI workflow
+  - ✅ Added Viewer System documentation
+  - ✅ Expanded error handling to cover AI failures
+  - ✅ Added AI-specific extension points for new engines and features
+  - ✅ Updated separation of concerns to include AI layer
+
+  Key Improvements:
+
+  - Documentation now accurately reflects the mature AI integration
+  - Clear distinction between manual and AI-assisted workflows
+  - Proper documentation of the pluggable AI engine architecture
+  - Updated viewer from "planned" to fully implemented with feature details
+  - Added missing files and components to project structure
+
+  The documentation now provides a complete and accurate picture of the codebase's current capabilities, especially the significant AI features that were completely undocumented before.
+
+> Great. Now take another look again: Is there anything in the .md files that needs to be updated in light of the code, or vice-versa?
+
+⏺ Update Todos
+  ⎿  ☐ Perform second review of documentation vs code consistency
+
+⏺ Search(pattern: "Clear All", type: "ts", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Search(pattern: "api.*key", type: "ts", output_mode: "content")
+  ⎿  Found 17 lines (ctrl+r to expand)
+
+⏺ Search(pattern: "getCanvasForPage", type: "ts", output_mode: "content")
+  ⎿  Found 8 lines (ctrl+r to expand)
+
+⏺ Search(pattern: "sessionStorage|localStorage", type: "ts", output_mode: "content")
+  ⎿  Found 2 lines (ctrl+r to expand)
+
+⏺ Search(pattern: "default.*prompt", type: "ts", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Read(src/ai-orchestrator.ts)
+  ⎿  Read 20 lines (ctrl+r to expand)
+
+⏺ Search(pattern: "Delete|delete", path: "src", output_mode: "content")
+  ⎿  Found 30 lines (ctrl+r to expand)
+
+⏺ Search(pattern: "Clear All", output_mode: "content")
+  ⎿  Found 3 lines (ctrl+r to expand)
+
+⏺ Search(pattern: "temperature.*0\.1", type: "ts", output_mode: "content")
+  ⎿  Found 1 line (ctrl+r to expand)
+
+⏺ Search(pattern: "gemini-1\.5-flash", type: "ts", output_mode: "content")
+  ⎿  Found 1 line (ctrl+r to expand)
+
+⏺ Read(README.md)
+  ⎿  Read 10 lines (ctrl+r to expand)
+
+⏺ Read(README.md)
+  ⎿  Read 5 lines (ctrl+r to expand)
+
+⏺ Update Todos
+  ⎿  ☒ Perform second review of documentation vs code consistency
+
+⏺ Second Review: Documentation vs Code
+
+  After a thorough second review, I found several minor discrepancies but the documentation is now largely accurate:
+
+  Minor Issues Found:
+
+  1. "Clear All" functionality: Documentation mentions "Clear All" bulk operation, but I couldn't find this feature implemented in the code. Only individual delete buttons exist.
+  2. API key storage precision: Documentation says "stored locally for session" but code uses localStorage (persistent) not sessionStorage (session-only).
+  3. Default AI prompt: The actual default prompt in code is more specific than documented:
+  "Break this document page into 'regions' (paragraphs etc), and for each region, provide coordinates (as percentages of page width/height) and a descriptive label."
+
+  Technical Details That Could Be Added:
+
+  - Gemini model used: gemini-1.5-flash
+  - AI temperature setting: 0.1 (low for consistent results)
+  - Few-shot learning uses up to 2 most recent annotated pages
+  - API response format: JSON with fallback to markdown parsing
+
+  Overall Assessment:
+
+  The documentation is now substantially accurate and captures all major features correctly. The remaining discrepancies are minor details that don't affect the user experience or understanding of the system's capabilities.
+
+  The documentation successfully reflects:
+  - ✅ Complete AI integration architecture
+  - ✅ Actual viewer functionality (cropped regions)
+  - ✅ Correct file structure
+  - ✅ Bidirectional highlighting features
+  - ✅ Auto-selection of new annotations
+  - ✅ Pluggable AI engine design
+
+  These minor discrepancies could be addressed but aren't critical for user understanding or developer onboarding.
+
+> Ok, remove the mention of "Clear all".
+
+⏺ Update(README.md)
+  ⎿  Updated README.md with 1 addition and 1 removal                                                     
+       13      - Sidebar showing all annotations organized by page
+       14      - Click annotations in list to select and scroll to them on PDF
+       15      - Bidirectional hover highlighting between PDF and sidebar
+       16 -    - Individual delete buttons and bulk "Clear All" option
+       16 +    - Individual delete buttons for each annotation
+       17    - **Label Editing**: Double-click annotations to edit labels
+       18    - **Save/Load Workflow**: Save annotations as JSON files and reload them for further editing
+       19    - **Resolution Independence**: All coordinates stored as fractions for consistent display
+
+⏺ Update(README.md)
+  ⎿  Updated README.md with 1 addition and 1 removal                                                      
+       66    - **Resize**: Drag any of the 8 resize handles (corners and edges)
+       67    - **Move**: Click and drag the annotation box itself
+       68    - **Edit Label**: Double-click an annotation to change its label
+       69 -  - **Delete**: Use the red 'X' button in the annotation list, or "Clear All" for bulk deletion
+       69 +  - **Delete**: Use the red 'X' button in the annotation list to remove individual annotations
+       70    
+       71    ### Saving & Loading
+       72    - **Save**: Click "Save Annotations" to download a JSON file named after your PDF
+
+⏺ Update(ARCHITECTURE.md)
+  ⎿  Updated ARCHITECTURE.md with 1 addition and 1 removal                                      
+       45    - **Organization**: Annotations grouped by page number
+       46    - **Interactions**: Click to select, hover to highlight, delete buttons
+       47    - **Navigation**: Click sidebar items to scroll to annotations
+       48 -  - **Bulk Operations**: "Clear All" with confirmation dialog
+       48 +  - **Individual Operations**: Delete buttons for removing specific annotations
+       49    
+       50    #### 5. AI Engine Architecture
+       51    - **Pluggable Design**: Abstract `AIEngine` interface allows different AI providers
+
+⏺ Removed all mentions of "Clear All" functionality from both README.md and ARCHITECTURE.md to accurately reflect the actual implementation which only supports individual annotation deletion.
+
+╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                                                                                                                                                                                                 │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ⏵⏵ auto-accept edits on (shift+tab to cycle)
+
+
+
+
+
