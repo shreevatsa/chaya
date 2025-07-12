@@ -45,6 +45,10 @@ export async function initializePdfjs(): Promise<void> {
 
 
 // Load and parse annotations from JSON data
+export function generateId(): string {
+    return 'annotation_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
 export function parseAnnotationsFromJson(jsonData: any): Annotation[] {
     // Validate the JSON structure
     if (!jsonData.metadata || !jsonData.annotationsByPage) {

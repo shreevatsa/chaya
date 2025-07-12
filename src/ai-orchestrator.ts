@@ -131,18 +131,18 @@ function getApiKey(): string | null {
 function showAIPromptDialog(pageNumber: number): Promise<string | null> {
     return new Promise(resolve => {
         const overlay = document.createElement('div');
-        overlay.className = 'ai-prompt-overlay'; // Use a class for styling
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 z-20 flex items-center justify-center';
 
         const dialog = document.createElement('div');
-        dialog.className = 'ai-prompt-dialog';
+        dialog.className = 'bg-white rounded-lg shadow-xl p-6 max-w-lg w-full';
 
         dialog.innerHTML = `
-            <h3>AI Annotate Page ${pageNumber}</h3>
-            <label for="ai-prompt">Prompt for AI:</label>
-            <textarea id="ai-prompt">Break this document page into "regions" (paragraphs etc), and for each region, provide coordinates (as percentages of page width/height) and a descriptive label.</textarea>
-            <div class="dialog-buttons">
-                <button id="ai-cancel">Cancel</button>
-                <button id="ai-submit">🤖 Annotate with AI</button>
+            <h3 class="text-lg font-bold mb-4">AI Annotate Page ${pageNumber}</h3>
+            <label for="ai-prompt" class="block text-sm font-medium text-gray-700 mb-2">Prompt for AI:</label>
+            <textarea id="ai-prompt" class="w-full h-32 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">Break this document page into "regions" (paragraphs etc), and for each region, provide coordinates (as percentages of page width/height) and a descriptive label.</textarea>
+            <div class="mt-4 flex justify-end gap-3">
+                <button id="ai-cancel" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
+                <button id="ai-submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">🤖 Annotate with AI</button>
             </div>
         `;
 
