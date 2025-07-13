@@ -40,7 +40,7 @@ export class GeminiEngine implements AIEngine {
     private apiKey: string;
     private model: string;
 
-    constructor(apiKey: string, model = 'gemini-1.5-flash') {
+    constructor(apiKey: string, model = 'gemini-2.5-pro') {
         this.apiKey = apiKey;
         this.model = model;
     }
