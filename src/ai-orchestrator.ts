@@ -28,29 +28,52 @@ export async function runAIAssistedAnnotation(
         return null; // User cancelled
     }
 
-    // 2. Get the API key, prompting the user if necessary.
-    const apiKey = getApiKey();
-    if (!apiKey) {
+    // 2. Get the API keys, prompting the user if necessary.
+    const geminiApiKey = getGeminiApiKey();
+    if (!geminiApiKey) {
         return null; // User cancelled or no key provided
     }
 
-    // 3. Prepare the request for the AI engine.
-    const request = await prepareAnnotationRequest(pageDiv, pageNumber, userPrompt, allAnnotations, getCanvasForPage);
-    if (!request) {
-        return null; // Could not prepare the request (e.g., canvas not found)
+    const googleVisionApiKey = getGoogleVisionApiKey();
+    if (!googleVisionApiKey) {
+        return null; // User cancelled or no key provided
     }
 
-    // 4. Instantiate the engine and run the annotation process.
+    // 3. Get word-level OCR data from Google Vision API
+    const canvas = pageDiv.querySelector('canvas') as HTMLCanvasElement;
+    if (!canvas) {
+        console.error("Could not find canvas for page", pageNumber);
+        return null;
+    }
+
+    let visionData;
+    try {
+        console.log("Orchestrator: Getting word-level OCR from Google Vision...");
+        visionData = await getWordLevelOCR(canvas, googleVisionApiKey);
+        console.log("Orchestrator: Got", visionData.words.length, "words from Vision API");
+    } catch (error) {
+        console.error("Orchestrator: Vision API failed:", error);
+        alert(`Vision API failed: ${error instanceof Error ? error.message : String(error)}`);
+        return null;
+    }
+
+    // 4. Prepare the request for the AI engine.
+    const request = await prepareAnnotationRequest(pageDiv, pageNumber, userPrompt, allAnnotations, getCanvasForPage, visionData);
+    if (!request) {
+        return null; // Could not prepare the request
+    }
+
+    // 5. Instantiate the engine and run the annotation process.
     //    This is where you could easily swap in a different engine, e.g., OpenAIEngine.
-    const engine: AIEngine = new GeminiEngine(apiKey);
+    const engine: AIEngine = new GeminiEngine(geminiApiKey);
 
     try {
         console.log("Orchestrator: Calling AI engine...");
         const response = await engine.annotate(request);
         console.log("Orchestrator: AI engine returned successfully.");
 
-        // 5. Convert the engine's response into the application's annotation format.
-        return convertResponseToAnnotations(response.parsedAnnotations, pageNumber);
+        // 6. Convert the engine's response into the application's annotation format.
+        return convertResponseToAnnotations(response.parsedAnnotations, pageNumber, visionData, canvas);
 
     } catch (error) {
         console.error("Orchestrator: An error occurred during AI processing:", error);
@@ -62,6 +85,79 @@ export async function runAIAssistedAnnotation(
 // --- Helper Functions for Orchestration ---
 
 /**
+ * Word data from Google Vision API
+ */
+interface VisionWord {
+    text: string;
+    xmin: number;
+    xmax: number;
+    ymin: number;
+    ymax: number;
+}
+
+/**
+ * Complete response from Google Vision API
+ */
+interface VisionData {
+    words: VisionWord[];
+    fullText: string;
+    rawResponse: any; // Store full response for future experiments
+}
+
+/**
+ * Get word-level OCR data from Google Vision API
+ */
+async function getWordLevelOCR(canvas: HTMLCanvasElement, apiKey: string): Promise<VisionData> {
+    const base64Image = canvas.toDataURL('image/jpeg', 1.0).split(',')[1];
+    
+    const apiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
+    const requestData = {
+        requests: [{
+            image: { content: base64Image },
+            features: [{ type: 'DOCUMENT_TEXT_DETECTION' }]
+        }]
+    };
+    
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+    });
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Google Vision API error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.responses || !data.responses[0] || !data.responses[0].textAnnotations) {
+        throw new Error('Invalid response from Google Vision API');
+    }
+    
+    const ocrResponse = data.responses[0];
+    const fullText = ocrResponse.fullTextAnnotation?.text || '';
+    
+    // Extract word-level data (skip first annotation which is full text)
+    const words: VisionWord[] = ocrResponse.textAnnotations.slice(1).map((word: any) => {
+        const box = word.boundingPoly || word.boundingBox;
+        return {
+            text: word.description,
+            xmin: Math.min(...box.vertices.map((v: any) => v.x || 0)),
+            xmax: Math.max(...box.vertices.map((v: any) => v.x || 0)),
+            ymin: Math.min(...box.vertices.map((v: any) => v.y || 0)),
+            ymax: Math.max(...box.vertices.map((v: any) => v.y || 0))
+        };
+    });
+    
+    return {
+        words,
+        fullText,
+        rawResponse: data.responses[0] // Store for future experiments
+    };
+}
+
+/**
  * Prepares the request object needed by the AIEngine.
  * This involves getting the canvas, extracting the image, and gathering few-shot examples.
  */
@@ -70,7 +166,8 @@ async function prepareAnnotationRequest(
     pageNumber: number,
     prompt: string,
     allAnnotations: Annotation[],
-    getCanvasForPage: (pageNumber: number) => HTMLCanvasElement | null
+    getCanvasForPage: (pageNumber: number) => HTMLCanvasElement | null,
+    visionData: VisionData
 ): Promise<AIAnnotationRequest | null> {
     const canvas = pageDiv.querySelector('canvas') as HTMLCanvasElement;
     if (!canvas) {
@@ -83,20 +180,120 @@ async function prepareAnnotationRequest(
     // Get examples from up to 2 most recent annotated pages for few-shot prompting.
     const examples = getExamplesFromRecentPages(pageNumber, allAnnotations, getCanvasForPage);
 
-    return { base64Image, prompt, examples };
+    // Transform vision data for LLM consumption (easy experimentation point)
+    const transformedVisionData = transformVisionDataForLLM(visionData, canvas);
+
+    return { 
+        base64Image, 
+        prompt: enhancePromptWithVisionData(prompt, transformedVisionData), 
+        examples 
+    };
+}
+
+/**
+ * Transform vision data for LLM consumption - easy experimentation point
+ * This function can be easily modified to experiment with different formats
+ */
+function transformVisionDataForLLM(visionData: VisionData, canvas: HTMLCanvasElement): any {
+    // EXPERIMENT POINT: Transform coordinates to different ranges
+    const coordTransform = (coord: number, dimension: number) => {
+        // Current: normalize to 0-1000 range
+        return Math.round((coord / dimension) * 1000);
+    };
+    
+    // EXPERIMENT POINT: Choose what data to include
+    const transformedWords = visionData.words.map((word, index) => ({
+        index,
+        text: word.text,
+        // EXPERIMENT POINT: Different coordinate formats
+        box_2d: [
+            coordTransform(word.ymin, canvas.height), // ymin
+            coordTransform(word.xmin, canvas.width),  // xmin
+            coordTransform(word.ymax, canvas.height), // ymax
+            coordTransform(word.xmax, canvas.width)   // xmax
+        ]
+    }));
+    
+    return {
+        words: transformedWords,
+        fullText: visionData.fullText,
+        // EXPERIMENT POINT: Include more/less raw data
+        pageWidth: canvas.width,
+        pageHeight: canvas.height
+    };
+}
+
+/**
+ * Enhance the user prompt with vision data
+ */
+function enhancePromptWithVisionData(userPrompt: string, visionData: any): string {
+    return `${userPrompt}
+
+I'm also providing precise word-level OCR data from Google Vision API. Use this data to create accurate bounding boxes for semantic regions.
+
+WORD DATA (coordinates normalized to 0-1000):
+${JSON.stringify(visionData.words, null, 2)}
+
+For each semantic region, provide:
+1. The wordIndices array containing the indices of words that belong to this region
+2. The semantic type and descriptive label
+3. The bounding box that encompasses all words in the region
+
+Return as JSON array with format:
+[
+  {
+    "wordIndices": [0, 1, 2, 3],
+    "semanticType": "title", 
+    "label": "descriptive label",
+    "box_2d": [ymin, xmin, ymax, xmax]
+  }
+]`;
 }
 
 /**
  * Converts the raw, parsed annotations from the AI engine into the application's
  * internal Annotation format, including generating unique IDs.
  */
-function convertResponseToAnnotations(parsedAnnotations: any[], pageNumber: number): Annotation[] {
+function convertResponseToAnnotations(parsedAnnotations: any[], pageNumber: number, visionData: VisionData, canvas: HTMLCanvasElement): Annotation[] {
     return parsedAnnotations.map((region: any) => {
-        // Extract box_2d coordinates [ymin, xmin, ymax, xmax] normalized to 0-1000
-        const box2d = region.box_2d || region.box2d || [0, 0, 100, 100]; // fallback if missing
+        // EXPERIMENT POINT: Try different approaches for bounding box calculation
+        
+        // Method 1: Use word indices to calculate precise bounding box
+        if (region.wordIndices && Array.isArray(region.wordIndices) && region.wordIndices.length > 0) {
+            const regionWords = region.wordIndices
+                .map((idx: number) => visionData.words[idx])
+                .filter(Boolean);
+            
+            if (regionWords.length > 0) {
+                // Calculate precise bounding box from actual words
+                const xmin = Math.min(...regionWords.map((w: VisionWord) => w.xmin));
+                const xmax = Math.max(...regionWords.map((w: VisionWord) => w.xmax));
+                const ymin = Math.min(...regionWords.map((w: VisionWord) => w.ymin));
+                const ymax = Math.max(...regionWords.map((w: VisionWord) => w.ymax));
+                
+                // Convert to fractional coordinates
+                const x = xmin / canvas.width;
+                const y = ymin / canvas.height;
+                const width = Math.max(0.01, (xmax - xmin) / canvas.width);
+                const height = Math.max(0.01, (ymax - ymin) / canvas.height);
+                
+                return {
+                    id: generateId(),
+                    x, y, width, height,
+                    label: region.label || 'AI Annotation',
+                    semanticType: region.semanticType,
+                    pageNumber: pageNumber,
+                    wordIndices: region.wordIndices,
+                    ocrText: regionWords.map((w: VisionWord) => w.text).join(' ')
+                };
+            }
+        }
+        
+        // Method 2: Fallback to box_2d coordinates
+        const box2d = region.box_2d || region.box2d || [0, 0, 100, 100];
         
         if (!Array.isArray(box2d) || box2d.length !== 4) {
-            console.warn('Invalid box_2d format, using fallback:', box2d);
+            console.warn('Invalid box_2d format and no valid wordIndices, using fallback:', box2d);
             const x = Math.max(0, Math.min(1, region.x || 0));
             const y = Math.max(0, Math.min(1, region.y || 0));
             const width = Math.max(0.01, Math.min(1 - x, region.width || 0.1));
@@ -126,6 +323,7 @@ function convertResponseToAnnotations(parsedAnnotations: any[], pageNumber: numb
             id: generateId(),
             x, y, width, height,
             label: region.label || 'AI Annotation',
+            semanticType: region.semanticType,
             pageNumber: pageNumber
         };
     });
@@ -134,14 +332,31 @@ function convertResponseToAnnotations(parsedAnnotations: any[], pageNumber: numb
 /**
  * Retrieves the Gemini API key from local storage, or prompts the user if not found.
  */
-function getApiKey(): string | null {
+function getGeminiApiKey(): string | null {
     let apiKey = localStorage.getItem('gemini-api-key');
     if (!apiKey) {
         apiKey = window.prompt('Please enter your Gemini API key (will be saved for this session):');
         if (apiKey) {
             localStorage.setItem('gemini-api-key', apiKey);
         } else {
-            alert("API key is required to use the AI feature.");
+            alert("Gemini API key is required to use the AI feature.");
+            return null;
+        }
+    }
+    return apiKey;
+}
+
+/**
+ * Retrieves the Google Vision API key from local storage, or prompts the user if not found.
+ */
+function getGoogleVisionApiKey(): string | null {
+    let apiKey = localStorage.getItem('google-vision-api-key');
+    if (!apiKey) {
+        apiKey = window.prompt('Please enter your Google Vision API key (will be saved for this session):');
+        if (apiKey) {
+            localStorage.setItem('google-vision-api-key', apiKey);
+        } else {
+            alert("Google Vision API key is required to use the AI feature.");
             return null;
         }
     }

@@ -93,7 +93,7 @@ export class GeminiEngine implements AIEngine {
             contents: [{ parts }],
             generationConfig: {
                 temperature: 0.1,
-                maxOutputTokens: 4096, // Increased for potentially complex responses
+                maxOutputTokens: 262144, // 256k tokens for complex documents with many regions
                 response_mime_type: "application/json",
             }
         };
