@@ -255,6 +255,10 @@ function loadAnnotationsFromJson(jsonData: any): void {
 
         console.log('Loaded annotations:', annotations);
 
+        // Clear all existing annotation boxes before rendering new ones
+        const existingBoxes = document.querySelectorAll('.annotation-box');
+        existingBoxes.forEach(box => box.remove());
+
         // If PDF is already loaded, render the annotations
         if (pdfContainer.children.length > 0) {
             renderLoadedAnnotations();
@@ -287,6 +291,13 @@ function renderLoadedAnnotations(): void {
 
 // Create visual annotation box
 function createAnnotationBox(overlay: HTMLDivElement, pageDiv: HTMLDivElement, annotation: Annotation): void {
+    // Check if annotation box already exists to prevent duplicates
+    const existingBox = overlay.querySelector(`[data-annotation-id="${annotation.id}"]`);
+    if (existingBox) {
+        console.log(`Annotation box with ID ${annotation.id} already exists, skipping creation`);
+        return;
+    }
+
     const pageWidth = pageDiv.offsetWidth;
     const pageHeight = pageDiv.offsetHeight;
 
