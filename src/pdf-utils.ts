@@ -13,6 +13,10 @@ export interface Annotation {
     height: number;
     label: string;
     pageNumber: number;
+    // Optional fields for enhanced AI annotations
+    semanticType?: string;
+    wordIndices?: number[];
+    ocrText?: string;
 }
 
 // Wait for PDF.js to be available before using it
