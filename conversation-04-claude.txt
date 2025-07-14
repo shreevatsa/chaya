@@ -1,6 +1,3 @@
-Welcome to fish, the friendly interactive shell
-Type help for instructions on how to use fish
-shreevatsa@shreevatsa-personal ~/w/bookchop (main)> claude
 ╭───────────────────────────────────────────────────╮
 │ ✻ Welcome to Claude Code!                         │
 │                                                   │
@@ -1593,10 +1590,1023 @@ shreevatsa@shreevatsa-personal ~/w/bookchop (main)> claude
 
   Is there anything else you'd like me to work on with the bookchop application?
 
+> This is a major architectural change, so I'm just brainstorming right now. Tell me if this sounds feasible. Right now, the PDF and JSON files are saved separately on disk. I wonder whether it will be possible to package them and the 
+  application together into a self-contained file -- maybe it can be a .html file that contains the PDF and JSON inside it (basically a wrapper over them), so that someone can open the `.chaya.html` (say) file, and continue the application 
+  from there.
+
+⏺ This is a fascinating architectural idea! Yes, this is definitely feasible and would create a really elegant self-contained annotation workflow. Let me break down the technical approach:
+
+  Technical Implementation Strategy:
+
+  1. Data Embedding in HTML
+
+  <!DOCTYPE html>
+  <html>
+  <head>
+      <title>Bookchop - Document.pdf</title>
+      <!-- All CSS and JS inlined -->
+  </head>
+  <body>
+      <!-- UI elements -->
+
+      <script>
+          // Embedded data
+          const EMBEDDED_PDF = "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PAovVHlwZS...";
+          const EMBEDDED_ANNOTATIONS = {
+              "metadata": {...},
+              "annotationsByPage": {...}
+          };
+
+          // Auto-load on page load
+          window.addEventListener('load', () => {
+              loadEmbeddedData();
+          });
+      </script>
+  </body>
+  </html>
+
+  2. Self-Contained Architecture
+
+  - Inline all assets: CSS, JS, even PDF.js library
+  - Embed PDF as base64: Convert PDF to data URL
+  - Embed annotations as JSON: Direct JavaScript object
+  - Remove file upload UI: Replace with embedded data loading
+
+  3. Export Workflow
+
+  function exportAsChayaFile() {
+      const pdfBase64 = getCurrentPdfAsBase64();
+      const annotationsData = getCurrentAnnotations();
+
+      const htmlTemplate = `
+          <!DOCTYPE html>
+          <html>
+          <!-- Entire bookchop app inlined -->
+          <script>
+              const EMBEDDED_PDF = "${pdfBase64}";
+              const EMBEDDED_ANNOTATIONS = ${JSON.stringify(annotationsData)};
+              // Auto-load logic
+          </script>
+          </html>
+      `;
+
+      downloadFile(`${pdfName}.chaya.html`, htmlTemplate);
+  }
+
+  Benefits:
+
+  - ✅ True portability: Single file contains everything
+  - ✅ Version control friendly: Can track changes to the .chaya.html file
+  - ✅ Sharing: Email/send one file with all context
+  - ✅ Offline capable: No external dependencies
+  - ✅ Incremental saves: Create new .chaya.html versions as you work
+
+  Technical Challenges:
+
+  1. File Size
+
+  - Large PDFs → large HTML files (base64 adds ~33% overhead)
+  - Could implement compression or chunking
+
+  2. Browser Limits
+
+  - Some browsers have limits on data URLs
+  - File system APIs might struggle with very large files
+
+  3. Security
+
+  - Some browsers block data URLs in certain contexts
+  - Need to test cross-browser compatibility
+
+  Implementation Phases:
+
+  Phase 1: Proof of Concept
+
+  - Create export function that generates .chaya.html
+  - Test with small PDFs
+  - Basic auto-loading of embedded data
+
+  Phase 2: Full Integration
+
+  - Inline all CSS/JS dependencies
+  - Remove/hide file upload UI when in embedded mode
+  - Add "Continue Editing" vs "New Document" modes
+
+  Phase 3: Polish
+
+  - Compression for large files
+  - Progress indicators for export
+  - File format versioning
+
+  Alternative Approaches:
+
+  - ZIP format: Bundle HTML + PDF + JSON in a ZIP file
+  - Data URLs with compression: Use gzip compression before base64
+  - Hybrid approach: Keep small files embedded, larger files as separate downloads
+
+  This would create a really unique and powerful annotation workflow - basically turning each annotated document into its own portable application. Would you like me to start exploring a proof of concept for this?
+
+> (And I'd like to package the viewer application too into the same thing.) The 33% overhead is concerning. What are some alternatives?
+
+⏺ Great point! The 33% base64 overhead is significant for large PDFs. Here are several alternatives to reduce the bloat:
+
+  Option 1: Binary Data in HTML
+
+  Instead of base64, embed binary data directly using modern approaches:
+
+  // Use Uint8Array and compress
+  const pdfData = new Uint8Array([...]); // Raw PDF bytes
+  const compressed = pako.gzip(pdfData); // ~50-70% reduction
+  const htmlTemplate = `
+  <script>
+      const PDF_DATA = new Uint8Array([${Array.from(compressed)}]);
+      const pdfBytes = pako.ungzip(PDF_DATA);
+  </script>`;
+
+  Savings: ~50-70% reduction vs base64
+
+  Option 2: Self-Extracting ZIP Approach
+
+  Create an HTML file that contains a ZIP and extracts itself:
+
+  // Embed ZIP as base64 (only the ZIP, which is already compressed)
+  const zipData = "UEsDBBQAAAAI..."; // Much smaller than PDF base64
+  const htmlTemplate = `
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+      JSZip.loadAsync('${zipData}', {base64: true}).then(zip => {
+          const pdfData = zip.file("document.pdf").async("uint8array");
+          const annotations = JSON.parse(zip.file("annotations.json").async("text"));
+          // Load both
+      });
+  </script>`;
+
+  Savings: ZIP compression typically 80-95% for PDFs
+
+  Option 3: Chunked Loading
+
+  Split large PDFs into chunks and lazy-load:
+
+  const CHUNK_SIZE = 64 * 1024; // 64KB chunks
+  const PDF_CHUNKS = [
+      "chunk1_base64...",
+      "chunk2_base64...",
+      // ...
+  ];
+
+  async function loadPDF() {
+      const chunks = PDF_CHUNKS.map(chunk =>
+          Uint8Array.from(atob(chunk), c => c.charCodeAt(0))
+      );
+      const pdfData = concatenateChunks(chunks);
+      return pdfData;
+  }
+
+  Benefits: Faster initial load, progressive loading
+
+  Option 4: Hybrid Web Archive (.MHTML)
+
+  Use the MHTML format (similar to .chaya concept):
+
+  Content-Type: multipart/related; boundary="BOUNDARY"
+
+  --BOUNDARY
+  Content-Type: text/html
+
+  <!DOCTYPE html>
+  <html><!-- App HTML --></html>
+
+  --BOUNDARY
+  Content-Type: application/pdf
+  Content-Transfer-Encoding: base64
+
+  JVBERi0xLjQK...
+
+  --BOUNDARY
+  Content-Type: application/json
+
+  {"annotations": {...}}
+
+  Benefits: Native browser support, no size overhead
+
+  Option 5: Modern Compression + Streaming
+
+  Use modern compression with streaming decompression:
+
+  // Use Brotli compression (better than gzip)
+  const compressed = await compressWithBrotli(pdfBytes);
+  const htmlTemplate = `
+  <script type="module">
+      import { decompress } from './brotli-wasm.js';
+      const compressedData = new Uint8Array([${Array.from(compressed)}]);
+      const pdfData = await decompress(compressedData);
+  </script>`;
+
+  Savings: Brotli typically 15-25% better than gzip
+
+  Recommended Approach: Hybrid Strategy
+
+  function exportChayaFile(pdf, annotations) {
+      const pdfSize = pdf.byteLength;
+
+      if (pdfSize < 1MB) {
+          // Small files: Use compressed binary embedding
+          return createCompressedEmbedded(pdf, annotations);
+      } else if (pdfSize < 10MB) {
+          // Medium files: Use chunked approach
+          return createChunkedEmbedded(pdf, annotations);
+      } else {
+          // Large files: Use MHTML or warn user
+          return createMHTMLFormat(pdf, annotations);
+      }
+  }
+
+  Size Comparison Example:
+
+  For a 5MB PDF:
+  - Base64: ~6.65MB (+33%)
+  - Gzip + Base64: ~1.5MB (-70%)
+  - ZIP format: ~1MB (-80%)
+  - MHTML: ~5MB (no overhead)
+  - Brotli compressed: ~1.2MB (-75%)
+
+  My Recommendation:
+
+  Start with ZIP-based approach (Option 2) because:
+  - ✅ Excellent compression (80-95% typical)
+  - ✅ Mature JavaScript libraries (JSZip)
+  - ✅ Can bundle multiple files naturally
+  - ✅ Easy to implement
+  - ✅ Good browser support
+
+  Would you like me to prototype the ZIP-based self-extracting approach? It would create very compact .chaya.html files.
+
+> I don't think that makes sense. Most of these PDFs (scanned books) are already compressed as far as the main data (the page images) goes, so I don't expect much further compression from gzip or zip. And the MHTML is cool but it seems like
+   it requires base64 inside, so there's an overhead, correct?
+
+✻ Thinking…
+
+  The user makes excellent points:
+
+  1. PDFs of scanned books are already heavily compressed - the images inside are typically JPEG or similar, which are already compressed. Further compression with gzip/zip won't help much with the actual image data.
+  2. MHTML does indeed require base64 encoding for binary data, so there's still the 33% overhead.
+
+  Let me think about this more carefully:
+
+  - PDFs are already compressed
+  - Base64 adds 33% overhead no matter what
+  - ZIP/gzip won't compress already-compressed image data much
+  - MHTML still needs base64 for binary data
+
+  So the user is right - most of my suggestions don't actually solve the fundamental problem. The real issue is that HTML/JavaScript fundamentally can't embed raw binary data efficiently.
+
+  What are the real alternatives?
+
+  1. Accept the 33% overhead - for most use cases, this might be acceptable
+  2. Use a different container format entirely (not HTML)
+  3. Use modern browser APIs that can handle binary data more efficiently
+  4. Hybrid approach where the HTML contains references to external binary data
+
+  Actually, there are some modern approaches:
+  - Service Workers can intercept requests and serve embedded data
+  - Web Streams API
+  - Modern data: URLs with proper binary handling
+  - IndexedDB for client-side storage
+
+  But the user is fundamentally correct - if we want a single HTML file, we're stuck with base64 overhead for binary data.
+
+⏺ You're absolutely right! I was overcomplicating this. Let me think more clearly:
+
+  Reality Check:
+
+  1. PDF Compression Reality
+
+  - Scanned book PDFs are already ~90% compressed (JPEG images)
+  - ZIP/gzip will only compress the small PDF metadata/structure
+  - Realistic compression: 5-15% total reduction, not 80-95%
+
+  2. MHTML Reality
+
+  - Yes, MHTML still requires base64 for binary content
+  - Still has the 33% overhead - not a solution
+
+  3. Browser Fundamental Limitation
+
+  - HTML/JavaScript can't embed raw binary data efficiently
+  - Any single-file approach will have encoding overhead
+
+  Practical Alternatives:
+
+  Option 1: Accept the 33% Overhead
+
+  For a 10MB scanned PDF → 13.3MB .chaya.html file
+  - Question: Is this acceptable for your use case?
+  - Benefit: Simplest implementation
+  - Downside: Larger files
+
+  Option 2: Different Container Format
+
+  Instead of HTML, use a structured format:
+  document.chaya  (actually a ZIP file)
+  ├── app.html    (full bookchop application)
+  ├── document.pdf
+  └── annotations.json
+  - Benefit: No encoding overhead
+  - Downside: Need custom "launcher" (browser extension or app)
+
+  Option 3: Hybrid Reference Approach
+
+  HTML file + companion files:
+  document.chaya.html  (contains app + references)
+  document.chaya.pdf   (actual PDF)
+  document.chaya.json  (annotations)
+  - Benefit: No overhead, HTML loads companions
+  - Downside: Multiple files (defeats the purpose)
+
+  Option 4: Modern Browser APIs
+
+  Use Service Worker to serve embedded data without base64:
+  // More complex but avoids base64 overhead
+  const pdfBlob = new Blob([binaryData], {type: 'application/pdf'});
+  const url = URL.createObjectURL(pdfBlob);
+
+  My Revised Recommendation:
+
+  Accept the 33% overhead for the elegant single-file approach. Here's why:
+
+  - ✅ Storage is cheap - extra 3-4MB per document is manageable
+  - ✅ Convenience trumps size - single-file portability is valuable
+  - ✅ Simple implementation - no complex workarounds needed
+  - ✅ Works everywhere - no browser compatibility issues
+
+  What's your tolerance for the file size increase? Is a 10MB PDF becoming 13.3MB acceptable for the convenience of single-file packaging?
+
+> I guess Option 2 (zip file) is what is done by EPUB and Microsoft Office formats (docx etc)?
+
+⏺ Exactly! You've hit on the perfect analogy. Both EPUB and Office formats are essentially ZIP files with a different extension:
+
+  How They Work:
+
+  EPUB (.epub)
+
+  book.epub  (ZIP file)
+  ├── META-INF/
+  │   └── container.xml
+  ├── OEBPS/
+  │   ├── content.opf
+  │   ├── toc.ncx
+  │   ├── chapter1.xhtml
+  │   ├── styles.css
+  │   └── images/
+  └── mimetype
+
+  Office Documents (.docx, .xlsx, .pptx)
+
+  document.docx  (ZIP file)
+  ├── [Content_Types].xml
+  ├── _rels/
+  ├── word/
+  │   ├── document.xml
+  │   ├── styles.xml
+  │   └── media/
+  └── docProps/
+
+  For Bookchop (.chaya):
+
+  document.chaya  (ZIP file)
+  ├── manifest.json     # Metadata, version info
+  ├── app/
+  │   ├── index.html    # Bookchop annotator
+  │   ├── viewer.html   # Bookchop viewer
+  │   ├── app.js        # All JavaScript bundled
+  │   └── app.css       # All styles bundled
+  ├── document.pdf      # Original PDF (no encoding overhead!)
+  └── annotations.json  # Annotation data
+
+  Benefits of ZIP Approach:
+
+  - ✅ Zero encoding overhead - PDF stays as-is
+  - ✅ Industry standard - proven pattern
+  - ✅ Version control friendly - can diff/track changes
+  - ✅ Extensible - easy to add more files later
+  - ✅ Tool ecosystem - can open with ZIP tools for debugging
+
+  Implementation:
+
+  async function exportChayaFile() {
+      const zip = new JSZip();
+
+      // Add application files
+      zip.file("app/index.html", await buildAnnotatorHTML());
+      zip.file("app/viewer.html", await buildViewerHTML());
+      zip.file("app/app.js", await bundleAllJS());
+      zip.file("app/app.css", await bundleAllCSS());
+
+      // Add document data (no encoding!)
+      zip.file("document.pdf", pdfArrayBuffer);
+      zip.file("annotations.json", JSON.stringify(annotations));
+      zip.file("manifest.json", JSON.stringify({
+          version: "1.0",
+          created: new Date().toISOString(),
+          originalFilename: pdfFilename
+      }));
+
+      const blob = await zip.generateAsync({type: "blob"});
+      downloadFile(`${pdfName}.chaya`, blob);
+  }
+
+  Opening .chaya Files:
+
+  Two approaches:
+
+  Option A: Browser Extension
+
+  - Install extension that registers .chaya handler
+  - Extension unzips and opens app/index.html
+
+  Option B: Web App Launcher
+
+  - Website that accepts .chaya uploads
+  - Unzips in browser and loads the embedded app
+  - No installation required
+
+  This is much cleaner than the HTML embedding approach! The ZIP format gives us the best of both worlds - single file portability with zero overhead.
+
+  Would you like me to prototype this approach?
+
+> Options A and B are not mutually exclusive, right? You could have a browser extension that registers handler and redirects to the website, for example?
+
+⏺ Absolutely! You're thinking about this perfectly. The approaches are completely complementary and could work together seamlessly.
+
+  Hybrid Approach: Extension + Web Launcher
+
+  Browser Extension (Convenience Layer)
+
+  // Extension registers .chaya file handler
+  chrome.fileBrowserHandler.onExecute.addListener((id, details) => {
+    if (id === 'open-chaya') {
+      const file = details.entries[0];
+      // Redirect to web launcher with file
+      const launcherUrl = `https://bookchop.app/open?file=${encodeURIComponent(file.name)}`;
+      chrome.tabs.create({url: launcherUrl});
+    }
+  });
+
+  Web Launcher (Universal Access)
+
+  // Website handles both extension redirects AND direct uploads
+  if (urlParams.has('file')) {
+    // Came from extension - request file access
+    showExtensionFileAccess();
+  } else {
+    // Direct visit - show upload interface
+    showFileUploadInterface();
+  }
+
+  User Experience Flows:
+
+  Flow 1: With Extension (Seamless)
+
+  1. User double-clicks document.chaya
+  2. Extension captures the file
+  3. Extension opens bookchop.app/open with file reference
+  4. Web app loads the file directly
+  5. Result: Native file association experience
+
+  Flow 2: Without Extension (Still Works)
+
+  1. User visits bookchop.app
+  2. User drags/uploads document.chaya file
+  3. Web app unzips and loads embedded app
+  4. Result: Universal access, no installation required
+
+  Flow 3: Sharing (Best of Both)
+
+  1. User shares .chaya file via email/cloud
+  2. Recipient can either:
+    - Double-click (if they have extension)
+    - Or upload to web launcher (if they don't)
+  3. Result: Works for everyone regardless of setup
+
+  Implementation Benefits:
+
+  - ✅ Progressive enhancement - works better with extension, still works without
+  - ✅ Zero barrier to entry - anyone can open .chaya files
+  - ✅ Native feel - extension users get OS-level file associations
+  - ✅ Fallback path - web launcher ensures universal compatibility
+  - ✅ Same codebase - web launcher IS the .chaya opener
+
+  Extension Implementation:
+
+  // manifest.json
+  {
+    "name": "Bookchop File Handler",
+    "permissions": ["fileSystem", "tabs"],
+    "file_browser_handlers": [{
+      "id": "open-chaya",
+      "default_title": "Open with Bookchop",
+      "file_filters": ["filesystem:*.chaya"]
+    }]
+  }
+
+  This gives users the best possible experience at each level of engagement:
+  - Power users: Install extension → native file associations
+  - Casual users: Use web launcher → no installation needed
+  - Shared workflows: Both approaches work seamlessly
+
+  The extension essentially becomes a "shortcut" to the web launcher, rather than a separate application. Very elegant architecture!
+
+> Ok great, how would we go about implementing this? What changes would be needed? Just plan it for now.
+
+⏺ Implementation Plan for .chaya Format
+
+  Phase 1: Core ZIP Export/Import Infrastructure
+
+  1.1 Add ZIP Dependencies
+
+  // Add to package.json
+  "dependencies": {
+    "jszip": "^3.10.1"
+  }
+
+  1.2 Create Bundling System
+
+  // New file: src/bundler.ts
+  export async function bundleApplication(): Promise<{
+    indexHtml: string,
+    viewerHtml: string,
+    bundledJs: string,
+    bundledCss: string
+  }> {
+    // Inline all dependencies into self-contained HTML files
+    // Bundle all JS modules into single file
+    // Bundle all CSS into single file
+  }
+
+  1.3 Modify Export System
+
+  // Update annotator.ts
+  async function exportAsChayaFile() {
+    const zip = new JSZip();
+
+    // Bundle application
+    const bundle = await bundleApplication();
+    zip.file("app/index.html", bundle.indexHtml);
+    zip.file("app/viewer.html", bundle.viewerHtml);
+    zip.file("app/app.js", bundle.bundledJs);
+    zip.file("app/app.css", bundle.bundledCss);
+
+    // Add document data
+    zip.file("document.pdf", getCurrentPdfBuffer());
+    zip.file("annotations.json", JSON.stringify(getCurrentAnnotations()));
+    zip.file("manifest.json", createManifest());
+
+    downloadFile(`${pdfName}.chaya`, await zip.generateAsync({type: "blob"}));
+  }
+
+  Phase 2: .chaya File Loader
+
+  2.1 Create Web Launcher Interface
+
+  <!-- New file: launcher.html -->
+  <!DOCTYPE html>
+  <html>
+  <head><title>Bookchop Launcher</title></head>
+  <body>
+    <div id="upload-zone">
+      <h1>Open .chaya File</h1>
+      <input type="file" accept=".chaya" id="chaya-upload">
+      <div class="drop-zone">Drop .chaya file here</div>
+    </div>
+    <div id="app-container" style="display: none;">
+      <!-- Dynamic content loaded here -->
+    </div>
+  </body>
+  </html>
+
+  2.2 Implement .chaya Loader
+
+  // New file: src/chaya-loader.ts
+  export async function loadChayaFile(file: File): Promise<void> {
+    const zip = await JSZip.loadAsync(file);
+
+    // Extract and validate manifest
+    const manifest = JSON.parse(await zip.file("manifest.json").async("string"));
+
+    // Load application files
+    const indexHtml = await zip.file("app/index.html").async("string");
+    const appJs = await zip.file("app/app.js").async("string");
+    const appCss = await zip.file("app/app.css").async("string");
+
+    // Load document data
+    const pdfBuffer = await zip.file("document.pdf").async("arraybuffer");
+    const annotations = JSON.parse(await zip.file("annotations.json").async("string"));
+
+    // Inject into current page
+    injectAndRunApplication(indexHtml, appJs, appCss, pdfBuffer, annotations);
+  }
+
+  Phase 3: Application Mode Detection
+
+  3.1 Detect Runtime Mode
+
+  // Add to existing files
+  enum AppMode {
+    STANDALONE = 'standalone',  // Normal bookchop.app usage
+    EMBEDDED = 'embedded'       // Running from .chaya file
+  }
+
+  function detectAppMode(): AppMode {
+    return window.CHAYA_EMBEDDED_DATA ? AppMode.EMBEDDED : AppMode.STANDALONE;
+  }
+
+  3.2 Modify UI Based on Mode
+
+  // Update annotator.ts and viewer.ts
+  function initializeApp() {
+    const mode = detectAppMode();
+
+    if (mode === AppMode.EMBEDDED) {
+      // Hide file upload UI
+      hideFileUploadControls();
+      // Load embedded data
+      loadEmbeddedData();
+      // Show "embedded mode" indicator
+      showEmbeddedModeUI();
+    } else {
+      // Normal standalone mode
+      showFileUploadControls();
+    }
+  }
+
+  Phase 4: Browser Extension
+
+  4.1 Extension Manifest
+
+  // New: extension/manifest.json
+  {
+    "manifest_version": 3,
+    "name": "Bookchop File Handler",
+    "version": "1.0",
+    "permissions": ["activeTab"],
+    "action": {
+      "default_popup": "popup.html"
+    },
+    "content_scripts": [{
+      "matches": ["file://*.chaya"],
+      "js": ["content.js"]
+    }]
+  }
+
+  4.2 Extension Logic
+
+  // New: extension/content.js
+  // Detect .chaya file access
+  if (location.href.endsWith('.chaya')) {
+    // Redirect to web launcher
+    const launcherUrl = `https://bookchop.app/launcher?fileUrl=${encodeURIComponent(location.href)}`;
+    location.replace(launcherUrl);
+  }
+
+  Phase 5: Build System Updates
+
+  5.1 Update Build Scripts
+
+  // Update package.json
+  {
+    "scripts": {
+      "build": "npm run build:app && npm run build:launcher && npm run build:extension",
+      "build:app": "tsc && postcss ./src/input.css -o ./dist/output.css",
+      "build:launcher": "webpack --config launcher.webpack.js",
+      "build:extension": "cp -r extension/ dist/extension/"
+    }
+  }
+
+  5.2 Add Bundling Configuration
+
+  // New: launcher.webpack.js
+  module.exports = {
+    entry: './src/launcher.ts',
+    output: {
+      filename: 'launcher.js',
+      path: path.resolve(__dirname, 'dist')
+    },
+    // Bundle everything into single file for embedding
+  };
+
+  Phase 6: File Structure Changes
+
+  bookchop/
+  ├── src/
+  │   ├── annotator.ts          # Modified: add export functionality
+  │   ├── viewer.ts             # Modified: add embedded mode
+  │   ├── bundler.ts            # New: application bundling
+  │   ├── chaya-loader.ts       # New: .chaya file handling
+  │   └── launcher.ts           # New: web launcher entry point
+  ├── extension/                # New: browser extension
+  │   ├── manifest.json
+  │   ├── content.js
+  │   └── popup.html
+  ├── launcher.html             # New: web launcher interface
+  ├── launcher.webpack.js       # New: bundling config
+  └── dist/
+      ├── app/                  # Existing app files
+      ├── launcher.html         # Built launcher
+      ├── launcher.js           # Bundled launcher
+      └── extension/            # Built extension
+
+  Phase 7: Deployment Strategy
+
+  7.1 Website Structure
+
+  bookchop.app/
+  ├── /                         # Existing annotator
+  ├── /viewer                   # Existing viewer
+  ├── /launcher                 # New: .chaya file opener
+  └── /extension               # New: extension download
+
+  7.2 Extension Distribution
+
+  - Chrome Web Store listing
+  - Firefox Add-ons listing
+  - Manual installation instructions
+
+  Key Implementation Decisions:
+
+  1. Backwards Compatibility: Keep existing PDF+JSON workflow intact
+  2. Progressive Enhancement: .chaya format is additive feature
+  3. Self-Contained Bundling: Each .chaya file contains full application
+  4. Universal Fallback: Web launcher works without extension
+  5. Single Codebase: Same app code for standalone and embedded modes
+
+  This plan creates a complete ecosystem around the .chaya format while maintaining all existing functionality.
+
+> I like this plan more or less; could you save it somewhere for future reference?
+
+⏺ Write(CHAYA_IMPLEMENTATION_PLAN.md)
+  ⎿  Wrote 317 lines to CHAYA_IMPLEMENTATION_PLAN.md                                                                                                                                                        
+     # .chaya Format Implementation Plan
+     ## Overview
+     Implementation plan for creating self-contained `.chaya` files that package the PDF, annotations, and Bookchop application together in a single ZIP-based format (similar to EPUB or Office documents).
+     ## Architecture Goals
+     - **Single-file portability**: Everything in one `.chaya` file
+     - **Zero encoding overhead**: PDF stays as raw binary in ZIP
+     - **Universal access**: Works with or without browser extension
+     - **Progressive enhancement**: Extension provides native file associations
+     … +307 lines (ctrl+r to expand)
+
+⏺ Perfect! I've saved the complete implementation plan as CHAYA_IMPLEMENTATION_PLAN.md in your project directory.
+
+  The plan is now documented and ready for future reference. It covers the full architecture from ZIP-based file format through browser extension to deployment strategy, with all the technical details and code examples needed for
+  implementation.
+
+  You can reference this file whenever you're ready to start working on the .chaya format feature!
+
+> Right now the annotator.html is the "main" file. In my long-term vision, the user should be able to upload a PDF (or pre-existing .chaya file), and easily switch between (1) annotating, i.e. marking out regions, (2) (what the viewer.html 
+  page currently exists as a starting point of, but needs a better name), giving "types" to the earlier-marked regions (verse, etc), and (does not exist yet) doing OCR and proof-corrections on the regions, and finally (3) viewing the result
+   as a nice HTML page, where each paragraph (etc) can be traced back to its corresponding page region. Does that make sense?
+
+⏺ Absolutely! That makes perfect sense and sounds like a comprehensive document processing workflow. Let me break down what I understand:
+
+  Your Long-Term Vision: Unified Document Processing Pipeline
+
+  Current State:
+
+  - annotator.html = Main entry point for region marking
+  - viewer.html = Basic region display (needs evolution)
+
+  Target State: Three-Mode Application
+
+  Mode 1: Region Annotation (Current annotator functionality)
+
+  - Upload PDF or .chaya file
+  - Mark out physical regions (paragraphs, verses, headers, etc.)
+  - AI-assisted region detection
+  - Basic labeling
+
+  Mode 2: Content Classification & OCR (Evolution of current viewer)
+
+  - Take regions from Mode 1
+  - Assign semantic types (verse, chorus, title, annotation, etc.)
+  - OCR text from each region
+  - Proof-read and correct OCR output
+  - Link regions to their semantic meaning
+
+  Mode 3: Final Presentation (New)
+
+  - Beautiful HTML rendering of the processed document
+  - Each paragraph/element clickable to show source region
+  - Bidirectional tracing: content ↔ original page location
+  - Export as clean HTML/web page
+
+  Proposed Application Structure:
+
+  bookchop.app/
+  ├── /                    # Main hub - choose PDF or .chaya
+  ├── /annotate           # Mode 1: Region marking
+  ├── /process            # Mode 2: Classification + OCR
+  ├── /view               # Mode 3: Final presentation
+  └── /launcher           # .chaya file opener
+
+  Workflow:
+
+  PDF Upload → Annotate Regions → Classify & OCR → Final Presentation
+       ↓              ↓                ↓              ↓
+    Raw PDF    →  .chaya v1   →   .chaya v2   →   HTML Export
+                 (regions)     (typed+OCR'd)    (presentation)
+
+  Key Design Questions:
+
+  1. Navigation: Should users move linearly through modes, or jump around freely?
+  2. Data Evolution: How does the .chaya format evolve as it moves through stages?
+  Stage 1: PDF + regions
+  Stage 2: PDF + regions + types + OCR text
+  Stage 3: PDF + regions + types + OCR + corrections
+  3. Mode Integration: Single-page app with mode switching, or separate pages?
+  4. Naming: What should we call Mode 2? "Processing"? "Classification"? "Enhancement"?
+
+  Does this capture your vision correctly? I think this transforms Bookchop from a simple annotation tool into a complete document digitization pipeline - very powerful concept!
+
+> Come to think of it, maybe Mode 1 and Mode 2 can be combined, and Mode 3 is what the current viewer will become.
+
+✻ Thinking…
+
+  The user is refining their vision. Instead of three separate modes, they're thinking:
+
+  - Mode 1+2 (combined): Annotating regions AND assigning types/OCR in one unified interface
+  - Mode 3: Final presentation (evolution of current viewer)
+
+  This makes a lot of sense from a UX perspective:
+  - When you're marking a region, you might immediately know it's a "verse" or "title"
+  - OCR could happen automatically when regions are created
+  - Less context switching between modes
+  - More fluid workflow
+
+  So the new structure would be:
+  - Main entry: Upload PDF or .chaya
+  - Annotator (enhanced): Mark regions + assign types + OCR/correction
+  - Viewer (evolved): Beautiful presentation with traceability
+
+  This is actually cleaner than the three-mode approach.
+
+⏺ Excellent insight! That's much cleaner and more intuitive. Combining annotation and classification into a single fluid workflow makes total sense.
+
+  Refined Vision: Two-Mode Application
+
+  Mode 1: Enhanced Annotator (Evolution of current annotator)
+
+  - Upload PDF or .chaya file
+  - Mark out regions (current functionality)
+  - NEW: Immediately assign semantic types (verse, chorus, title, etc.)
+  - NEW: Auto-OCR text from regions
+  - NEW: Proof-read and correct OCR inline
+  - NEW: Enhanced sidebar showing regions with types and text
+
+  Mode 2: Presentation Viewer (Evolution of current viewer)
+
+  - Beautiful HTML rendering of processed document
+  - Click any element → highlight source region on original PDF
+  - Export as clean HTML/web page
+  - Navigate between semantic elements
+
+  Enhanced Annotator Workflow:
+
+  1. Draw region → 2. Auto-OCR → 3. Assign type → 4. Correct text
+                      ↓
+              All happens in one interface
+
+  Updated UI Concept:
+
+  Enhanced Annotator Sidebar:
+
+  ┌─ Annotations ────────────────┐
+  │ ☐ Page 1                     │
+  │   📝 Title: "Song of..."     │
+  │   🎵 Verse 1: "When I wa..." │
+  │   🎵 Chorus: "Oh how he..."  │
+  │   📖 Annotation: "This..."   │
+  │                              │
+  │ ☐ Page 2                     │
+  │   🎵 Verse 2: "In the..."    │
+  └──────────────────────────────┘
+
+  Region Properties Panel:
+
+  ┌─ Selected Region ──────────┐
+  │ Type: [Verse ▼]            │
+  │ ┌─ OCR Text ──────────────┐ │
+  │ │ When I was young and... │ │
+  │ │ [Edit] [Re-OCR]        │ │
+  │ └────────────────────────┘ │
+  │ Confidence: 94%            │
+  └────────────────────────────┘
+
+  Benefits of Combined Approach:
+
+  - ✅ Contextual workflow: Type regions as you create them
+  - ✅ Immediate feedback: See OCR results right away
+  - ✅ Less mode switching: Everything in one interface
+  - ✅ Natural progression: Annotate → Process → Present
+  - ✅ Iterative refinement: Easy to go back and adjust
+
+  File Structure Evolution:
+
+  bookchop.app/
+  ├── /                    # Main hub + enhanced annotator
+  ├── /view               # Presentation mode
+  └── /launcher           # .chaya file opener
+
+  This feels much more natural - when you're drawing a box around a verse, you already know it's a verse, so why not capture that immediately? The two-mode approach creates a more streamlined user experience.
+
+> Actually, the OCR can probably be a second page. The first page can just mark out regions and assign semantic types.
+
+⏺ Perfect! That's even cleaner - separating the spatial/semantic work from the OCR work makes a lot of sense.
+
+  Refined Three-Mode Application:
+
+  Mode 1: Region Marking & Classification
+
+  - Draw regions on PDF
+  - Assign semantic types (verse, chorus, title, etc.)
+  - Focus purely on spatial layout and meaning
+  - No text processing yet
+
+  Mode 2: OCR & Text Correction
+
+  - Take classified regions from Mode 1
+  - Auto-OCR each region
+  - Present text for proof-reading/correction
+  - Focus purely on text accuracy
+
+  Mode 3: Presentation Viewer
+
+  - Beautiful HTML rendering
+  - Bidirectional linking between text and source regions
+
+  Natural Workflow Progression:
+
+  Page 1: "What is this region and where?"
+     ↓
+  Page 2: "What does this region say?"
+     ↓
+  Page 3: "How should this look as a final document?"
+
+  Page 1 UI Focus:
+
+  ┌─ PDF ────────────┐  ┌─ Regions ──────────┐
+  │ [Region boxes]   │  │ □ Title            │
+  │ [Region boxes]   │  │ □ Verse 1          │
+  │ [Region boxes]   │  │ □ Chorus           │
+  │                  │  │ □ Verse 2          │
+  └──────────────────┘  │ □ Annotation       │
+                        └────────────────────┘
+
+  Page 2 UI Focus:
+
+  ┌─ Region: Verse 1 ──────────────────┐
+  │ [Thumbnail of region]              │
+  │ ┌─ OCR Text ──────────────────────┐ │
+  │ │ When I was young and foolish... │ │
+  │ │ [Confidence: 94%]               │ │
+  │ └─────────────────────────────────┘ │
+  │ [Previous] [Next Region] [Re-OCR]  │
+  └────────────────────────────────────┘
+
+  This separation allows users to:
+  1. Focus on layout first - get all the regions right
+  2. Then focus on text - one cognitive task at a time
+  3. Finally see the result - polished presentation
+
+  Much better workflow progression!
+
+> Great, can you write this down somewhere?
+
+⏺ Write(THREE_MODE_WORKFLOW.md)
+  ⎿  Wrote 239 lines to THREE_MODE_WORKFLOW.md                                                                                                                                                             
+     # Three-Mode Document Processing Workflow
+     ## Overview
+     Evolution of Bookchop from a simple annotation tool into a comprehensive document digitization pipeline with three distinct modes for processing documents from raw PDF to polished HTML presentation.
+     ## Application Modes
+     ### **Mode 1: Region Marking & Classification**
+     **Purpose**: Spatial layout and semantic meaning
+     **Current State**: Enhanced version of `annotator.html`
+     … +229 lines (ctrl+r to expand)
+
+⏺ Perfect! I've saved the complete three-mode workflow plan as THREE_MODE_WORKFLOW.md in your project directory.
+
+  This document captures the refined vision with:
+  - Clear separation of the three modes
+  - Detailed UI layouts for each mode
+  - Data evolution through the .chaya format
+  - Implementation phases and priorities
+  - Semantic type definitions
+
+  The plan is now documented and ready for reference when you decide to implement this enhanced workflow system!
+
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                                                                                                                                                 │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-  ⏵⏵ auto-accept edits on (shift+tab to cycle)
+  ⏵⏵ auto-accept edits on (shift+tab to cycle)                                                                                                                                                                 Context left until auto-compact: 11%
 
 
 
