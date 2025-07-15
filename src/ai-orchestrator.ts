@@ -237,38 +237,6 @@ async function prepareMultiPageAnnotationRequest(
     };
 }
 
-/**
- * Prepares the request object needed by the AIEngine.
- * This involves getting the canvas, extracting the image, and gathering few-shot examples.
- */
-async function prepareAnnotationRequest(
-    pageDiv: HTMLDivElement,
-    pageNumber: number,
-    prompt: string,
-    allAnnotations: Annotation[],
-    getCanvasForPage: (pageNumber: number) => HTMLCanvasElement | null,
-    visionData: VisionData
-): Promise<AIAnnotationRequest | null> {
-    const canvas = pageDiv.querySelector('canvas') as HTMLCanvasElement;
-    if (!canvas) {
-        console.error("Could not find canvas for page", pageNumber);
-        return null;
-    }
-
-    const base64Image = canvas.toDataURL('image/png').split(',')[1];
-
-    // Get examples from up to 2 most recent annotated pages for few-shot prompting.
-    const examples = getExamplesFromRecentPages(pageNumber, allAnnotations, getCanvasForPage);
-
-    // Transform vision data for LLM consumption (easy experimentation point)
-    const transformedVisionData = transformVisionDataForLLM(visionData, canvas);
-
-    return { 
-        base64Image, 
-        prompt: enhancePromptWithVisionData(prompt, transformedVisionData), 
-        examples 
-    };
-}
 
 /**
  * Transform vision data for LLM consumption - easy experimentation point
@@ -324,7 +292,7 @@ For each semantic region, provide:
 3. The semantic type and descriptive label
 4. The bounding box that encompasses all words in the region
 
-IMPORTANT: Don't make the bounding boxes too tight. Make sure at least a pixel or two of empty space is present on all sides (i.e. the text does not intersect or touch the edges of the bounding box). It's ok for the bounding boxes to overlap slightly.
+IMPORTANT: Don't make the bounding boxes too tight. Make sure at least 5-10 pixels of empty space is present on all sides (i.e. the text does not intersect or touch the edges of the bounding box). It's ok for the bounding boxes to overlap slightly. Err on the side of making boxes larger rather than smaller.
 
 Return as JSON array with format:
 [
@@ -338,34 +306,6 @@ Return as JSON array with format:
 ]`;
 }
 
-/**
- * Enhance the user prompt with vision data
- */
-function enhancePromptWithVisionData(userPrompt: string, visionData: any): string {
-    return `${userPrompt}
-
-I'm also providing precise word-level OCR data from Google Vision API. Use this data to create accurate bounding boxes for semantic regions.
-
-WORD DATA (coordinates normalized to 0-1000):
-${JSON.stringify(visionData.words, null, 2)}
-
-For each semantic region, provide:
-1. The wordIndices array containing the indices of words that belong to this region
-2. The semantic type and descriptive label
-3. The bounding box that encompasses all words in the region
-
-IMPORTANT: Don't make the bounding boxes too tight. Make sure at least a pixel or two of empty space is present on all sides (i.e. the text does not intersect or touch the edges of the bounding box). It's ok for the bounding boxes to overlap slightly.
-
-Return as JSON array with format:
-[
-  {
-    "wordIndices": [0, 1, 2, 3],
-    "semanticType": "title", 
-    "label": "descriptive label",
-    "box_2d": [ymin, xmin, ymax, xmax]
-  }
-]`;
-}
 
 /**
  * Converts the raw, parsed annotations from the AI engine into the application's
@@ -404,13 +344,6 @@ function convertMultiPageResponseToAnnotations(
     return allAnnotations;
 }
 
-/**
- * Converts the raw, parsed annotations from the AI engine into the application's
- * internal Annotation format, including generating unique IDs.
- */
-function convertResponseToAnnotations(parsedAnnotations: any[], pageNumber: number, visionData: VisionData, canvas: HTMLCanvasElement): Annotation[] {
-    return parsedAnnotations.map((region: any) => convertSingleRegionToAnnotation(region, pageNumber, visionData, canvas)).filter((annotation): annotation is Annotation => annotation !== null);
-}
 
 /**
  * Converts a single region from AI response to Annotation format
@@ -537,7 +470,7 @@ function showAIPromptDialog(pageNumber: number): Promise<string | null> {
         dialog.innerHTML = `
             <h3 class="text-lg font-bold mb-4">AI Annotate Pages ${pageNumber}+ (up to 5 pages)</h3>
             <label for="ai-prompt" class="block text-sm font-medium text-gray-700 mb-2">Prompt for AI:</label>
-            <textarea id="ai-prompt" class="w-full h-32 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">Break these document pages into "regions" (paragraphs etc), and for each region, provide a descriptive label and bounding box. The box_2d should be [ymin, xmin, ymax, xmax] normalized to 0-1000. Don't make bounding boxes too tight - leave a pixel or two of empty space on all sides.</textarea>
+            <textarea id="ai-prompt" class="w-full h-32 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">Break these document pages into "regions" (paragraphs etc), and for each region, provide a descriptive label and bounding box. The box_2d should be [ymin, xmin, ymax, xmax] normalized to 0-1000. Don't make bounding boxes too tight - leave 5-10 pixels of empty space on all sides.</textarea>
             <div class="mt-4 flex justify-end gap-3">
                 <button id="ai-cancel" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
                 <button id="ai-submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">🤖 Annotate with AI</button>

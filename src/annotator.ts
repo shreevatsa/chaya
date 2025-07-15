@@ -888,9 +888,7 @@ pdfUpload.addEventListener('change', async (event) => {
             for (let i = 1; i <= pdf.numPages; i++) {
                 const pageProgress = 40 + (50 * i / pdf.numPages);
                 updateLoadingProgress(pageProgress, `Rendering page ${i} of ${pdf.numPages}...`, `Processing page ${i}`);
-                console.log('Rendering page', i);
                 await renderPage(pdf, i, containerWidth);
-                console.log('Page', i, 'rendered');
             }
             
             updateLoadingProgress(90, 'Finalizing...', 'Setting up annotation features');
