@@ -125,7 +125,12 @@ loadFilesBtn.addEventListener('click', async () => {
         loadingMessage.textContent = 'Loading PDF and annotations...';
 
         // Load and parse annotations first
-        const annotationsText = await readFileAsText(annotationsFile);
+        const annotationsText = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsText(annotationsFile!);
+        });
         const annotationsData = JSON.parse(annotationsText);
         loadedAnnotations = parseAnnotationsFromJson(annotationsData);
 
@@ -134,7 +139,12 @@ loadFilesBtn.addEventListener('click', async () => {
         // Clear container and load PDF
         pdfContainer.innerHTML = '';
 
-        const pdfArrayBuffer = await readFileAsArrayBuffer(pdfFile);
+        const pdfArrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as ArrayBuffer);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsArrayBuffer(pdfFile!);
+        });
         const typedArray = new Uint8Array(pdfArrayBuffer);
 
         // Wait for PDF.js and load document
@@ -258,21 +268,3 @@ function highlightAnnotationRegion(annotation: Annotation, highlight: boolean): 
     }
 }
 
-// File reading utilities
-function readFileAsText(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsText(file);
-    });
-}
-
-function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as ArrayBuffer);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsArrayBuffer(file);
-    });
-}
