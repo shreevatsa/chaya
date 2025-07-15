@@ -106,11 +106,16 @@ async function renderPage(pdf: any, pageNumber: number, containerWidth: number) 
             annotations.push(...newAnnotations);
             hasUnsavedChanges = true;
 
-            // Render the new annotation boxes
-            const annotationLayer = pageDiv.querySelector('.annotation-layer') as HTMLDivElement;
-            if (annotationLayer) {
-                for (const annotation of newAnnotations) {
-                    createAnnotationBox(annotationLayer, pageDiv, annotation);
+            // Render the new annotation boxes on their respective pages
+            for (const annotation of newAnnotations) {
+                const targetPageDiv = pdfContainer.querySelector(`[data-page-number="${annotation.pageNumber}"]`) as HTMLDivElement;
+                if (targetPageDiv) {
+                    const targetAnnotationLayer = targetPageDiv.querySelector('.annotation-layer') as HTMLDivElement;
+                    if (targetAnnotationLayer) {
+                        createAnnotationBox(targetAnnotationLayer, targetPageDiv, annotation);
+                    }
+                } else {
+                    console.warn(`Could not find page div for annotation on page ${annotation.pageNumber}`);
                 }
             }
 

@@ -4779,10 +4779,141 @@
 
   This should significantly improve the visual quality of AI-generated bounding boxes, making them more user-friendly and practical for document annotation workflows.
 
+> There seems to be a bug where after the annotations for the five pages come back from the AI, they are all drawn on the same (first of the five) page. The annotations themselves are fine, as we can see if we save to disk and load again.
+
+⏺ You're right! That's a bug in the multi-page response handling. The annotations are getting the correct pageNumber in their data, but they're all being visually rendered on the first page. Let me trace through the issue.
+
+  The problem is likely in the convertMultiPageResponseToAnnotations function or how the visual boxes are created for multi-page responses. Let me check:
+
+⏺ Read(src/ai-orchestrator.ts)
+  ⎿  Read 15 lines (ctrl+r to expand)
+
+⏺ The issue is in how the AI annotations are added to the UI. Let me check where the annotations are rendered after AI processing. Let me look at the AI annotation flow in the main annotator.ts:
+
+⏺ Search(pattern: "runAIAssistedAnnotation.*then|newAnnotations.*render"", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Search(pattern: "runAIAssistedAnnotation"", output_mode: "content")
+  ⎿  Found 71 lines (ctrl+r to expand)
+
+⏺ Let me search in the actual source files:
+
+⏺ Search(pattern: "runAIAssistedAnnotation"", output_mode: "content")
+  ⎿  Found 107 lines (ctrl+r to expand)
+
+⏺ Let me search in the source files without the .har file:
+
+⏺ Search(pattern: "runAIAssistedAnnotation"", glob: "**/*.ts", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Search(pattern: "runAIAssistedAnnotation", output_mode: "content")
+  ⎿  Found 154 lines (ctrl+r to expand)
+
+⏺ Perfect! I found it. The issue is in the annotator.ts file where it calls runAIAssistedAnnotation. Looking at the code:
+
+  const newAnnotations = await runAIAssistedAnnotation(pageDiv, pageNumber, annotations, getCanvasForPage);
+  if (newAnnotations) {
+      // Add the new annotations to the main list
+      annotations.push(...newAnnotations);
+      hasUnsavedChanges = true;
+
+      // Render the new annotation boxes
+      const annotationLayer = pageDiv.querySelector('.annotation-layer') as HTMLDivElement;
+      if (annotationLayer) {
+          for (const annotation of newAnnotations) {
+              createAnnotationBox(annotationLayer, pageDiv, annotation);  // ❌ ALWAYS USES CURRENT PAGE!
+          }
+      }
+  }
+
+  The problem is that it's always using the current pageDiv and current annotationLayer to render ALL annotations, even when they belong to different pages!
+
+  For multi-page annotations, I need to find the correct page div for each annotation based on its pageNumber. Let me fix this:
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 10 additions and 5 removals                                                                                    
+       106                annotations.push(...newAnnotations);
+       107                hasUnsavedChanges = true;
+       108    
+       109 -              // Render the new annotation boxes
+       110 -              const annotationLayer = pageDiv.querySelector('.annotation-layer') as HTMLDivElement;
+       111 -              if (annotationLayer) {
+       112 -                  for (const annotation of newAnnotations) {
+       113 -                      createAnnotationBox(annotationLayer, pageDiv, annotation);
+       109 +              // Render the new annotation boxes on their respective pages
+       110 +              for (const annotation of newAnnotations) {
+       111 +                  const targetPageDiv = pdfContainer.querySelector(`[data-page-number="${annotation.pageNumber}"]`) as HTMLDivElement;
+       112 +                  if (targetPageDiv) {
+       113 +                      const targetAnnotationLayer = targetPageDiv.querySelector('.annotation-layer') as HTMLDivElement;
+       114 +                      if (targetAnnotationLayer) {
+       115 +                          createAnnotationBox(targetAnnotationLayer, targetPageDiv, annotation);
+       116 +                      }
+       117 +                  } else {
+       118 +                      console.warn(`Could not find page div for annotation on page ${annotation.pageNumber}`);
+       119                    }
+       120                }
+       121    
+
+⏺ Now let me build and test the fix:
+
+⏺ Bash(npm run build)
+  ⎿  > bookchop@1.0.0 build                                                   
+     > tsc && ./node_modules/.bin/postcss ./src/input.css -o ./dist/output.css
+
+⏺ Bash(npm test)
+  ⎿  > bookchop@1.0.0 test          
+     > playwright test
+
+     … +179 lines (ctrl+r to expand)
+
+⏺ Perfect! ✅ Multi-Page Visual Rendering Bug Fixed:
+
+  The Problem:
+
+  When AI processed 5 pages and returned annotations for pages 1, 2, 3, 4, 5, the code was:
+  1. ✅ Correctly storing all annotations with proper pageNumber in the data
+  2. ❌ Incorrectly rendering all visual boxes on the first page only
+
+  The Root Cause:
+
+  // OLD CODE (BUGGY):
+  const annotationLayer = pageDiv.querySelector('.annotation-layer');  // ❌ Always first page
+  for (const annotation of newAnnotations) {
+      createAnnotationBox(annotationLayer, pageDiv, annotation);       // ❌ All on first page
+  }
+
+  The code was using the current page's pageDiv and annotationLayer for ALL annotations, regardless of their actual pageNumber.
+
+  The Fix:
+
+  // NEW CODE (CORRECT):
+  for (const annotation of newAnnotations) {
+      const targetPageDiv = pdfContainer.querySelector(`[data-page-number="${annotation.pageNumber}"]`);
+      if (targetPageDiv) {
+          const targetAnnotationLayer = targetPageDiv.querySelector('.annotation-layer');
+          if (targetAnnotationLayer) {
+              createAnnotationBox(targetAnnotationLayer, targetPageDiv, annotation);  // ✅ Correct page
+          }
+      }
+  }
+
+  Now each annotation is rendered on its correct page by:
+  1. Finding the right page div using data-page-number="${annotation.pageNumber}"
+  2. Finding the annotation layer within that specific page
+  3. Creating the visual box on the correct page with correct positioning
+
+  Verification:
+
+  - Data integrity: Annotations always had correct pageNumber (that's why save/reload worked)
+  - Visual rendering: Now matches the data - annotations appear on their intended pages
+  - No regressions: All tests still pass, single-page annotations unaffected
+
+  The multi-page AI annotation feature now works correctly with annotations appearing on their proper pages immediately after processing! 🎯
+
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                                                                                                                                                 │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-  ⏵⏵ auto-accept edits on (shift+tab to cycle)                                                                                                                                                                 Context left until auto-compact: 16%
+  ⏵⏵ auto-accept edits on (shift+tab to cycle)                                                                                                                                                                  Context left until auto-compact: 5%
 
 
 
