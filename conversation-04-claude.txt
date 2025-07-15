@@ -5620,6 +5620,34 @@
 
 ⏺ The console log messages have been removed. The progress bar on the page will continue to show the rendering progress, but the console will no longer be cluttered with "Rendering page nn" and "Page nn rendered" messages.
 
+> Remove the labels like "Position: 11%, 71%" below each annotation. It's not needed.
+
+⏺ I'll search for where those position labels are being generated and remove them.
+
+⏺ Search(pattern: "Position:|11%|71%", output_mode: "content")
+  ⎿  Found 1 line (ctrl+r to expand)
+
+⏺ Found it! The position label is in src/annotator.ts at line 696. Let me read that section to see the context and remove it.
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 15 lines (ctrl+r to expand)
+
+⏺ I can see the position label is in a div with class "text-xs text-gray-500 mt-1". I'll remove that entire div element:
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 3 removals                                                                             
+       692                            <div class="text-sm font-medium text-gray-900 truncate">
+       693                                ${annotation.label}
+       694                            </div>
+       695 -                          <div class="text-xs text-gray-500 mt-1">
+       696 -                              Position: ${Math.round(annotation.x * 100)}%, ${Math.round(annotation.y * 100)}%
+       697 -                          </div>
+       695                        </div>
+       696                        <div class="ml-2 flex-shrink-0">
+       697                            <button class="delete-annotation-btn text-red-500 hover:text-red-700 p-1" 
+
+⏺ Perfect! The position labels like "Position: 11%, 71%" have been removed from below each annotation in the sidebar.
+
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                                                                                                                                                 │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

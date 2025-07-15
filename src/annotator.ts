@@ -692,9 +692,6 @@ function updateAnnotationList(): void {
                         <div class="text-sm font-medium text-gray-900 truncate">
                             ${annotation.label}
                         </div>
-                        <div class="text-xs text-gray-500 mt-1">
-                            Position: ${Math.round(annotation.x * 100)}%, ${Math.round(annotation.y * 100)}%
-                        </div>
                     </div>
                     <div class="ml-2 flex-shrink-0">
                         <button class="delete-annotation-btn text-red-500 hover:text-red-700 p-1" 
