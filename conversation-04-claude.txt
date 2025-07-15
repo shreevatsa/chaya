@@ -7115,6 +7115,330 @@
 
   The code already follows good design patterns with appropriate use of deep modules where they're beneficial and simple direct approaches where abstraction isn't needed.
 
+> The default filename when saving annotations is currently the name of the PDF file, with the .pdf at the end replaced by .json. This is good. But when the annotations are loaded from a JSON file with a different name, maybe the default 
+  filename when saving them back should be that of the file they were loaded from?
+
+⏺ You're absolutely right! That would provide much better user experience - if someone loads annotations from "chapter1-annotations.json", they'd expect to save back to the same filename rather than reverting to the PDF's name.
+
+  Let me look at the current save functionality and modify it to remember the loaded annotations filename:
+
+⏺ Search(pattern: "save.*annotations|download.*json|filename", path: "src/annotator.ts", output_mode: "content")
+  ⎿  Found 12 lines (ctrl+r to expand)
+
+⏺ Search(pattern: "saveAnnotationsBtn|save.*annotations|downloadFileName", path: "src/annotator.ts", output_mode: "content")
+  ⎿  Found 12 lines (ctrl+r to expand)
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 25 lines (ctrl+r to expand)
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 15 lines (ctrl+r to expand)
+
+⏺ Now let me find where annotations are loaded from JSON files:
+
+⏺ Search(pattern: "annotations.*upload|loadAnnotationsFromJson", path: "src/annotator.ts", output_mode: "content")
+  ⎿  Found 3 lines (ctrl+r to expand)
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 25 lines (ctrl+r to expand)
+
+⏺ Perfect! I can see the structure. I need to:
+
+  1. Add a variable to track the loaded annotations filename
+  2. Update the filename when annotations are loaded from JSON
+  3. Use that filename (if available) when saving, falling back to the PDF-based name
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 1 addition                                                            
+       26    
+       27    let annotations: Annotation[] = [];
+       28    let loadedAnnotations: any = null; // Store loaded annotations until PDF is ready
+       29 +  let loadedAnnotationsFileName: string | null = null; // Track filename of loaded annotations
+       30    let isDrawing = false;
+       31    let startX = 0;
+       32    let startY = 0;
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 1 addition and 1 removal                       
+       935            try {
+       936                const jsonText = e.target?.result as string;
+       937                const jsonData = JSON.parse(jsonText);
+       938 -              loadAnnotationsFromJson(jsonData);
+       938 +              loadAnnotationsFromJson(jsonData, file.name);
+       939            } catch (error) {
+       940                console.error('Error parsing annotations JSON:', error);
+       941                alert('Error parsing annotations file: ' + error);
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 1 addition and 1 removal                             
+       251    }
+       252    
+       253    // Load annotations from JSON file
+       254 -  function loadAnnotationsFromJson(jsonData: any): void {
+       254 +  function loadAnnotationsFromJson(jsonData: any, fileName?: string): void {
+       255        try {
+       256            // Check for unsaved changes before loading new annotations
+       257            if (hasUnsavedChanges && annotations.length > 0) {
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 5 additions                         
+       270    
+       271            // Clear existing annotations and use parsed ones
+       272            annotations = parsedAnnotations;
+       273 +          
+       274 +          // Remember the filename for future saves
+       275 +          if (fileName) {
+       276 +              loadedAnnotationsFileName = fileName;
+       277 +          }
+       278    
+       279            console.log('Loaded annotations:', annotations);
+       280    
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 8 additions and 3 removals                                     
+        995            });
+        996        });
+        997    
+        998 -      // Generate filename based on PDF name
+        999 -      const baseFileName = fileName.replace(/\.pdf$/i, '');
+       1000 -      const downloadFileName = `${baseFileName}.json`;
+        998 +      // Generate filename - prefer loaded annotations filename, fallback to PDF name
+        999 +      let downloadFileName: string;
+       1000 +      if (loadedAnnotationsFileName) {
+       1001 +          downloadFileName = loadedAnnotationsFileName;
+       1002 +      } else {
+       1003 +          const baseFileName = fileName.replace(/\.pdf$/i, '');
+       1004 +          downloadFileName = `${baseFileName}.json`;
+       1005 +      }
+       1006    
+       1007        // Download the JSON file
+       1008        const blob = new Blob([JSON.stringify(annotationsData, null, 2)], {
+  ⎿  API Error (529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}) · Retrying in 1 seconds… (attempt 1/10)
+
+⏺ Now I should also clear the loaded annotations filename when a new PDF is loaded, so it doesn't persist across different PDF sessions:
+
+⏺ Search(pattern: "pdfUpload.*addEventListener.*change", path: "src/annotator.ts", output_mode: "content")
+  ⎿  Found 1 line (ctrl+r to expand)
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 15 lines (ctrl+r to expand)
+
+⏺ Update(src/annotator.ts)
+  ⎿  Error: String to replace not found in file.
+     String:     // Clear existing annotations and DOM elements
+         annotations = [];
+         loadedAnnotations = null;
+         hasUnsavedChanges = false;
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 15 lines (ctrl+r to expand)
+
+⏺ Search(pattern: "annotations = \[\]|loadedAnnotations = null", path: "src/annotator.ts", output_mode: "content")
+  ⎿  Found 1 line (ctrl+r to expand)
+
+⏺ Let me look for where annotations are cleared in the PDF loading process:
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 30 lines (ctrl+r to expand)
+
+⏺ It seems the annotations are not explicitly cleared when a new PDF is loaded - they're only cleared when the user confirms to proceed despite having unsaved changes. Let me add the filename clearing at the start of the PDF loading
+  process:
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 3 additions                                                  
+       854        // Clear any previously rendered PDF
+       855        pdfContainer.innerHTML = '';
+       856        
+       857 +      // Clear loaded annotations filename since we're starting fresh with a new PDF
+       858 +      loadedAnnotationsFileName = null;
+       859 +      
+       860        // Show progress bar
+       861        showLoadingProgress();
+       862    
+
+⏺ Let me test this to make sure it compiles correctly:
+
+⏺ Bash(npm run build)
+  ⎿  > bookchop@1.0.0 build                                                   
+     > tsc && ./node_modules/.bin/postcss ./src/input.css -o ./dist/output.css
+
+⏺ Perfect! The changes compile successfully. Now let me create a quick test to verify this works as expected:
+
+⏺ Bash(npm test)
+  ⎿  > bookchop@1.0.0 test          
+     > playwright test
+
+     … +178 lines (ctrl+r to expand)
+
+⏺ Excellent! All tests pass. Let me provide a summary of the improvement I made:
+
+  Summary
+
+  I've implemented the enhancement you requested for better filename handling when saving annotations. Here's what was changed:
+
+  Problem
+
+  - When annotations were loaded from a JSON file (e.g., "chapter1-annotations.json"), saving them would revert to using the PDF filename (e.g., "document.json")
+  - This created a poor user experience where the original annotation filename was lost
+
+  Solution
+
+  I added a system to remember and reuse the loaded annotations filename:
+
+  1. Added tracking variable: loadedAnnotationsFileName to remember the filename of loaded annotations
+  2. Updated loading logic: When annotations are loaded from JSON, the filename is stored
+  3. Enhanced save logic: When saving, it now prioritizes the loaded annotations filename over the PDF-based filename
+  4. Proper cleanup: When a new PDF is loaded, the stored filename is cleared so it doesn't persist across different documents
+
+  User Experience Improvement
+
+  - Before: Load "chapter1-annotations.json" → save → downloads "document.json"
+  - After: Load "chapter1-annotations.json" → save → downloads "chapter1-annotations.json"
+
+  Fallback Behavior
+
+  - If no annotations file was loaded (user created annotations from scratch), it still uses the PDF filename as before
+  - This maintains backward compatibility for existing workflows
+
+  The change is minimal, maintains all existing functionality, and provides the intuitive behavior users would expect when working with named annotation files.
+
+> Given that `loadAnnotationsFromJson` is a global variable, I think instead of passing `file.name` to `loadAnnotationsFromJson` (making that function's interface more complex), we could just set the variable before calling the function? 
+  Would that work?
+
+✻ Thinking…
+
+  The user is making a good point about the design. Looking at the current implementation:
+
+  1. I added a parameter to loadAnnotationsFromJson(jsonData: any, fileName?: string)
+  2. I'm calling it with loadAnnotationsFromJson(jsonData, file.name)
+
+  But since loadedAnnotationsFileName is a global variable, I could indeed just set it before calling the function, which would keep the function interface simpler. This follows the principle of not making interfaces more complex than 
+  necessary.
+
+  Let me check where loadAnnotationsFromJson is called to make sure this approach would work everywhere.
+
+⏺ You're absolutely right! That's a much cleaner approach. Since loadedAnnotationsFileName is a global variable, there's no need to complicate the function interface. Let me refactor this:
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 1 addition and 1 removal                             
+       251    }
+       252    
+       253    // Load annotations from JSON file
+       254 -  function loadAnnotationsFromJson(jsonData: any, fileName?: string): void {
+       254 +  function loadAnnotationsFromJson(jsonData: any): void {
+       255        try {
+       256            // Check for unsaved changes before loading new annotations
+       257            if (hasUnsavedChanges && annotations.length > 0) {
+
+✻ Thinking…
+
+  Now I need to remove the code that sets the filename inside the function and instead set it before calling the function.
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 5 removals                          
+       270    
+       271            // Clear existing annotations and use parsed ones
+       272            annotations = parsedAnnotations;
+       273 -          
+       274 -          // Remember the filename for future saves
+       275 -          if (fileName) {
+       276 -              loadedAnnotationsFileName = fileName;
+       277 -          }
+       273    
+       274            console.log('Loaded annotations:', annotations);
+       275    
+
+✻ Thinking…
+
+  Now I need to update the call site to set the global variable before calling the function.
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 2 additions and 1 removal                                        
+       938            try {
+       939                const jsonText = e.target?.result as string;
+       940                const jsonData = JSON.parse(jsonText);
+       941 -              loadAnnotationsFromJson(jsonData, file.name);
+       941 +              loadedAnnotationsFileName = file.name; // Remember filename before loading
+       942 +              loadAnnotationsFromJson(jsonData);
+       943            } catch (error) {
+       944                console.error('Error parsing annotations JSON:', error);
+       945                alert('Error parsing annotations file: ' + error);
+  ⎿  API Error (529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}) · Retrying in 1 seconds… (attempt 1/10)
+  ⎿  API Error (529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}) · Retrying in 1 seconds… (attempt 2/10)
+  ⎿  API Error (529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}) · Retrying in 2 seconds… (attempt 3/10)
+  ⎿  API Error (529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}) · Retrying in 4 seconds… (attempt 4/10)
+  ⎿  API Error (529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}) · Retrying in 8 seconds… (attempt 5/10)
+  ⎿  API Error (529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}) · Retrying in 17 seconds… (attempt 6/10)
+  ⎿  API Error (529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}) · Retrying in 37 seconds… (attempt 7/10)
+  ⎿  API Error (529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}) · Retrying in 35 seconds… (attempt 8/10)
+
+✻ Thinking…
+
+  Let me check that the function is compiled correctly and that all tests still pass.
+
+⏺ Bash(npm run build)
+  ⎿  > bookchop@1.0.0 build                                                   
+     > tsc && ./node_modules/.bin/postcss ./src/input.css -o ./dist/output.css
+
+✻ Thinking…
+
+  Perfect! No compilation errors. Let me run a quick test to make sure everything still works.
+
+⏺ Bash(npm test -- --grep "no JavaScript errors")
+  ⎿  > bookchop@1.0.0 test                        
+     > playwright test --grep no JavaScript errors
+
+     … +30 lines (ctrl+r to expand)
+
+✻ Thinking…
+
+  Perfect! The refactoring is working correctly. This is a much cleaner approach:
+
+  Before: The function had an optional parameter that complicated its interface
+  function loadAnnotationsFromJson(jsonData: any, fileName?: string): void
+
+  After: The function has a simple, focused interface
+  function loadAnnotationsFromJson(jsonData: any): void
+
+  And the filename is set at the call site before calling the function:
+  loadedAnnotationsFileName = file.name; // Remember filename before loading
+  loadAnnotationsFromJson(jsonData);
+
+  This follows the design principle of keeping interfaces as simple as possible. The function now only does one thing - load annotations from JSON data. The filename tracking is handled by the caller using the global state, which is 
+  appropriate since it's managing global state anyway.
+
+⏺ Perfect! That's a much cleaner design. You're absolutely right - since loadedAnnotationsFileName is a global variable, there's no need to complicate the function interface.
+
+  Before:
+  function loadAnnotationsFromJson(jsonData: any, fileName?: string): void {
+      // ...
+      if (fileName) {
+          loadedAnnotationsFileName = fileName;
+      }
+      // ...
+  }
+
+  // Call site
+  loadAnnotationsFromJson(jsonData, file.name);
+
+  After:
+  function loadAnnotationsFromJson(jsonData: any): void {
+      // Simple, focused function that just loads annotations
+  }
+
+  // Call site
+  loadedAnnotationsFileName = file.name; // Set global state before loading
+  loadAnnotationsFromJson(jsonData);
+
+  This approach:
+  1. Keeps the function interface simple - it only takes the data it needs to process
+  2. Follows single responsibility - the function just loads annotations, filename tracking is handled separately
+  3. Uses global state appropriately - since we're already managing global state, it's cleaner to set it at the call site
+  4. Maintains clarity - it's very clear at the call site that we're setting the filename and then loading annotations
+
+  This is a good example of the "deep modules" principle - the function has a simple interface and does one thing well, while the complexity of coordinating the filename tracking is kept at the appropriate level (the caller that manages the
+   overall state).
+
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                                                                                                                                                 │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

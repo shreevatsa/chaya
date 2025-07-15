@@ -26,6 +26,7 @@ type Annotation = SharedAnnotation;
 
 let annotations: Annotation[] = [];
 let loadedAnnotations: any = null; // Store loaded annotations until PDF is ready
+let loadedAnnotationsFileName: string | null = null; // Track filename of loaded annotations
 let isDrawing = false;
 let startX = 0;
 let startY = 0;
@@ -848,6 +849,9 @@ pdfUpload.addEventListener('change', async (event) => {
     // Clear any previously rendered PDF
     pdfContainer.innerHTML = '';
     
+    // Clear loaded annotations filename since we're starting fresh with a new PDF
+    loadedAnnotationsFileName = null;
+    
     // Show progress bar
     showLoadingProgress();
 
@@ -934,6 +938,7 @@ annotationsUpload.addEventListener('change', async (event) => {
         try {
             const jsonText = e.target?.result as string;
             const jsonData = JSON.parse(jsonText);
+            loadedAnnotationsFileName = file.name; // Remember filename before loading
             loadAnnotationsFromJson(jsonData);
         } catch (error) {
             console.error('Error parsing annotations JSON:', error);
@@ -989,9 +994,14 @@ saveAnnotationsBtn.addEventListener('click', () => {
         });
     });
 
-    // Generate filename based on PDF name
-    const baseFileName = fileName.replace(/\.pdf$/i, '');
-    const downloadFileName = `${baseFileName}.json`;
+    // Generate filename - prefer loaded annotations filename, fallback to PDF name
+    let downloadFileName: string;
+    if (loadedAnnotationsFileName) {
+        downloadFileName = loadedAnnotationsFileName;
+    } else {
+        const baseFileName = fileName.replace(/\.pdf$/i, '');
+        downloadFileName = `${baseFileName}.json`;
+    }
 
     // Download the JSON file
     const blob = new Blob([JSON.stringify(annotationsData, null, 2)], {
