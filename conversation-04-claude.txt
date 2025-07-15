@@ -4704,10 +4704,85 @@
 
   Now users won't accidentally lose their annotation work when loading different files!
 
+> Can you tell the AI something like "Don't make the bounding boxes too tight. Make sure at least a pixel of two of empty space is present on all sides (i.e. the text does not intersect or touch the edges of the bounding box). It's ok for 
+  the bounding boxes to overlap slightly."
+
+⏺ Absolutely! I'll add that guidance to the AI prompt to improve the bounding box quality. Let me update the prompt in the AI orchestrator:
+
+⏺ Update(src/ai-orchestrator.ts)
+  ⎿  Updated src/ai-orchestrator.ts with 2 additions                                                                                                                                                                                           
+       324    3. The semantic type and descriptive label
+       325    4. The bounding box that encompasses all words in the region
+       326    
+       327 +  IMPORTANT: Don't make the bounding boxes too tight. Make sure at least a pixel or two of empty space is present on all sides (i.e. the text does not intersect or touch the edges of the bounding box). It's ok for the bounding 
+           + boxes to overlap slightly.
+       328 +  
+       329    Return as JSON array with format:
+       330    [
+       331      {
+
+⏺ Now let me also update the single-page prompt with the same guidance:
+
+⏺ Update(src/ai-orchestrator.ts)
+  ⎿  Updated src/ai-orchestrator.ts with 2 additions                                                                                                                                                                                           
+       354    2. The semantic type and descriptive label
+       355    3. The bounding box that encompasses all words in the region
+       356    
+       357 +  IMPORTANT: Don't make the bounding boxes too tight. Make sure at least a pixel or two of empty space is present on all sides (i.e. the text does not intersect or touch the edges of the bounding box). It's ok for the bounding 
+           + boxes to overlap slightly.
+       358 +  
+       359    Return as JSON array with format:
+       360    [
+       361      {
+
+⏺ I should also update the default prompt that appears in the UI dialog to give users the same guidance:
+
+⏺ Update(src/ai-orchestrator.ts)
+  ⎿  Updated src/ai-orchestrator.ts with 1 addition and 1 removal                                                                                                                                                                               
+       537            dialog.innerHTML = `
+       538                <h3 class="text-lg font-bold mb-4">AI Annotate Pages ${pageNumber}+ (up to 5 pages)</h3>
+       539                <label for="ai-prompt" class="block text-sm font-medium text-gray-700 mb-2">Prompt for AI:</label>
+       540 -              <textarea id="ai-prompt" class="w-full h-32 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">Break these document pages into "regions" (paragraphs etc), and for each 
+     region, provide a descriptive label and bounding box. The box_2d should be [ymin, xmin, ymax, xmax] normalized to 0-1000.</textarea>
+           -  provide a descriptive label and bounding box. The box_2d should be [ymin, xmin, ymax, xmax] normalized to 0-1000.</textarea>
+       540 +              <textarea id="ai-prompt" class="w-full h-32 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">Break these document pages into "regions" (paragraphs etc), and for each 
+     region, provide a descriptive label and bounding box. The box_2d should be [ymin, xmin, ymax, xmax] normalized to 0-1000. Don't make bounding boxes too tight - leave a pixel or two of empty space on all sides.</textarea>
+           +  provide a descriptive label and bounding box. The box_2d should be [ymin, xmin, ymax, xmax] normalized to 0-1000. Don't make bounding boxes too tight - leave a pixel or two of empty space on all sides.</textarea>
+       541                <div class="mt-4 flex justify-end gap-3">
+       542                    <button id="ai-cancel" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
+       543                    <button id="ai-submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">🤖 Annotate with AI</button>
+
+⏺ Now let me build to ensure everything compiles correctly:
+
+⏺ Bash(npm run build)
+  ⎿  > bookchop@1.0.0 build                                                   
+     > tsc && ./node_modules/.bin/postcss ./src/input.css -o ./dist/output.css
+
+⏺ Perfect! ✅ AI Bounding Box Guidance Added:
+
+  Enhanced Prompts Include:
+  - Clear instruction: "Don't make the bounding boxes too tight"
+  - Specific guidance: "Make sure at least a pixel or two of empty space is present on all sides"
+  - Visual clarity: "The text does not intersect or touch the edges of the bounding box"
+  - Overlap permission: "It's ok for the bounding boxes to overlap slightly"
+
+  Applied to:
+  1. Multi-page AI prompts - When processing 5 pages at once
+  2. Single-page AI prompts - When processing individual pages
+  3. Default user prompt - What users see in the dialog box
+
+  Benefits:
+  - Better readability: Annotations won't have text touching edges
+  - Visual breathing room: Makes annotations easier to see and work with
+  - Reduced precision anxiety: AI won't over-optimize for tight boundaries
+  - Overlap flexibility: AI can create natural groupings without gaps
+
+  This should significantly improve the visual quality of AI-generated bounding boxes, making them more user-friendly and practical for document annotation workflows.
+
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                                                                                                                                                 │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-  ⏵⏵ auto-accept edits on (shift+tab to cycle)                                                                                                                                                                 Context left until auto-compact: 18%
+  ⏵⏵ auto-accept edits on (shift+tab to cycle)                                                                                                                                                                 Context left until auto-compact: 16%
 
 
 

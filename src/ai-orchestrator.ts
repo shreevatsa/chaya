@@ -324,6 +324,8 @@ For each semantic region, provide:
 3. The semantic type and descriptive label
 4. The bounding box that encompasses all words in the region
 
+IMPORTANT: Don't make the bounding boxes too tight. Make sure at least a pixel or two of empty space is present on all sides (i.e. the text does not intersect or touch the edges of the bounding box). It's ok for the bounding boxes to overlap slightly.
+
 Return as JSON array with format:
 [
   {
@@ -351,6 +353,8 @@ For each semantic region, provide:
 1. The wordIndices array containing the indices of words that belong to this region
 2. The semantic type and descriptive label
 3. The bounding box that encompasses all words in the region
+
+IMPORTANT: Don't make the bounding boxes too tight. Make sure at least a pixel or two of empty space is present on all sides (i.e. the text does not intersect or touch the edges of the bounding box). It's ok for the bounding boxes to overlap slightly.
 
 Return as JSON array with format:
 [
@@ -533,7 +537,7 @@ function showAIPromptDialog(pageNumber: number): Promise<string | null> {
         dialog.innerHTML = `
             <h3 class="text-lg font-bold mb-4">AI Annotate Pages ${pageNumber}+ (up to 5 pages)</h3>
             <label for="ai-prompt" class="block text-sm font-medium text-gray-700 mb-2">Prompt for AI:</label>
-            <textarea id="ai-prompt" class="w-full h-32 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">Break these document pages into "regions" (paragraphs etc), and for each region, provide a descriptive label and bounding box. The box_2d should be [ymin, xmin, ymax, xmax] normalized to 0-1000.</textarea>
+            <textarea id="ai-prompt" class="w-full h-32 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">Break these document pages into "regions" (paragraphs etc), and for each region, provide a descriptive label and bounding box. The box_2d should be [ymin, xmin, ymax, xmax] normalized to 0-1000. Don't make bounding boxes too tight - leave a pixel or two of empty space on all sides.</textarea>
             <div class="mt-4 flex justify-end gap-3">
                 <button id="ai-cancel" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
                 <button id="ai-submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">🤖 Annotate with AI</button>
