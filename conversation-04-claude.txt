@@ -4491,10 +4491,223 @@
 
   Excellent detective work! Your scenario was indeed a major cause of the bug, especially for large PDFs where users might load annotations while pages are still rendering.
 
+> Right now, there is no warning about unsaved changes to annotations, if one chooses a different JSON file to load.
+
+⏺ You're absolutely right! Loading a new JSON file will completely replace all current annotations without any warning, which could cause users to lose their work. Let me add an unsaved changes warning for JSON loading.
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 15 lines (ctrl+r to expand)
+
+⏺ I need to add the unsaved changes check before clearing the existing annotations. Let me find where the hasUnsavedChanges flag is used and add a similar warning:
+
+⏺ Search(pattern: "hasUnsavedChanges.*confirm|unsaved.*confirm"", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Let me check how the unsaved changes warning is currently implemented:
+
+⏺ Search(pattern: "hasUnsavedChanges", output_mode: "content")
+  ⎿  Found 52 lines (ctrl+r to expand)
+
+⏺ I can see the hasUnsavedChanges flag is used and there's a beforeunload warning. Now let me add a similar warning before loading new JSON. I need to add the check before clearing existing annotations:
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 12 additions                                                                               
+       247    // Load annotations from JSON file
+       248    function loadAnnotationsFromJson(jsonData: any): void {
+       249        try {
+       250 +          // Check for unsaved changes before loading new annotations
+       251 +          if (hasUnsavedChanges && annotations.length > 0) {
+       252 +              const confirmed = confirm(
+       253 +                  'You have unsaved annotations that will be lost when loading new annotations. ' +
+       254 +                  'Do you want to continue loading the new annotations file?\n\n' +
+       255 +                  'Click OK to proceed (current annotations will be lost), or Cancel to keep current annotations.'
+       256 +              );
+       257 +              if (!confirmed) {
+       258 +                  return; // User chose to keep current annotations
+       259 +              }
+       260 +          }
+       261 +  
+       262            // Use shared parsing function
+       263            const parsedAnnotations = parseAnnotationsFromJson(jsonData);
+       264    
+
+⏺ Now I should also reset the hasUnsavedChanges flag when new annotations are successfully loaded:
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 3 additions                                 
+       282            // Update the annotation list
+       283            updateAnnotationList();
+       284    
+       285 +          // Reset unsaved changes flag since we've loaded new data
+       286 +          hasUnsavedChanges = false;
+       287 +  
+       288        } catch (error) {
+       289            console.error('Error loading annotations:', error);
+       290            alert('Error loading annotations: ' + error);
+
+⏺ Let me also check if there's any similar issue when loading PDF files - users might lose annotations if they load a different PDF:
+
+⏺ Search(pattern: "pdfUpload.*onchange|pdf.*upload.*addEventListener"", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Search(pattern: "pdf-upload.*change"", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Let me find the PDF upload handler:
+
+⏺ Search(pattern: "addEventListener.*change"", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Search(pattern: "onchange|\.change"", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Let me check how file uploads are handled by looking at the HTML and then finding the event handlers:
+
+⏺ Read(annotator.html)
+  ⎿  Read 20 lines (ctrl+r to expand)
+
+⏺ Let me search for where the file input event handlers are set up:
+
+⏺ Search(pattern: "getElementById.*upload|annotations-upload"", output_mode: "content")
+  ⎿  Found 35 lines (ctrl+r to expand)
+
+⏺ Now let me find where the event listeners are set up for these uploads:
+
+⏺ Search(pattern: "pdfUpload\.|annotationsUpload\."", output_mode: "content")
+  ⎿  Found 23 lines (ctrl+r to expand)
+
+⏺ Perfect! Now let me find the annotations upload handler:
+
+⏺ Search(pattern: "annotationsUpload.*addEventListener"", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Search(pattern: "annotations-upload.*files|\.files.*annotations"", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Let me search for how JSON files are handled:
+
+⏺ Search(pattern: "loadAnnotationsFromJson|\.json.*load"", output_mode: "content")
+  ⎿  Found 23 lines (ctrl+r to expand)
+
+⏺ Let me search for drag and drop handlers, as that's likely how files are loaded:
+
+⏺ Search(pattern: "dragover|drop.*event|ondrop"", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Search(pattern: "FileReader|readAsText"", output_mode: "content")
+  ⎿  Found 44 lines (ctrl+r to expand)
+
+⏺ Now I found it! Let me check where this file handling code is called. I can see there's a FileReader for annotations. Let me search for where this is triggered:
+
+⏺ Search(pattern: "Loading annotations file|\.name.*annotations"", output_mode: "content")
+  ⎿  Found 21 lines (ctrl+r to expand)
+
+⏺ Perfect! I found where the annotations file upload handler is. The warning I added to loadAnnotationsFromJson() will automatically work when users select a new JSON file through the file input.
+
+  Let me also check if we need a similar warning for PDF uploads since loading a new PDF might clear annotations. Let me check what happens when a new PDF is loaded:
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 15 lines (ctrl+r to expand)
+
+⏺ Let me check what happens when a PDF is loaded:
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 20 lines (ctrl+r to expand)
+
+⏺ Let me find the PDF loading function:
+
+⏺ Search(pattern: "pdfContainer\.innerHTML.*=.*''|clearContainer|container.*clear"", output_mode: "content")
+  ⎿  Found 15 lines (ctrl+r to expand)
+
+⏺ I found it! When a new PDF is loaded, pdfContainer.innerHTML = '' clears the container, which would remove all annotation visual boxes, but the annotations array would still contain the data. This creates a mismatch where the data exists
+  but no visual boxes are shown.
+
+  Let me check if there's already logic to handle this properly or if we need to add unsaved changes protection. Let me look at the PDF loading function:
+
+⏺ Read(src/annotator.ts)
+  ⎿  Read 25 lines (ctrl+r to expand)
+
+⏺ Let me find the start of the PDF loading function:
+
+⏺ Search(pattern: "async.*event.*PDF|pdfUpload.*addEventListener"", output_mode: "content")
+  ⎿  Found 0 lines 
+
+⏺ Search(pattern: "Listen for file selection|pdfUpload.*change"", output_mode: "content")
+  ⎿  Found 11 lines (ctrl+r to expand)
+
+⏺ Now let me add the unsaved changes warning for PDF uploads as well:
+
+⏺ Update(src/annotator.ts)
+  ⎿  Updated src/annotator.ts with 14 additions                                                                           
+       829            return;
+       830        }
+       831    
+       832 +      // Check for unsaved changes before loading new PDF
+       833 +      if (hasUnsavedChanges && annotations.length > 0) {
+       834 +          const confirmed = confirm(
+       835 +              'You have unsaved annotations that will be lost when loading a new PDF. ' +
+       836 +              'Do you want to continue loading the new PDF?\n\n' +
+       837 +              'Click OK to proceed (current annotations will be lost), or Cancel to keep current annotations.'
+       838 +          );
+       839 +          if (!confirmed) {
+       840 +              // Reset the file input to clear the selection
+       841 +              target.value = '';
+       842 +              return;
+       843 +          }
+       844 +      }
+       845 +  
+       846        // Clear any previously rendered PDF
+       847        pdfContainer.innerHTML = '';
+       848        
+
+⏺ Now let me build and test the changes:
+
+⏺ Bash(npm run build)
+  ⎿  > bookchop@1.0.0 build                                                   
+     > tsc && ./node_modules/.bin/postcss ./src/input.css -o ./dist/output.css
+
+⏺ Bash(npm test)
+  ⎿  > bookchop@1.0.0 test          
+     > playwright test
+
+     … +182 lines (ctrl+r to expand)
+
+⏺ Perfect! All tests pass.
+
+  ✅ Unsaved Changes Warnings Added:
+
+  New Protection for JSON Loading:
+  - Warning shown: When user selects new JSON file with unsaved annotations
+  - User choice: OK (lose current work) or Cancel (keep current annotations)
+  - Reset flag: hasUnsavedChanges = false when new JSON successfully loads
+
+  New Protection for PDF Loading:
+  - Warning shown: When user selects new PDF with unsaved annotations
+  - User choice: OK (lose current work) or Cancel (keep current annotations)
+  - File input reset: If user cancels, the file input is cleared so they can try again
+
+  Complete Protection Summary:
+
+  | Action                    | Warning                    | Behavior                                                |
+  |---------------------------|----------------------------|---------------------------------------------------------|
+  | Load new JSON             | ✅ Warns if unsaved changes | Clears all existing annotations, loads new ones         |
+  | Load new PDF              | ✅ Warns if unsaved changes | Clears visual annotations, but preserves data initially |
+  | Close browser tab         | ✅ Already existed          | Browser standard beforeunload warning                   |
+  | Manual annotation changes | ✅ Already existed          | Sets hasUnsavedChanges = true                           |
+  | Save annotations          | ✅ Already existed          | Sets hasUnsavedChanges = false                          |
+
+  User Experience:
+  - Clear warnings: Users understand exactly what they'll lose
+  - Escape route: Users can cancel to preserve their work
+  - No false alarms: Only warns when there are actual unsaved changes
+  - Consistent messaging: Same warning style for JSON and PDF loading
+
+  Now users won't accidentally lose their annotation work when loading different files!
+
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                                                                                                                                                 │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-  ⏵⏵ auto-accept edits on (shift+tab to cycle)
+  ⏵⏵ auto-accept edits on (shift+tab to cycle)                                                                                                                                                                 Context left until auto-compact: 18%
 
 
 

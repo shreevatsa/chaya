@@ -247,6 +247,18 @@ function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement
 // Load annotations from JSON file
 function loadAnnotationsFromJson(jsonData: any): void {
     try {
+        // Check for unsaved changes before loading new annotations
+        if (hasUnsavedChanges && annotations.length > 0) {
+            const confirmed = confirm(
+                'You have unsaved annotations that will be lost when loading new annotations. ' +
+                'Do you want to continue loading the new annotations file?\n\n' +
+                'Click OK to proceed (current annotations will be lost), or Cancel to keep current annotations.'
+            );
+            if (!confirmed) {
+                return; // User chose to keep current annotations
+            }
+        }
+
         // Use shared parsing function
         const parsedAnnotations = parseAnnotationsFromJson(jsonData);
 
@@ -269,6 +281,9 @@ function loadAnnotationsFromJson(jsonData: any): void {
 
         // Update the annotation list
         updateAnnotationList();
+
+        // Reset unsaved changes flag since we've loaded new data
+        hasUnsavedChanges = false;
 
     } catch (error) {
         console.error('Error loading annotations:', error);
@@ -812,6 +827,20 @@ pdfUpload.addEventListener('change', async (event) => {
 
     if (!file) {
         return;
+    }
+
+    // Check for unsaved changes before loading new PDF
+    if (hasUnsavedChanges && annotations.length > 0) {
+        const confirmed = confirm(
+            'You have unsaved annotations that will be lost when loading a new PDF. ' +
+            'Do you want to continue loading the new PDF?\n\n' +
+            'Click OK to proceed (current annotations will be lost), or Cancel to keep current annotations.'
+        );
+        if (!confirmed) {
+            // Reset the file input to clear the selection
+            target.value = '';
+            return;
+        }
     }
 
     // Clear any previously rendered PDF
