@@ -1,5 +1,8 @@
 import { initializePdfjs, waitForPdfjs, parseAnnotationsFromJson, Annotation as SharedAnnotation } from './pdf-utils.js';
 
+// JSZip is loaded globally via script tag in the HTML
+declare const JSZip: any;
+
 // Initialize PDF.js
 initializePdfjs();
 
@@ -102,65 +105,143 @@ class ChayaApp {
     }
 
     private initializeCentralizedFileLoading(): void {
-        const pdfUpload = document.getElementById('app-pdf-upload') as HTMLInputElement;
-        const annotationsUpload = document.getElementById('app-annotations-upload') as HTMLInputElement;
-        const loadFilesBtn = document.getElementById('load-files-btn') as HTMLButtonElement;
-        const fileStatus = document.getElementById('file-status') as HTMLDivElement;
+        // Set up file input event listeners (these don't change)
+        this.setupFileInputListeners();
 
-        // File input handlers
-        pdfUpload.addEventListener('change', (event) => {
-            const target = event.target as HTMLInputElement;
-            this.state.pdfFile = target.files?.[0] || null;
-            this.updateFileStatus();
-        });
-
-        annotationsUpload.addEventListener('change', (event) => {
-            const target = event.target as HTMLInputElement;
-            this.state.annotationsFile = target.files?.[0] || null;
-            if (this.state.annotationsFile) {
-                this.state.loadedAnnotationsFileName = this.state.annotationsFile.name;
-            }
-            this.updateFileStatus();
-        });
-
-        // Load files button
-        loadFilesBtn.addEventListener('click', async () => {
-            if (!this.state.pdfFile) return;
-            
-            // Check for unsaved changes
-            if (this.state.hasUnsavedChanges) {
-                const confirmed = confirm(
-                    'You have unsaved changes that will be lost when loading new files. ' +
-                    'Do you want to continue?'
-                );
-                if (!confirmed) return;
-            }
-
-            await this.loadFiles();
-        });
-
-        // Initial status update
-        this.updateFileStatus();
+        // Initial UI update
+        this.updateSlotUI();
     }
 
-    private updateFileStatus(): void {
-        const loadFilesBtn = document.getElementById('load-files-btn') as HTMLButtonElement;
-        const fileStatus = document.getElementById('file-status') as HTMLDivElement;
+    private setupFileInputListeners(): void {
+        const chayaUpload = document.getElementById('chaya-upload') as HTMLInputElement;
+        const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
 
-        if (this.state.pdfFile) {
-            loadFilesBtn.disabled = false;
-            const pdfName = this.state.pdfFile.name;
-            const annotationsName = this.state.annotationsFile?.name;
-            
-            if (annotationsName) {
-                fileStatus.textContent = `Ready to load: ${pdfName} + ${annotationsName}`;
-            } else {
-                fileStatus.textContent = `Ready to load: ${pdfName}`;
+        if (chayaUpload) {
+            chayaUpload.addEventListener('change', async (event) => {
+                const target = event.target as HTMLInputElement;
+                const file = target.files?.[0];
+                if (file) {
+                    await this.loadChayaFile(file);
+                }
+            });
+        }
+
+        if (pdfUpload) {
+            pdfUpload.addEventListener('change', async (event) => {
+                const target = event.target as HTMLInputElement;
+                const file = target.files?.[0];
+                if (file) {
+                    this.state.pdfFile = file;
+                    this.state.annotationsFile = null;
+                    this.state.loadedAnnotations = [];
+                    this.state.loadedAnnotationsFileName = null;
+                    await this.loadFiles();
+                }
+            });
+        }
+    }
+
+    private updateSlotUI(): void {
+        const chayaSlot = document.getElementById('chaya-slot') as HTMLDivElement;
+        const pdfSlot = document.getElementById('pdf-slot') as HTMLDivElement;
+        const documentFilename = document.getElementById('document-filename') as HTMLDivElement;
+
+        if (this.state.documentLoaded) {
+            // Download mode
+            const filename = this.state.pdfFile?.name || 'document';
+            documentFilename.textContent = `Document: ${filename}`;
+            documentFilename.classList.remove('hidden');
+
+            // Update .chaya slot - preserve file input
+            const chayaInput = chayaSlot.querySelector('#chaya-upload') as HTMLInputElement;
+            chayaSlot.innerHTML = `
+                <div class="download-slot border-2 border-blue-500 bg-blue-50 rounded-lg p-8 text-center hover:bg-blue-100 transition-colors cursor-pointer">
+                    <div class="text-4xl mb-3">📦</div>
+                    <div class="text-sm font-medium text-blue-700 mb-1">Download .chaya</div>
+                    <div class="text-xs text-blue-600">Complete package</div>
+                </div>
+            `;
+            if (chayaInput) {
+                chayaSlot.appendChild(chayaInput);
+            }
+
+            // Update .pdf slot - preserve file input
+            const pdfInput = pdfSlot.querySelector('#pdf-upload') as HTMLInputElement;
+            pdfSlot.innerHTML = `
+                <div class="download-slot border-2 border-gray-500 bg-gray-50 rounded-lg p-8 text-center hover:bg-gray-100 transition-colors cursor-pointer">
+                    <div class="text-4xl mb-3">📄</div>
+                    <div class="text-sm font-medium text-gray-700 mb-1">Download .pdf</div>
+                    <div class="text-xs text-gray-600">Original document</div>
+                </div>
+            `;
+            if (pdfInput) {
+                pdfSlot.appendChild(pdfInput);
             }
         } else {
-            loadFilesBtn.disabled = true;
-            fileStatus.textContent = 'Select a PDF file to begin';
+            // Upload mode
+            documentFilename.classList.add('hidden');
+
+            // Reset .chaya slot - preserve file input
+            const chayaInput = chayaSlot.querySelector('#chaya-upload') as HTMLInputElement;
+            chayaSlot.innerHTML = `
+                <div class="upload-slot border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
+                    <div class="text-4xl mb-3">📦</div>
+                    <div class="text-sm font-medium text-gray-700 mb-1">Upload .chaya</div>
+                    <div class="text-xs text-gray-500">Complete package</div>
+                </div>
+            `;
+            if (chayaInput) {
+                chayaSlot.appendChild(chayaInput);
+            }
+
+            // Reset .pdf slot - preserve file input
+            const pdfInput = pdfSlot.querySelector('#pdf-upload') as HTMLInputElement;
+            pdfSlot.innerHTML = `
+                <div class="upload-slot border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
+                    <div class="text-4xl mb-3">📄</div>
+                    <div class="text-sm font-medium text-gray-700 mb-1">Upload .pdf</div>
+                    <div class="text-xs text-gray-500">Start from scratch</div>
+                </div>
+            `;
+            if (pdfInput) {
+                pdfSlot.appendChild(pdfInput);
+            }
         }
+
+        // Re-attach event listeners after updating innerHTML
+        this.attachSlotEventListeners();
+    }
+
+    private attachSlotEventListeners(): void {
+        const chayaSlot = document.getElementById('chaya-slot') as HTMLDivElement;
+        const pdfSlot = document.getElementById('pdf-slot') as HTMLDivElement;
+
+        // Remove existing event listeners by replacing elements
+        chayaSlot.onclick = () => {
+            if (!this.state.documentLoaded) {
+                const chayaUpload = document.getElementById('chaya-upload') as HTMLInputElement;
+                if (chayaUpload) {
+                    chayaUpload.click();
+                } else {
+                    console.error('chaya-upload element not found');
+                }
+            } else {
+                this.downloadChayaFile();
+            }
+        };
+
+        pdfSlot.onclick = () => {
+            if (!this.state.documentLoaded) {
+                const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
+                if (pdfUpload) {
+                    pdfUpload.click();
+                } else {
+                    console.error('pdf-upload element not found');
+                }
+            } else {
+                this.downloadPdfFile();
+            }
+        };
     }
 
     private async loadFiles(): Promise<void> {
@@ -202,6 +283,9 @@ class ChayaApp {
             // Mark as loaded
             this.state.documentLoaded = true;
             this.state.hasUnsavedChanges = false;
+
+            // Update slot UI to download mode
+            this.updateSlotUI();
 
             // Notify tabs that data is ready and wait for rendering to complete
             this.notifyTabsDataReady();
@@ -257,6 +341,208 @@ class ChayaApp {
             reader.onerror = () => reject(reader.error);
             reader.readAsText(file);
         });
+    }
+
+    // .chaya file handling methods (placeholder implementations)
+    private async loadChayaFile(file: File): Promise<void> {
+        const loadingDiv = document.getElementById('app-loading') as HTMLDivElement;
+        
+        try {
+            console.log('Loading .chaya file:', file.name);
+            
+            // Show loading progress
+            loadingDiv.classList.remove('hidden');
+            this.updateLoadingProgress(0, 'Loading .chaya file...', 'Reading ZIP file...');
+            
+            // Read ZIP file
+            const zip = new JSZip();
+            const zipContent = await zip.loadAsync(file);
+            
+            this.updateLoadingProgress(20, 'Extracting files...', 'Validating .chaya format...');
+            
+            // Validate required files
+            const requiredFiles = ['manifest.json', 'document.pdf', 'annotations.json'];
+            for (const requiredFile of requiredFiles) {
+                if (!zipContent.file(requiredFile)) {
+                    throw new Error(`Invalid .chaya file: missing ${requiredFile}`);
+                }
+            }
+            
+            this.updateLoadingProgress(40, 'Reading manifest...', 'Validating format version...');
+            
+            // Read and validate manifest
+            const manifestText = await zipContent.file('manifest.json')!.async('string');
+            const manifest = JSON.parse(manifestText);
+            console.log('Manifest:', manifest);
+            
+            this.updateLoadingProgress(60, 'Extracting PDF...', 'Loading document content...');
+            
+            // Extract PDF data
+            const pdfArrayBuffer = await zipContent.file('document.pdf')!.async('arraybuffer');
+            const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
+            const pdfFile = new File([pdfBlob], manifest.originalFilename || 'document.pdf', {
+                type: 'application/pdf'
+            });
+            
+            this.updateLoadingProgress(80, 'Loading annotations...', 'Parsing annotation data...');
+            
+            // Extract annotations
+            const annotationsText = await zipContent.file('annotations.json')!.async('string');
+            const annotationsData = JSON.parse(annotationsText);
+            const annotations = parseAnnotationsFromJson(annotationsData);
+            
+            this.updateLoadingProgress(90, 'Initializing document...', 'Setting up PDF viewer...');
+            
+            // Update state
+            this.state.pdfFile = pdfFile;
+            this.state.annotationsFile = null; // Not needed for .chaya files
+            this.state.loadedAnnotations = annotations;
+            this.state.loadedAnnotationsFileName = file.name;
+            
+            // Load PDF document
+            const pdfjs = await waitForPdfjs();
+            const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
+            this.state.pdfDocument = await loadingTask.promise;
+            
+            this.updateLoadingProgress(95, 'Finalizing...', 'Preparing user interface...');
+            
+            // Mark as loaded
+            this.state.documentLoaded = true;
+            this.state.hasUnsavedChanges = false;
+            
+            // Update slot UI to download mode
+            this.updateSlotUI();
+            
+            this.updateLoadingProgress(100, 'Complete!', 'Chaya file loaded successfully');
+            
+            // Notify tabs that data is ready
+            this.notifyTabsDataReady();
+            
+            // Listen for rendering completion
+            this.waitForRenderingComplete();
+            
+            console.log('Successfully loaded .chaya file:', file.name);
+            
+        } catch (error) {
+            console.error('Error loading .chaya file:', error);
+            this.updateLoadingProgress(0, 'Error loading .chaya file', `Failed: ${error}`);
+            setTimeout(() => {
+                loadingDiv.classList.add('hidden');
+            }, 3000);
+        }
+    }
+
+    private async downloadChayaFile(): Promise<void> {
+        if (!this.state.pdfDocument || !this.state.pdfFile) {
+            alert('No document loaded to create .chaya file');
+            return;
+        }
+
+        try {
+            console.log('Creating .chaya file...');
+            
+            // Create ZIP file
+            const zip = new JSZip();
+            
+            // Add manifest.json
+            const manifest = {
+                version: "1.0",
+                created: new Date().toISOString(),
+                originalFilename: this.state.pdfFile.name,
+                chayaFormatVersion: "1.0",
+                application: {
+                    name: "Bookchop",
+                    version: "1.0.0"
+                }
+            };
+            zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+            
+            // Add original PDF
+            const pdfArrayBuffer = await this.readFileAsArrayBuffer(this.state.pdfFile);
+            zip.file("document.pdf", pdfArrayBuffer);
+            
+            // Add annotations.json
+            const annotationsData = this.createAnnotationsJSON();
+            zip.file("annotations.json", JSON.stringify(annotationsData, null, 2));
+            
+            // Generate ZIP file
+            const chayaBlob = await zip.generateAsync({
+                type: "blob",
+                compression: "DEFLATE",
+                compressionOptions: {
+                    level: 9
+                }
+            });
+            
+            // Download the .chaya file
+            const fileName = this.state.pdfFile.name.replace(/\.pdf$/i, '.chaya');
+            const url = URL.createObjectURL(chayaBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            console.log('Successfully created .chaya file:', fileName);
+            
+        } catch (error) {
+            console.error('Error creating .chaya file:', error);
+            alert('Error creating .chaya file: ' + error);
+        }
+    }
+
+    private createAnnotationsJSON(): any {
+        // Create annotations JSON structure according to the spec
+        const annotationsData = {
+            metadata: {
+                sourcePdf: this.state.pdfFile?.name || 'unknown.pdf',
+                annotationVersion: "1.1",
+                annotatedAt: new Date().toISOString()
+            },
+            annotationsByPage: {} as Record<string, Array<{
+                id: string;
+                x: number;
+                y: number;
+                width: number;
+                height: number;
+                label: string;
+            }>>
+        };
+
+        // Group annotations by page
+        this.state.loadedAnnotations.forEach(annotation => {
+            const pageKey = annotation.pageNumber.toString();
+            if (!annotationsData.annotationsByPage[pageKey]) {
+                annotationsData.annotationsByPage[pageKey] = [];
+            }
+
+            annotationsData.annotationsByPage[pageKey].push({
+                id: annotation.id,
+                x: annotation.x,
+                y: annotation.y,
+                width: annotation.width,
+                height: annotation.height,
+                label: annotation.label
+            });
+        });
+
+        return annotationsData;
+    }
+
+    private async downloadPdfFile(): Promise<void> {
+        if (!this.state.pdfFile) return;
+        
+        // Download the original PDF file
+        const url = URL.createObjectURL(this.state.pdfFile);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = this.state.pdfFile.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     private waitForRenderingComplete(): void {

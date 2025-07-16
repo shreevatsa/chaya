@@ -30,11 +30,10 @@ export function initializeAnnotator(): void {
     
     // Get DOM elements
     const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
-    const saveAnnotationsBtn = document.getElementById('save-annotations') as HTMLButtonElement;
     const annotationList = document.getElementById('annotation-list') as HTMLDivElement;
     const annotationCount = document.getElementById('annotation-count') as HTMLDivElement;
 
-    if (!pdfContainer || !saveAnnotationsBtn || !annotationList || !annotationCount) {
+    if (!pdfContainer || !annotationList || !annotationCount) {
         console.error('Required DOM elements not found for Mark tab');
         return;
     }
@@ -124,85 +123,8 @@ export function initializeAnnotator(): void {
     }
     
     function setupEventListeners(): void {
-        // Save annotations handler
-        const saveAnnotationsBtn = document.getElementById('save-annotations') as HTMLButtonElement;
-        saveAnnotationsBtn.addEventListener('click', () => {
-            if (annotations.length === 0) {
-                alert('No annotations to save!');
-                return;
-            }
-
-            // Get the PDF filename from the app state
-            const chayaApp = (window as any).chayaApp;
-            const sharedState = chayaApp?.getSharedState();
-            const fileName = sharedState?.pdfFileName || 'unknown.pdf';
-
-            // Create annotations JSON structure according to the spec
-            const annotationsData = {
-                metadata: {
-                    sourcePdf: fileName,
-                    annotationVersion: "1.1",
-                    annotatedAt: new Date().toISOString()
-                },
-                annotationsByPage: {} as Record<string, Array<{
-                    id: string;
-                    x: number;
-                    y: number;
-                    width: number;
-                    height: number;
-                    label: string;
-                }>>
-            };
-
-            // Group annotations by page
-            annotations.forEach(annotation => {
-                const pageKey = annotation.pageNumber.toString();
-                if (!annotationsData.annotationsByPage[pageKey]) {
-                    annotationsData.annotationsByPage[pageKey] = [];
-                }
-
-                annotationsData.annotationsByPage[pageKey].push({
-                    id: annotation.id,
-                    x: annotation.x,
-                    y: annotation.y,
-                    width: annotation.width,
-                    height: annotation.height,
-                    label: annotation.label
-                });
-            });
-
-            // Generate filename - prefer loaded annotations filename, fallback to PDF name
-            let downloadFileName: string;
-            if (loadedAnnotationsFileName) {
-                downloadFileName = loadedAnnotationsFileName;
-            } else {
-                const baseFileName = fileName.replace(/\\.pdf$/i, '');
-                downloadFileName = `${baseFileName}.json`;
-            }
-
-            // Download the JSON file
-            const blob = new Blob([JSON.stringify(annotationsData, null, 2)], {
-                type: 'application/json'
-            });
-
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = downloadFileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            // Update app state and reset unsaved changes flag
-            const chayaApp2 = (window as any).chayaApp;
-            if (chayaApp2) {
-                chayaApp2.updateAnnotations(annotations);
-                chayaApp2.markAsSaved();
-            }
-            hasUnsavedChanges = false;
-            console.log('Annotations saved to:', downloadFileName);
-        });
+        // Event listeners for annotation functionality would go here
+        // (Save functionality moved to .chaya download)
     }
 
     // Helper functions for annotation management
