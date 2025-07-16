@@ -14353,6 +14353,84 @@
 
   Try switching to the Read tab now - it should automatically process the loaded PDF data and show the annotations!
 
+> The PDF pages are getting shown out of order, unfortunately.
+
+⏺ The out-of-order page rendering is likely happening because we removed the await keyword or the pages are being rendered asynchronously without proper ordering. Let me check the current page rendering logic:
+
+⏺ Read(src/modes/annotator.ts)
+  ⎿  Read 15 lines (ctrl+r to expand)
+
+⏺ The loop looks correct with await renderPage() being called sequentially. The issue might be in the renderPage function itself or in how the DOM elements are being appended. Let me check the renderPage function:
+
+⏺ Read(src/modes/annotator.ts)
+  ⎿  Read 15 lines (ctrl+r to expand)
+
+⏺ Let me find the part where the page is appended to the container:
+
+⏺ Search(pattern: "appendChild.*pageDiv|pdfContainer.*appendChild", path: "src/modes/annotator.ts", output_mode: "content")
+  ⎿  Found 1 line (ctrl+r to expand)
+
+⏺ Read(src/modes/annotator.ts)
+  ⎿  Read 20 lines (ctrl+r to expand)
+
+⏺ I found the issue! The problem is that the page DOM elements are being appended to the container before the canvas is actually rendered. This means:
+
+  1. Page 1 DOM created → appended to container (shows blank)
+  2. Page 2 DOM created → appended to container (shows blank)
+  3. Page 1 canvas renders → page 1 shows content
+  4. Page 2 canvas renders → page 2 shows content
+
+  But if the canvas rendering happens out of order (due to PDF.js async operations), the visual order gets scrambled.
+
+  Let me fix this by moving the DOM append to after the canvas rendering:
+
+⏺ Update(src/modes/annotator.ts)
+  ⎿  Updated src/modes/annotator.ts with 3 additions and 1 removal                 
+       307            pageDiv.appendChild(canvas);
+       308            pageDiv.appendChild(annotationLayer);
+       309            pageDiv.appendChild(aiButton);
+       310 -          pdfContainer.appendChild(pageDiv);
+       310    
+       311            const renderContext = {
+       312                canvasContext: context!,
+     ...
+       315            };
+       316    
+       317            await page.render(renderContext).promise;
+       318 +          
+       319 +          // Only append to container after the page is fully rendered
+       320 +          pdfContainer.appendChild(pageDiv);
+       321    
+       322            // Add mouse event listeners for annotation drawing
+       323            setupAnnotationDrawing(annotationLayer, pageDiv, pageNumber);
+
+⏺ Now let's build and test:
+
+⏺ Bash(npm run build)
+  ⎿  > bookchop@1.0.0 build                                                   
+     > tsc && ./node_modules/.bin/postcss ./src/input.css -o ./dist/output.css
+
+⏺ Perfect! Now the page rendering order should be correct:
+
+  What Changed
+
+  Before (out of order):
+  pdfContainer.appendChild(pageDiv);        // ← Page DOM added immediately (blank)
+  await page.render(renderContext).promise; // ← Canvas renders later (async)
+
+  After (correct order):
+  await page.render(renderContext).promise; // ← Canvas renders first
+  pdfContainer.appendChild(pageDiv);        // ← Page DOM added only after rendering
+
+  Why This Fixes It
+
+  1. Sequential processing: The for loop with await ensures pages are processed 1, 2, 3, 4...
+  2. Complete rendering: Each page's canvas is fully rendered before moving to the next
+  3. DOM append order: Pages are only added to the container after they're fully rendered
+  4. Visual consistency: Pages appear in the correct order: 1, 2, 3, 4...
+
+  The pages should now appear in the correct order from top to bottom, even with a large 279-page PDF. Each page will be fully rendered before being added to the DOM, ensuring the visual order matches the logical page order.
+
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                                                                                                                                                 │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

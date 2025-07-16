@@ -307,7 +307,6 @@ export function initializeAnnotator(): void {
         pageDiv.appendChild(canvas);
         pageDiv.appendChild(annotationLayer);
         pageDiv.appendChild(aiButton);
-        pdfContainer.appendChild(pageDiv);
 
         const renderContext = {
             canvasContext: context!,
@@ -315,6 +314,9 @@ export function initializeAnnotator(): void {
         };
 
         await page.render(renderContext).promise;
+        
+        // Only append to container after the page is fully rendered
+        pdfContainer.appendChild(pageDiv);
 
         // Add mouse event listeners for annotation drawing
         setupAnnotationDrawing(annotationLayer, pageDiv, pageNumber);
