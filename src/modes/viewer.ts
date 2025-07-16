@@ -3,114 +3,71 @@
 
 import { initializePdfjs, waitForPdfjs, parseAnnotationsFromJson, Annotation } from '../pdf-utils.js';
 
-let pdfFile: File | null = null;
-let annotationsFile: File | null = null;
 let loadedAnnotations: Annotation[] = [];
 
 export function initializeViewer(): void {
     console.log('Initializing Read tab (viewer)');
     
-    // Get DOM elements with read-tab specific IDs
-    const pdfUpload = document.getElementById('read-pdf-upload') as HTMLInputElement;
-    const annotationsUpload = document.getElementById('read-annotations-upload') as HTMLInputElement;
-    const loadFilesBtn = document.getElementById('load-read-files') as HTMLButtonElement;
+    // Get DOM elements
     const pdfContainer = document.getElementById('read-pdf-container') as HTMLDivElement;
     const loadingMessage = document.getElementById('read-loading-message') as HTMLDivElement;
     const annotationCount = document.getElementById('read-annotation-count') as HTMLDivElement;
     const annotationList = document.getElementById('read-annotation-list') as HTMLDivElement;
 
-    if (!pdfUpload || !annotationsUpload || !loadFilesBtn || !pdfContainer || !annotationCount || !annotationList) {
+    if (!pdfContainer || !annotationCount || !annotationList || !loadingMessage) {
         console.error('Required DOM elements not found for Read tab');
         return;
     }
 
-    // Set up event listeners
-    setupEventListeners();
+    // Listen for centralized data ready event
+    document.addEventListener('appDataReady', (event: Event) => {
+        const customEvent = event as CustomEvent;
+        const { pdfDocument, annotations, annotationsFileName, pdfFileName } = customEvent.detail;
+        handleDataReady(pdfDocument, annotations, annotationsFileName, pdfFileName);
+    });
 
-    function setupEventListeners(): void {
-        // File input handlers
-        pdfUpload.addEventListener('change', (event) => {
-            const target = event.target as HTMLInputElement;
-            pdfFile = target.files?.[0] || null;
-            updateLoadButton();
-        });
-
-        annotationsUpload.addEventListener('change', (event) => {
-            const target = event.target as HTMLInputElement;
-            annotationsFile = target.files?.[0] || null;
-            updateLoadButton();
-        });
-
-        // Load and display the files
-        loadFilesBtn.addEventListener('click', async () => {
-            if (!pdfFile || !annotationsFile) return;
-
-            try {
-                loadFilesBtn.disabled = true;
-                loadFilesBtn.textContent = 'Loading...';
-                loadingMessage.textContent = 'Loading PDF and annotations...';
-
-                // Load and parse annotations first
-                const annotationsText = await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => resolve(e.target?.result as string);
-                    reader.onerror = () => reject(reader.error);
-                    reader.readAsText(annotationsFile!);
-                });
-                const annotationsData = JSON.parse(annotationsText);
-                loadedAnnotations = parseAnnotationsFromJson(annotationsData);
-
-                console.log(`Loaded ${loadedAnnotations.length} annotations`);
-
-                // Clear container and load PDF
-                pdfContainer.innerHTML = '';
-
-                const pdfArrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => resolve(e.target?.result as ArrayBuffer);
-                    reader.onerror = () => reject(reader.error);
-                    reader.readAsArrayBuffer(pdfFile!);
-                });
-                const typedArray = new Uint8Array(pdfArrayBuffer);
-
-                // Wait for PDF.js and load document
-                const pdfjs = await waitForPdfjs();
-                const loadingTask = pdfjs.getDocument(typedArray);
-                const pdf = await loadingTask.promise;
-
-                console.log('PDF loaded successfully, pages:', pdf.numPages);
-
-                // Extract and display only the annotated regions
-                loadingMessage.textContent = 'Extracting annotated regions...';
-
-                for (let i = 0; i < loadedAnnotations.length; i++) {
-                    const annotation = loadedAnnotations[i];
-                    console.log(`Extracting region ${i + 1}/${loadedAnnotations.length}: ${annotation.label}`);
-
-                    const regionDiv = await extractAnnotationRegion(pdf, annotation);
-                    pdfContainer.appendChild(regionDiv);
-                }
-
-                loadingMessage.textContent = '';
-
-                // Update annotation list
-                updateAnnotationList();
-
-                console.log('All annotation regions extracted successfully');
-
-            } catch (error) {
-                console.error('Error loading files:', error);
-                loadingMessage.textContent = `Error loading files: ${error}`;
-            } finally {
-                loadFilesBtn.disabled = false;
-                loadFilesBtn.textContent = 'Load and View';
-            }
-        });
+    function handleDataReady(pdfDocument: any, annotations: Annotation[], annotationsFileName: string | null, pdfFileName: string | null): void {
+        console.log('Read tab: Data ready', { pdfDocument, annotations, annotationsFileName, pdfFileName });
+        
+        // Update local state
+        loadedAnnotations = annotations || [];
+        
+        // Clear container
+        pdfContainer.innerHTML = '';
+        
+        // Check if we have both PDF and annotations
+        if (!pdfDocument || !annotations || annotations.length === 0) {
+            pdfContainer.innerHTML = `
+                <div class="p-8 text-center text-gray-500">
+                    <div class="text-4xl mb-4">📖</div>
+                    <p>Load a PDF file and annotations to view annotated regions</p>
+                </div>
+            `;
+            annotationCount.textContent = 'No annotations loaded';
+            annotationList.innerHTML = '';
+            return;
+        }
+        
+        // Display the annotated regions
+        displayAnnotatedRegions(pdfDocument, annotations);
+        
+        // Update annotation list
+        updateAnnotationList();
     }
 
-    // Enable/disable load button based on file selection
-    function updateLoadButton(): void {
-        loadFilesBtn.disabled = !pdfFile || !annotationsFile;
+    async function displayAnnotatedRegions(pdfDocument: any, annotations: Annotation[]): Promise<void> {
+        loadingMessage.textContent = 'Extracting annotated regions...';
+        
+        for (let i = 0; i < annotations.length; i++) {
+            const annotation = annotations[i];
+            console.log(`Extracting region ${i + 1}/${annotations.length}: ${annotation.label}`);
+
+            const regionDiv = await extractAnnotationRegion(pdfDocument, annotation);
+            pdfContainer.appendChild(regionDiv);
+        }
+        
+        loadingMessage.textContent = '';
+        console.log('All annotation regions extracted successfully');
     }
 
     // Extract a cropped region from a page canvas for a specific annotation

@@ -10,8 +10,47 @@
     <div class="container mx-auto p-4">
         <!-- App Header with Tab Navigation -->
         <header class="mb-6">
-            <h1 class="text-3xl font-bold mb-4">Chaya</h1>
-            <nav class="flex space-x-2 bg-white rounded-lg p-2 shadow-sm">
+            <h1 class="text-lg font-bold mb-4">Chaya</h1>
+            
+            <!-- Centralized File Loading -->
+            <div class="bg-white rounded-lg p-4 shadow-sm mb-4">
+                <h2 class="text-lg font-medium mb-3">Document Files</h2>
+                <div class="mb-4">
+                    <label for="app-pdf-upload" class="block text-sm font-medium text-gray-700 mb-1">PDF File:</label>
+                    <input type="file" id="app-pdf-upload" accept=".pdf" 
+                           class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="app-annotations-upload" class="block text-sm font-medium text-gray-700 mb-1">Annotations File (optional):</label>
+                    <input type="file" id="app-annotations-upload" accept=".json" 
+                           class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                    <p class="mt-1 text-xs text-gray-500">Upload a .json file to load previously saved annotations</p>
+                </div>
+                
+                <div class="mt-4 flex items-center gap-4">
+                    <button id="load-files-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 opacity-50" disabled>
+                        Load Files
+                    </button>
+                    <div id="file-status" class="text-sm text-gray-500">
+                        Select a PDF file to begin
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Loading Progress -->
+            <div id="app-loading" class="bg-white border border-gray-300 rounded-lg shadow-sm p-6 mb-4 hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <span id="app-loading-text" class="text-sm font-medium text-gray-700">Loading PDF...</span>
+                    <span id="app-loading-percent" class="text-sm text-gray-500">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="app-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div id="app-loading-details" class="text-xs text-gray-500 mt-2">Preparing to load PDF...</div>
+            </div>
+            
+            <nav class="flex gap-3 bg-white rounded-lg p-2 shadow-sm">
                 <button id="mark-tab-btn" class="tab-btn active px-4 py-2 rounded-md font-medium transition-colors">
                     📝 Mark
                 </button>
@@ -28,34 +67,16 @@
         
         <!-- Mark Tab: Region annotation on PDF -->
         <div id="mark-tab" class="tab-content">
-            <div class="mb-4">
-                <label for="pdf-upload" class="block text-sm font-medium text-gray-700">Upload PDF:</label>
-                <input type="file" id="pdf-upload" accept=".pdf" class="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none">
-            </div>
-
-            <div class="mb-4">
-                <label for="annotations-upload" class="block text-sm font-medium text-gray-700">Load Existing Annotations (optional):</label>
-                <input type="file" id="annotations-upload" accept=".json" class="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none">
-                <p class="mt-1 text-xs text-gray-500">Upload a .json file to load previously saved annotations</p>
-            </div>
-
             <div class="flex gap-4" style="height: 70vh;">
                 <!-- Main PDF Container -->
                 <div class="flex-1">
-                    <!-- Loading Progress -->
-                    <div id="pdf-loading" class="bg-white border border-gray-300 rounded-lg shadow-sm p-6 mb-4 hidden">
-                        <div class="flex items-center justify-between mb-2">
-                            <span id="loading-text" class="text-sm font-medium text-gray-700">Loading PDF...</span>
-                            <span id="loading-percent" class="text-sm text-gray-500">0%</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
-                        </div>
-                        <div id="loading-details" class="text-xs text-gray-500 mt-2">Preparing to load PDF...</div>
-                    </div>
-                    
                     <div id="pdf-container" class="bg-white border border-gray-300 rounded-lg shadow-sm h-full overflow-y-auto p-4" style="position: relative;">
-                        <!-- PDF pages will be rendered here -->
+                        <div class="flex items-center justify-center h-full text-gray-500">
+                            <div class="text-center">
+                                <div class="text-4xl mb-4">📄</div>
+                                <p>Load a PDF file to start annotating</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -65,7 +86,7 @@
                     <div id="annotation-count" class="text-sm text-gray-500 mb-3">
                         No annotations
                     </div>
-                    <div id="annotation-list" class="space-y-2 flex-1 overflow-y-auto">
+                    <div id="annotation-list" class="flex-1 overflow-y-auto">
                         <!-- Annotation items will be added here -->
                     </div>
                     <div class="mt-4">
@@ -80,20 +101,20 @@
         <!-- Edit Tab: ProseMirror editor (placeholder for now) -->
         <div id="edit-tab" class="tab-content hidden">
             <div class="bg-white border border-gray-300 rounded-lg shadow-sm p-8 text-center">
-                <div class="max-w-md mx-auto">
-                    <div class="text-6xl mb-4">✏️</div>
-                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Rich Text Editor</h2>
+                <div class="max-w-lg">
+                    <div class="text-4xl mb-4">✏️</div>
+                    <h2 class="text-lg font-bold text-gray-900 mb-4">Rich Text Editor</h2>
                     <p class="text-gray-600 mb-6">
                         The Edit tab will feature a powerful ProseMirror editor where you can:
                     </p>
-                    <ul class="text-left text-gray-600 space-y-2 mb-6">
-                        <li>• Auto-OCR text from marked regions</li>
-                        <li>• Edit and proofread content</li>
-                        <li>• Add rich formatting (bold, italic, links)</li>
-                        <li>• Organize content with headings and structure</li>
-                        <li>• Maintain links to original PDF regions</li>
+                    <ul class="text-left text-gray-600 mb-6">
+                        <li class="mb-2">• Auto-OCR text from marked regions</li>
+                        <li class="mb-2">• Edit and proofread content</li>
+                        <li class="mb-2">• Add rich formatting (bold, italic, links)</li>
+                        <li class="mb-2">• Organize content with headings and structure</li>
+                        <li class="mb-2">• Maintain links to original PDF regions</li>
                     </ul>
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="bg-blue-100 border border-gray-300 rounded-lg p-4">
                         <p class="text-blue-800 text-sm">
                             <strong>Coming Soon:</strong> This feature is in development and will be available in the next update.
                         </p>
@@ -104,45 +125,22 @@
 
         <!-- Read Tab: Presentation view -->
         <div id="read-tab" class="tab-content hidden">
-            <div class="bg-white border border-gray-300 rounded-lg shadow-sm p-4 mb-4">
-                <h2 class="text-lg font-bold mb-3">View Annotated Document</h2>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="read-pdf-upload" class="block text-sm font-medium text-gray-700 mb-1">PDF File:</label>
-                        <input type="file" id="read-pdf-upload" accept=".pdf" 
-                               class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none">
-                    </div>
-                    
-                    <div>
-                        <label for="read-annotations-upload" class="block text-sm font-medium text-gray-700 mb-1">Annotations File:</label>
-                        <input type="file" id="read-annotations-upload" accept=".json" 
-                               class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none">
-                    </div>
-                </div>
-                
-                <div class="mt-4">
-                    <button id="load-read-files" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:bg-gray-400" disabled>
-                        Load and View
-                    </button>
-                </div>
-            </div>
-
             <!-- Annotation Summary -->
             <div class="bg-white border border-gray-300 rounded-lg shadow-sm p-4 mb-4">
                 <h2 class="text-lg font-bold mb-2 text-gray-900">Annotations</h2>
                 <div id="read-annotation-count" class="text-sm text-gray-500 mb-3">
                     No annotations loaded
                 </div>
-                <div id="read-annotation-list" class="flex flex-wrap gap-2">
+                <div id="read-annotation-list" class="flex gap-3">
                     <!-- Annotation navigation items will be added here -->
                 </div>
             </div>
 
             <!-- Annotated Regions Container -->
-            <div id="read-pdf-container" class="space-y-4">
+            <div id="read-pdf-container">
                 <div id="read-loading-message" class="p-8 text-center text-gray-500">
-                    Select PDF and annotations files to view annotated regions
+                    <div class="text-4xl mb-4">📖</div>
+                    <p>Load a PDF file and annotations to view annotated regions</p>
                 </div>
             </div>
         </div>

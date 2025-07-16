@@ -1,8 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    "./annotator.html",
-    "./viewer.html",
+    "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
     "./dist/**/*.js"
   ],

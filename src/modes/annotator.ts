@@ -28,167 +28,72 @@ let selectedAnnotationData: Annotation | null = null;
 export function initializeAnnotator(): void {
     console.log('Initializing Mark tab (annotator)');
     
-    // Get DOM elements with mark-tab specific IDs
-    const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
-    const annotationsUpload = document.getElementById('annotations-upload') as HTMLInputElement;
+    // Get DOM elements
     const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
     const saveAnnotationsBtn = document.getElementById('save-annotations') as HTMLButtonElement;
     const annotationList = document.getElementById('annotation-list') as HTMLDivElement;
     const annotationCount = document.getElementById('annotation-count') as HTMLDivElement;
 
-    // Progress bar elements
-    const pdfLoading = document.getElementById('pdf-loading') as HTMLDivElement;
-    const loadingText = document.getElementById('loading-text') as HTMLSpanElement;
-    const loadingPercent = document.getElementById('loading-percent') as HTMLSpanElement;
-    const progressBar = document.getElementById('progress-bar') as HTMLDivElement;
-    const loadingDetails = document.getElementById('loading-details') as HTMLDivElement;
-
-    if (!pdfUpload || !annotationsUpload || !pdfContainer || !saveAnnotationsBtn || !annotationList || !annotationCount) {
+    if (!pdfContainer || !saveAnnotationsBtn || !annotationList || !annotationCount) {
         console.error('Required DOM elements not found for Mark tab');
         return;
     }
 
+    // Listen for centralized data ready event
+    document.addEventListener('appDataReady', (event: Event) => {
+        const customEvent = event as CustomEvent;
+        const { pdfDocument, annotations: loadedAnnotations, annotationsFileName, pdfFileName } = customEvent.detail;
+        handleDataReady(pdfDocument, loadedAnnotations, annotationsFileName, pdfFileName);
+    });
+
     // Set up event listeners
     setupEventListeners();
     
+    function handleDataReady(pdfDocument: any, loadedAnnotations: Annotation[], annotationsFileName: string | null, pdfFileName: string | null): void {
+        console.log('Mark tab: Data ready', { pdfDocument, loadedAnnotations, annotationsFileName, pdfFileName });
+        
+        // Update global state
+        annotations = loadedAnnotations || [];
+        loadedAnnotationsFileName = annotationsFileName;
+        hasUnsavedChanges = false;
+        
+        // Clear container and render PDF
+        const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
+        pdfContainer.innerHTML = '';
+        
+        // Render PDF pages
+        renderPdfPages(pdfDocument, pdfContainer);
+        
+        // Update annotation list
+        updateAnnotationList();
+    }
+    
+    async function renderPdfPages(pdfDocument: any, container: HTMLDivElement): Promise<void> {
+        const containerWidth = container.offsetWidth;
+        
+        for (let i = 1; i <= pdfDocument.numPages; i++) {
+            await renderPage(pdfDocument, i, containerWidth);
+        }
+        
+        // Render loaded annotations if any
+        if (annotations.length > 0) {
+            renderLoadedAnnotations();
+        }
+    }
+    
     function setupEventListeners(): void {
-        // PDF upload handler
-        pdfUpload.addEventListener('change', async (event) => {
-            const target = event.target as HTMLInputElement;
-            const file = target.files?.[0];
-
-            if (!file) {
-                return;
-            }
-
-            // Check for unsaved changes before loading new PDF
-            if (hasUnsavedChanges && annotations.length > 0) {
-                const confirmed = confirm(
-                    'You have unsaved annotations that will be lost when loading a new PDF. ' +
-                    'Do you want to continue loading the new PDF?\\n\\n' +
-                    'Click OK to proceed (current annotations will be lost), or Cancel to keep current annotations.'
-                );
-                if (!confirmed) {
-                    // Reset the file input
-                    pdfUpload.value = '';
-                    return;
-                }
-            }
-
-            // Clear any previously rendered PDF
-            pdfContainer.innerHTML = '';
-            
-            // Clear loaded annotations filename since we're starting fresh with a new PDF
-            loadedAnnotationsFileName = null;
-            
-            // Show progress bar
-            showLoadingProgress();
-
-            const fileReader = new FileReader();
-            fileReader.onload = async (e) => {
-                try {
-                    updateLoadingProgress(10, 'Reading PDF file...', 'File loaded successfully');
-                    console.log('File reader loaded, processing PDF...');
-                    const typedArray = new Uint8Array(e.target?.result as ArrayBuffer);
-                    console.log('Created typed array, length:', typedArray.length);
-
-                    updateLoadingProgress(20, 'Initializing PDF.js...', 'Loading PDF processing library');
-                    // Wait for PDF.js to be available
-                    const pdfjs = await waitForPdfjs();
-                    console.log('PDF.js available, creating document...');
-                    console.log('PDF.js object:', pdfjs);
-                    console.log('getDocument function available:', typeof pdfjs.getDocument);
-
-                    if (!pdfjs.getDocument) {
-                        console.error('getDocument function not available on pdfjs object');
-                        hideLoadingProgress();
-                        return;
-                    }
-
-                    updateLoadingProgress(30, 'Parsing PDF document...', 'Analyzing PDF structure');
-                    const loadingTask = pdfjs.getDocument(typedArray);
-                    console.log('Loading task created:', loadingTask);
-                    const pdf = await loadingTask.promise;
-                    console.log('PDF loaded successfully, pages:', pdf.numPages);
-
-                    updateLoadingProgress(40, 'Rendering pages...', `Found ${pdf.numPages} page(s) to render`);
-                    const containerWidth = pdfContainer.offsetWidth;
-                    
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const pageProgress = 40 + (50 * i / pdf.numPages);
-                        updateLoadingProgress(pageProgress, `Rendering page ${i} of ${pdf.numPages}...`, `Processing page ${i}`);
-                        await renderPage(pdf, i, containerWidth);
-                    }
-                    
-                    updateLoadingProgress(90, 'Finalizing...', 'Setting up annotation features');
-                    console.log('All pages rendered successfully');
-
-                    // If we have loaded annotations waiting, render them now
-                    if (loadedAnnotations || annotations.length > 0) {
-                        updateLoadingProgress(95, 'Loading annotations...', 'Restoring saved annotations');
-                        console.log('Rendering loaded annotations...');
-                        renderLoadedAnnotations();
-                        loadedAnnotations = null; // Clear the loaded data
-
-                        // Update the annotation list
-                        updateAnnotationList();
-                    }
-
-                    updateLoadingProgress(100, 'Complete!', 'PDF ready for annotation');
-                    setTimeout(() => {
-                        hideLoadingProgress();
-                    }, 1000);
-
-                } catch (error) {
-                    console.error('Error loading PDF:', error);
-                    const reason = error instanceof Error ? error.message : 'Unknown error';
-                    updateLoadingProgress(0, 'Error loading PDF', `Failed: ${reason}`);
-                    setTimeout(() => {
-                        hideLoadingProgress();
-                    }, 3000);
-                }
-            };
-
-            fileReader.readAsArrayBuffer(file);
-        });
-
-        // Annotations upload handler
-        annotationsUpload.addEventListener('change', async (event) => {
-            const target = event.target as HTMLInputElement;
-            const file = target.files?.[0];
-
-            if (!file) {
-                return;
-            }
-
-            console.log('Loading annotations file:', file.name);
-
-            const fileReader = new FileReader();
-            fileReader.onload = (e) => {
-                try {
-                    const jsonText = e.target?.result as string;
-                    const jsonData = JSON.parse(jsonText);
-                    loadedAnnotationsFileName = file.name; // Remember filename before loading
-                    loadAnnotationsFromJson(jsonData);
-                } catch (error) {
-                    console.error('Error parsing annotations JSON:', error);
-                    alert('Error parsing annotations file: ' + error);
-                }
-            };
-
-            fileReader.readAsText(file);
-        });
-
         // Save annotations handler
+        const saveAnnotationsBtn = document.getElementById('save-annotations') as HTMLButtonElement;
         saveAnnotationsBtn.addEventListener('click', () => {
             if (annotations.length === 0) {
                 alert('No annotations to save!');
                 return;
             }
 
-            // Get the PDF filename (if available)
-            const fileInput = pdfUpload;
-            const fileName = fileInput.files?.[0]?.name || 'unknown.pdf';
+            // Get the PDF filename from the app state
+            const chayaApp = (window as any).chayaApp;
+            const sharedState = chayaApp?.getSharedState();
+            const fileName = sharedState?.pdfFileName || 'unknown.pdf';
 
             // Create annotations JSON structure according to the spec
             const annotationsData = {
@@ -247,37 +152,22 @@ export function initializeAnnotator(): void {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            // Reset unsaved changes flag
+            // Update app state and reset unsaved changes flag
+            const chayaApp2 = (window as any).chayaApp;
+            if (chayaApp2) {
+                chayaApp2.updateAnnotations(annotations);
+                chayaApp2.markAsSaved();
+            }
             hasUnsavedChanges = false;
             console.log('Annotations saved to:', downloadFileName);
         });
     }
 
-    // Helper functions (simplified versions of the full annotator functionality)
-    function showLoadingProgress(): void {
-        pdfLoading.classList.remove('hidden');
-        updateLoadingProgress(0, 'Loading PDF...', 'Preparing to load PDF...');
-    }
-
-    function hideLoadingProgress(): void {
-        pdfLoading.classList.add('hidden');
-    }
-
-    function updateLoadingProgress(percent: number, text: string, details: string): void {
-        const clampedPercent = Math.max(0, Math.min(100, percent));
-        
-        progressBar.style.width = `${clampedPercent}%`;
-        loadingPercent.textContent = `${Math.round(clampedPercent)}%`;
-        loadingText.textContent = text;
-        loadingDetails.textContent = details;
-        
-        // Update progress bar color based on status
-        if (clampedPercent === 100) {
-            progressBar.className = 'bg-green-600 h-2 rounded-full transition-all duration-300';
-        } else if (clampedPercent === 0 && text.includes('Error')) {
-            progressBar.className = 'bg-red-600 h-2 rounded-full transition-all duration-300';
-        } else {
-            progressBar.className = 'bg-blue-600 h-2 rounded-full transition-all duration-300';
+    // Helper functions for annotation management
+    function syncWithAppState(): void {
+        const chayaApp = (window as any).chayaApp;
+        if (chayaApp) {
+            chayaApp.updateAnnotations(annotations);
         }
     }
 
@@ -358,8 +248,9 @@ export function initializeAnnotator(): void {
                     }
                 }
 
-                // Update the sidebar
+                // Update the sidebar and sync with app state
                 updateAnnotationList();
+                syncWithAppState();
                 console.log(`Added ${newAnnotations.length} AI-generated annotations.`);
             }
         });
@@ -610,8 +501,9 @@ export function initializeAnnotator(): void {
                     selectAnnotation(newAnnotationBox, annotation);
                 }
 
-                // Update the annotation list
+                // Update the annotation list and sync with app state
                 updateAnnotationList();
+                syncWithAppState();
 
                 console.log('Created annotation:', annotation);
             } else {
@@ -743,6 +635,7 @@ export function initializeAnnotator(): void {
                     annotationBox.title = newLabel.trim();
                     hasUnsavedChanges = true;
                     updateAnnotationList();
+                    syncWithAppState();
                 }
             } else {
                 startDrag(e, annotationBox, annotation, pageDiv);
@@ -875,6 +768,7 @@ export function initializeAnnotator(): void {
             annotation.width = newWidth / pageWidth;
             annotation.height = newHeight / pageHeight;
             hasUnsavedChanges = true;
+            syncWithAppState();
         };
 
         const handleMouseUp = () => {
@@ -922,6 +816,7 @@ export function initializeAnnotator(): void {
             annotation.x = clampedLeft / pageWidth;
             annotation.y = clampedTop / pageHeight;
             hasUnsavedChanges = true;
+            syncWithAppState();
         };
 
         const handleMouseUp = () => {
@@ -993,6 +888,7 @@ export function initializeAnnotator(): void {
         });
 
         updateAnnotationList();
+        syncWithAppState();
 
         if (selectedAnnotationData && selectedAnnotationData.id === annotationId) {
             selectedAnnotation = null;
