@@ -7439,12 +7439,440 @@
   This is a good example of the "deep modules" principle - the function has a simple interface and does one thing well, while the complexity of coordinating the filename tracking is kept at the appropriate level (the caller that manages the
    overall state).
 
+> Take another look at @THREE_MODE_WORKFLOW.md. How can I move towards having all that functionality in a single app, while still keeping annotator and viewer as separate as possible?
+  ⎿  Read THREE_MODE_WORKFLOW.md (239 lines)
+
+⏺ Looking at the THREE_MODE_WORKFLOW.md, I can see a clear path to unify this into a single app while keeping the modes separate. Here's how I'd approach it:
+
+  Unified App Architecture
+
+  Single HTML Entry Point with Mode Switching
+
+  Instead of separate HTML files, create a single index.html with a mode switcher:
+
+  <!DOCTYPE html>
+  <html>
+  <head>
+      <title>Bookchop - Document Processing Pipeline</title>
+  </head>
+  <body>
+      <!-- Mode Navigation -->
+      <nav class="mode-switcher">
+          <button data-mode="annotate" class="active">📝 Mark Regions</button>
+          <button data-mode="ocr">🔍 Extract Text</button>
+          <button data-mode="view">📖 Present</button>
+      </nav>
+
+      <!-- Dynamic Content Area -->
+      <div id="app-container">
+          <!-- Mode-specific content loaded here -->
+      </div>
+  </body>
+  </html>
+
+  Modular TypeScript Architecture
+
+  Keep the existing separation but coordinate them:
+
+  src/
+  ├── app.ts              # Main coordinator & mode switching
+  ├── modes/
+  │   ├── annotator.ts    # Mode 1 (current annotator.ts)
+  │   ├── ocr.ts          # Mode 2 (new)
+  │   └── viewer.ts       # Mode 3 (current viewer.ts)
+  ├── shared/
+  │   ├── pdf-utils.ts    # Shared PDF handling
+  │   ├── data-manager.ts # .chaya file management
+  │   └── ui-utils.ts     # Common UI components
+
+  State Management Strategy
+
+  Use a simple coordinator pattern:
+
+  // src/app.ts
+  class BookchopApp {
+      private currentMode: 'annotate' | 'ocr' | 'view' = 'annotate';
+      private documentState = {
+          pdfFile: null,
+          chayaData: null,
+          currentStage: 1 // 1=regions, 2=+text, 3=presentation
+      };
+
+      async switchMode(newMode: string) {
+          // Save current state
+          await this.saveCurrentProgress();
+
+          // Switch UI
+          this.hideCurrentMode();
+          this.showMode(newMode);
+
+          // Load appropriate data for new mode
+          await this.loadModeData(newMode);
+      }
+
+      private showMode(mode: string) {
+          switch(mode) {
+              case 'annotate':
+                  import('./modes/annotator.js').then(m => m.initialize(this.documentState));
+                  break;
+              case 'ocr':
+                  import('./modes/ocr.js').then(m => m.initialize(this.documentState));
+                  break;
+              case 'view':
+                  import('./modes/viewer.js').then(m => m.initialize(this.documentState));
+                  break;
+          }
+      }
+  }
+
+  Implementation Steps
+
+  Phase 1: Minimal Unification
+
+  1. Create index.html with mode tabs
+  2. Move current annotator.ts content into modes/annotator.ts
+  3. Move current viewer.ts content into modes/viewer.ts
+  4. Create app.ts coordinator that shows/hides mode containers
+  5. Keep existing functionality 100% intact
+
+  Phase 2: Add Semantic Types to Mode 1
+
+  Enhance the current annotator with:
+  - Dropdown for semantic type selection during annotation creation
+  - Icons in sidebar based on semantic type
+  - Updated .chaya format with semanticType field
+
+  Phase 3: Build Mode 2 (OCR)
+
+  Create modes/ocr.ts with:
+  - Region-by-region navigation
+  - OCR text extraction and editing interface
+  - Progress through all regions
+
+  Phase 4: Enhance Mode 3
+
+  Transform current viewer into presentation mode with:
+  - Beautiful HTML rendering
+  - Bidirectional linking
+  - Export functionality
+
+  Benefits of This Approach
+
+  ✅ Keeps existing code intact - Your current annotator and viewer can be moved almost unchanged
+
+  ✅ Clear separation - Each mode is still a separate module with its own concerns
+
+  ✅ Shared infrastructure - PDF handling, file management, etc. can be shared
+
+  ✅ Progressive enhancement - Can build this incrementally without breaking existing functionality
+
+  ✅ Single deployable unit - One website instead of multiple pages
+
+  ✅ State persistence - Document state carries through modes automatically
+
+  File Organization
+
+  bookchop/
+  ├── index.html          # Unified entry point
+  ├── annotator.html      # Keep for backward compatibility
+  ├── viewer.html         # Keep for backward compatibility
+  ├── src/
+  │   ├── app.ts         # Main coordinator
+  │   ├── modes/
+  │   │   ├── annotator.ts
+  │   │   ├── ocr.ts
+  │   │   └── viewer.ts
+  │   └── shared/
+  │       ├── pdf-utils.ts
+  │       ├── data-manager.ts
+  │       └── ui-utils.ts
+
+  This approach gives you the unified three-mode workflow while maintaining the clean separation between concerns. The existing annotator and viewer code can be preserved almost exactly as-is, just wrapped in a mode management system.
+
+  Would you like me to start implementing Phase 1 - creating the basic mode switching infrastructure?
+
+> What about the html files (@annotator.html and @viewer.html) -- will they be separate?
+  ⎿  Read viewer.html (59 lines)
+
+⏺ Great question! For the three-mode workflow, I'd recommend keeping the existing HTML files as-is for backward compatibility, but creating a new unified entry point. Here's the approach:
+
+  Hybrid Approach: Best of Both Worlds
+
+  Keep existing files working:
+
+  - annotator.html - continues to work exactly as before
+  - viewer.html - continues to work exactly as before
+  - Users can still access these directly if they prefer
+
+  Add new unified entry point:
+
+  - index.html - new three-mode workflow interface
+
+  File Structure
+
+  bookchop/
+  ├── index.html          # NEW: Unified three-mode app
+  ├── annotator.html      # EXISTING: Standalone annotator (unchanged)
+  ├── viewer.html         # EXISTING: Standalone viewer (unchanged)
+  ├── ocr.html           # NEW: Standalone OCR mode (optional)
+
+  Implementation Strategy
+
+  Option 1: Embed HTML content in the unified app
+
+  The new index.html could contain all three mode interfaces in hidden divs:
+
+  <!DOCTYPE html>
+  <html>
+  <head>
+      <title>Bookchop - Document Processing Pipeline</title>
+      <link href="./dist/output.css" rel="stylesheet">
+  </head>
+  <body>
+      <!-- Mode Navigation -->
+      <nav class="mode-switcher">
+          <button data-mode="annotate" class="active">📝 Mark Regions</button>
+          <button data-mode="ocr">🔍 Extract Text</button>
+          <button data-mode="view">📖 Present</button>
+      </nav>
+
+      <!-- Mode 1: Annotation (based on annotator.html content) -->
+      <div id="annotate-mode" class="mode-container">
+          <!-- Copy the body content from annotator.html -->
+      </div>
+
+      <!-- Mode 2: OCR (new interface) -->
+      <div id="ocr-mode" class="mode-container hidden">
+          <!-- New OCR interface -->
+      </div>
+
+      <!-- Mode 3: Viewer (based on viewer.html content) -->
+      <div id="view-mode" class="mode-container hidden">
+          <!-- Copy the body content from viewer.html -->
+      </div>
+
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+      <script type="module" src="./dist/app.js"></script>
+  </body>
+  </html>
+
+  Option 2: Dynamic content loading
+
+  The unified app dynamically loads content:
+
+  <!DOCTYPE html>
+  <html>
+  <head>
+      <title>Bookchop - Document Processing Pipeline</title>
+      <link href="./dist/output.css" rel="stylesheet">
+  </head>
+  <body>
+      <!-- Mode Navigation -->
+      <nav class="mode-switcher">
+          <button data-mode="annotate" class="active">📝 Mark Regions</button>
+          <button data-mode="ocr">🔍 Extract Text</button>
+          <button data-mode="view">📖 Present</button>
+      </nav>
+
+      <!-- Dynamic Content Area -->
+      <div id="mode-container">
+          <!-- Content loaded dynamically based on selected mode -->
+      </div>
+
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+      <script type="module" src="./dist/app.js"></script>
+  </body>
+  </html>
+
+  Benefits of This Approach
+
+  ✅ Backward compatibility - Existing users can continue using annotator.html and viewer.html
+
+  ✅ Forward compatibility - New users get the unified workflow via index.html
+
+  ✅ Gradual migration - Can move users to the new interface over time
+
+  ✅ Testing flexibility - Can test the unified app without breaking existing functionality
+
+  ✅ Deployment simplicity - Same codebase serves both old and new interfaces
+
+  URL Structure
+
+  bookchop.app/               # NEW: Unified three-mode workflow
+  bookchop.app/annotator.html # EXISTING: Direct access to annotator
+  bookchop.app/viewer.html    # EXISTING: Direct access to viewer
+  bookchop.app/ocr.html       # NEW: Direct access to OCR mode (optional)
+
+  Recommendation
+
+  I'd go with Option 1 (embed HTML content) because:
+  - Simpler to implement initially
+  - No dynamic loading complexity
+  - Single file deployment
+  - All functionality immediately available
+
+  You could literally copy the <body> content from your existing annotator.html and viewer.html into the appropriate mode containers in the new index.html, then add the mode switching logic.
+
+  This gives you the three-mode workflow while preserving your existing interfaces completely unchanged. Users can choose their preferred way to access the functionality.
+
+> For what it's worth, there are no existing users yet. (Also the app will eventually be hosted not at bookchop.app but at https://chaya.shreevatsa.net/ for what it's worth.) So we're trying to decide on the best structure from scratch; we 
+  don't have to worry about the existing code or structure.
+
+⏺ Perfect! That changes everything - no need for backward compatibility concerns. Let me recommend the cleanest approach from scratch.
+
+  Recommended Structure: Single Unified App
+
+  Since there are no existing users, I'd go with a single HTML file with mode switching:
+
+  chaya.shreevatsa.net/
+  ├── index.html          # Single entry point with all three modes
+  ├── src/
+  │   ├── app.ts         # Main coordinator & mode switching
+  │   ├── modes/
+  │   │   ├── annotator.ts
+  │   │   ├── ocr.ts
+  │   │   └── viewer.ts
+  │   └── shared/
+  │       ├── pdf-utils.ts
+  │       └── data-manager.ts
+  └── dist/              # Built files
+
+  Single HTML Structure
+
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Chaya - Document Processing Pipeline</title>
+      <link href="./dist/output.css" rel="stylesheet">
+  </head>
+  <body class="bg-gray-100">
+      <div class="container mx-auto p-4">
+          <!-- App Header with Mode Navigation -->
+          <header class="mb-6">
+              <h1 class="text-3xl font-bold mb-4">Chaya</h1>
+              <nav class="flex space-x-2 bg-white rounded-lg p-2 shadow-sm">
+                  <button data-mode="annotate" class="mode-btn active">
+                      📝 Mark Regions
+                  </button>
+                  <button data-mode="ocr" class="mode-btn">
+                      🔍 Extract Text
+                  </button>
+                  <button data-mode="view" class="mode-btn">
+                      📖 Present
+                  </button>
+              </nav>
+          </header>
+
+          <!-- Mode 1: Region Marking -->
+          <div id="annotate-mode" class="mode-container">
+              <!-- Current annotator.html content goes here -->
+          </div>
+
+          <!-- Mode 2: OCR & Text Correction -->
+          <div id="ocr-mode" class="mode-container hidden">
+              <!-- New OCR interface -->
+          </div>
+
+          <!-- Mode 3: Presentation Viewer -->
+          <div id="view-mode" class="mode-container hidden">
+              <!-- Current viewer.html content goes here -->
+          </div>
+      </div>
+
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+      <script type="module" src="./dist/app.js"></script>
+  </body>
+  </html>
+
+  TypeScript Architecture
+
+  // src/app.ts - Main coordinator
+  export class ChayaApp {
+      private currentMode: 'annotate' | 'ocr' | 'view' = 'annotate';
+      private documentState = new DocumentState();
+
+      constructor() {
+          this.initializeModeButtons();
+          this.switchToMode('annotate');
+      }
+
+      private async switchToMode(mode: string) {
+          // Hide all modes
+          document.querySelectorAll('.mode-container').forEach(el =>
+              el.classList.add('hidden'));
+
+          // Show target mode
+          document.getElementById(`${mode}-mode`)?.classList.remove('hidden');
+
+          // Initialize mode-specific functionality
+          switch(mode) {
+              case 'annotate':
+                  const { initializeAnnotator } = await import('./modes/annotator.js');
+                  initializeAnnotator(this.documentState);
+                  break;
+              case 'ocr':
+                  const { initializeOCR } = await import('./modes/ocr.js');
+                  initializeOCR(this.documentState);
+                  break;
+              case 'view':
+                  const { initializeViewer } = await import('./modes/viewer.js');
+                  initializeViewer(this.documentState);
+                  break;
+          }
+      }
+  }
+
+  // Initialize app
+  new ChayaApp();
+
+  Benefits of Single HTML Approach
+
+  ✅ Simpler deployment - One file, one URL
+  ✅ Seamless mode switching - No page reloads
+  ✅ Shared state - Document data persists across modes
+  ✅ Better UX - Users see the full workflow progression
+  ✅ Easier to maintain - Single entry point
+  ✅ URL routing - Can add #annotate, #ocr, #view for direct links
+
+  URL Structure
+
+  chaya.shreevatsa.net/           # Main app (defaults to annotate mode)
+  chaya.shreevatsa.net/#annotate  # Direct link to annotate mode
+  chaya.shreevatsa.net/#ocr       # Direct link to OCR mode
+  chaya.shreevatsa.net/#view      # Direct link to view mode
+
+  Implementation Steps
+
+  1. Create single index.html with mode containers
+  2. Move existing annotator/viewer content into respective mode divs
+  3. Create app.ts with mode switching logic
+  4. Refactor existing TS files into modes/ directory
+  5. Add shared state management for document data
+  6. Build Mode 2 (OCR) as new functionality
+
+  This gives you the cleanest possible architecture - a single cohesive app that naturally guides users through the three-mode workflow, with no legacy concerns to worry about.
+
+  Would you like me to start implementing this structure?
+
+> No let's think about the modes more first. These are the things that I'd like to do:
+
+  - Take a PDF and mark out regions on it (this is what the annotator.html does already)
+  - OCR these regions + add structure around these regions (e.g. headings, paragraphs, verses, footnotes -- here maybe I can use Prosemirror),
+  - view the result (like a nicely digitized version of the PDF)
+
+  It would be nice to be able to go back and forth, for any region, between the three views: the location in the original PDF, the editor view where we can edit the equivalent text etc (proofreading / structuring / markup), and the final 
+  rendered view.
+
+  What modes should there exist, and should we even call them modes, and should we call them annotate, ocr, view?
+
+· Crafting… (4s · ↑ 0 tokens · esc to interrupt)
+
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                                                                                                                                                 │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-  ⏵⏵ auto-accept edits on (shift+tab to cycle)
-
-
+  ⏵⏵ auto-accept edits on (shift+tab to cycle)                                                                                               ✗ Auto-update failed · Try claude doctor or cd ~/.claude/local && npm update @anthropic-ai/claude-code
 
 
 
