@@ -10788,12 +10788,60 @@
 
   The unified application successfully maintains all existing functionality while providing the foundation for the three-mode workflow described in the CHAYA_WORKFLOW.md document.
 
+> Can you remove the old annotator.html and viewer.html and so on?
+
+⏺ Absolutely! Let me remove the old HTML files since they're no longer needed with the unified application.
+
+⏺ List(.)
+  ⎿  Listed 41 paths (ctrl+r to expand)
+
+⏺ I can see the old HTML files that need to be removed. Let me delete them:
+
+⏺ Bash(rm annotator.html viewer.html)
+  ⎿  (No content)
+
+⏺ Now let me also remove the old standalone TypeScript files in the src directory since they've been integrated into the unified structure:
+
+⏺ Bash(rm src/annotator.ts src/viewer.ts)
+  ⎿  (No content)
+
+⏺ Let me verify the files have been removed:
+
+⏺ List(.)
+  ⎿  Listed 37 paths (ctrl+r to expand)
+
+⏺ Perfect! Let me also build the project to make sure everything still works correctly after removing the old files:
+
+⏺ Bash(npm run build)
+  ⎿  > bookchop@1.0.0 build                                                   
+     > tsc && ./node_modules/.bin/postcss ./src/input.css -o ./dist/output.css
+
+⏺ Excellent! The build completed successfully.
+
+  ✅ Cleanup Complete
+
+  I've successfully removed the old files:
+  - annotator.html - Old standalone annotator interface
+  - viewer.html - Old standalone viewer interface
+  - src/annotator.ts - Old standalone annotator script
+  - src/viewer.ts - Old standalone viewer script
+
+  The project now has a clean, unified structure:
+  - index.html - Single unified application entry point
+  - src/app.ts - Main application coordinator
+  - src/modes/annotator.ts - Mark tab functionality
+  - src/modes/viewer.ts - Read tab functionality
+
+  The build system works correctly and the application maintains all functionality in the new unified structure. The codebase is now cleaner and follows the three-tab workflow architecture we designed.
+
+> Ok great, what's the next step?
+
+✳ Crafting… (0s · ↑ 0 tokens · esc to interrupt)
+
 ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                                                                                                                                                 │
 ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
   ⏵⏵ auto-accept edits on (shift+tab to cycle)                                                                                               ✗ Auto-update failed · Try claude doctor or cd ~/.claude/local && npm update @anthropic-ai/claude-code
-
-
 
 
 
