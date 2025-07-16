@@ -81,6 +81,23 @@ class ChayaApp {
             targetBtn.classList.remove('text-gray-600', 'hover:text-gray-800');
         }
 
+        // If we have loaded data, notify the newly active tab
+        if (this.state.documentLoaded && this.state.pdfDocument) {
+            console.log(`Notifying newly active ${tab} tab with existing data`);
+            const tabDataEvent = new CustomEvent(`${tab}TabDataReady`, {
+                detail: {
+                    pdfDocument: this.state.pdfDocument,
+                    annotations: this.state.loadedAnnotations,
+                    annotationsFileName: this.state.loadedAnnotationsFileName,
+                    pdfFileName: this.state.pdfFile?.name
+                }
+            });
+            // Use setTimeout to ensure the tab switch visual update happens first
+            setTimeout(() => {
+                document.dispatchEvent(tabDataEvent);
+            }, 100);
+        }
+
         console.log(`Switched to ${tab} tab`);
     }
 
@@ -162,13 +179,13 @@ class ChayaApp {
 
             // Load PDF
             const pdfArrayBuffer = await this.readFileAsArrayBuffer(this.state.pdfFile);
-            this.updateLoadingProgress(30, 'Processing PDF...', 'Initializing PDF.js...');
+            this.updateLoadingProgress(10, 'Processing PDF...', 'Initializing PDF.js...');
 
             const pdfjs = await waitForPdfjs();
             const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
             this.state.pdfDocument = await loadingTask.promise;
 
-            this.updateLoadingProgress(70, 'Loading annotations...', 'Processing annotation file...');
+            this.updateLoadingProgress(20, 'Loading annotations...', 'Processing annotation file...');
 
             // Load annotations if provided
             if (this.state.annotationsFile) {
@@ -180,19 +197,17 @@ class ChayaApp {
                 this.state.loadedAnnotationsFileName = null;
             }
 
-            this.updateLoadingProgress(100, 'Complete!', 'Files loaded successfully');
+            this.updateLoadingProgress(30, 'Rendering pages...', 'Processing PDF pages for display');
             
             // Mark as loaded
             this.state.documentLoaded = true;
             this.state.hasUnsavedChanges = false;
 
-            // Notify tabs that data is ready
+            // Notify tabs that data is ready and wait for rendering to complete
             this.notifyTabsDataReady();
-
-            // Hide loading after a short delay
-            setTimeout(() => {
-                loadingDiv.classList.add('hidden');
-            }, 1000);
+            
+            // Listen for rendering completion
+            this.waitForRenderingComplete();
 
         } catch (error) {
             console.error('Error loading files:', error);
@@ -203,7 +218,7 @@ class ChayaApp {
         }
     }
 
-    private updateLoadingProgress(percent: number, text: string, details: string): void {
+    public updateLoadingProgress(percent: number, text: string, details: string): void {
         const loadingText = document.getElementById('app-loading-text') as HTMLSpanElement;
         const loadingPercent = document.getElementById('app-loading-percent') as HTMLSpanElement;
         const progressBar = document.getElementById('app-progress-bar') as HTMLDivElement;
@@ -244,9 +259,53 @@ class ChayaApp {
         });
     }
 
+    private waitForRenderingComplete(): void {
+        // Listen for rendering completion from the active tab
+        const handleRenderingComplete = (event: Event) => {
+            const customEvent = event as CustomEvent;
+            const { tabName, totalPages, error } = customEvent.detail;
+            
+            if (error) {
+                console.error(`Rendering failed for ${tabName} tab: ${error}`);
+            } else {
+                console.log(`Rendering complete for ${tabName} tab: ${totalPages} pages`);
+            }
+            
+            // Hide loading after a short delay (progress should already be at 100% with "Complete!" text)
+            const loadingDiv = document.getElementById('app-loading') as HTMLDivElement;
+            setTimeout(() => {
+                console.log('Hiding loading progress bar');
+                loadingDiv.classList.add('hidden');
+            }, 1000);
+            
+            // Remove the event listener
+            document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
+        };
+        
+        document.addEventListener('tabRenderingComplete', handleRenderingComplete);
+        
+        // Add a timeout in case rendering gets stuck
+        const timeoutId = setTimeout(() => {
+            console.warn('Rendering timeout - hiding progress bar anyway');
+            const loadingDiv = document.getElementById('app-loading') as HTMLDivElement;
+            loadingDiv.classList.add('hidden');
+            document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
+        }, 300000); // 5 minutes timeout
+        
+        // Store timeout ID to cancel it when rendering completes normally
+        const originalHandler = handleRenderingComplete;
+        const wrappedHandler = (event: Event) => {
+            clearTimeout(timeoutId);
+            originalHandler(event);
+        };
+        
+        document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
+        document.addEventListener('tabRenderingComplete', wrappedHandler);
+    }
+
     private notifyTabsDataReady(): void {
-        // Dispatch custom events to notify tabs that data is ready
-        const dataReadyEvent = new CustomEvent('appDataReady', {
+        // Only notify the currently active tab to avoid conflicts
+        const activeTabEvent = new CustomEvent(`${this.state.currentTab}TabDataReady`, {
             detail: {
                 pdfDocument: this.state.pdfDocument,
                 annotations: this.state.loadedAnnotations,
@@ -254,8 +313,9 @@ class ChayaApp {
                 pdfFileName: this.state.pdfFile?.name
             }
         });
+        document.dispatchEvent(activeTabEvent);
         
-        document.dispatchEvent(dataReadyEvent);
+        console.log(`Notified ${this.state.currentTab} tab that data is ready`);
     }
 
     // Public methods for tabs to access shared state

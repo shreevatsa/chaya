@@ -19,8 +19,8 @@ export function initializeViewer(): void {
         return;
     }
 
-    // Listen for centralized data ready event
-    document.addEventListener('appDataReady', (event: Event) => {
+    // Listen for read tab specific data ready event
+    document.addEventListener('readTabDataReady', (event: Event) => {
         const customEvent = event as CustomEvent;
         const { pdfDocument, annotations, annotationsFileName, pdfFileName } = customEvent.detail;
         handleDataReady(pdfDocument, annotations, annotationsFileName, pdfFileName);
@@ -68,6 +68,15 @@ export function initializeViewer(): void {
         
         loadingMessage.textContent = '';
         console.log('All annotation regions extracted successfully');
+        
+        // Notify app that rendering is complete
+        const renderingCompleteEvent = new CustomEvent('tabRenderingComplete', {
+            detail: {
+                tabName: 'read',
+                totalPages: annotations.length
+            }
+        });
+        document.dispatchEvent(renderingCompleteEvent);
     }
 
     // Extract a cropped region from a page canvas for a specific annotation

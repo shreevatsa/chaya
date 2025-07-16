@@ -39,8 +39,8 @@ export function initializeAnnotator(): void {
         return;
     }
 
-    // Listen for centralized data ready event
-    document.addEventListener('appDataReady', (event: Event) => {
+    // Listen for mark tab specific data ready event
+    document.addEventListener('markTabDataReady', (event: Event) => {
         const customEvent = event as CustomEvent;
         const { pdfDocument, annotations: loadedAnnotations, annotationsFileName, pdfFileName } = customEvent.detail;
         handleDataReady(pdfDocument, loadedAnnotations, annotationsFileName, pdfFileName);
@@ -70,14 +70,56 @@ export function initializeAnnotator(): void {
     
     async function renderPdfPages(pdfDocument: any, container: HTMLDivElement): Promise<void> {
         const containerWidth = container.offsetWidth;
+        const totalPages = pdfDocument.numPages;
         
-        for (let i = 1; i <= pdfDocument.numPages; i++) {
-            await renderPage(pdfDocument, i, containerWidth);
-        }
+        console.log(`Starting to render ${totalPages} pages...`);
         
-        // Render loaded annotations if any
-        if (annotations.length > 0) {
-            renderLoadedAnnotations();
+        try {
+            for (let i = 1; i <= totalPages; i++) {
+                // Update progress during rendering (30% to 100% = 70% of the progress bar)
+                const progress = 30 + (70 * i / totalPages);
+                const isLastPage = i === totalPages;
+                const statusText = isLastPage ? 'Complete!' : `Rendering page ${i} of ${totalPages}...`;
+                const detailText = isLastPage ? 'PDF ready for annotation' : `Processing page ${i}`;
+                
+                console.log(`Rendering page ${i}/${totalPages}, progress: ${progress.toFixed(1)}%`);
+                updateAppProgress(progress, statusText, detailText);
+                
+                await renderPage(pdfDocument, i, containerWidth);
+                console.log(`Page ${i} rendered successfully`);
+            }
+            
+            console.log(`All ${totalPages} pages rendered successfully`);
+            
+            // Render loaded annotations if any
+            if (annotations.length > 0) {
+                console.log('Rendering loaded annotations...');
+                renderLoadedAnnotations();
+            }
+            
+            // Notify app that rendering is complete (but don't update progress since we already did)
+            console.log('Dispatching rendering complete event');
+            const renderingCompleteEvent = new CustomEvent('tabRenderingComplete', {
+                detail: {
+                    tabName: 'mark',
+                    totalPages: totalPages
+                }
+            });
+            document.dispatchEvent(renderingCompleteEvent);
+            
+        } catch (error) {
+            console.error('Error during PDF page rendering:', error);
+            updateAppProgress(0, 'Error rendering pages', `Failed at page: ${error}`);
+            
+            // Still notify completion even on error
+            const errorEvent = new CustomEvent('tabRenderingComplete', {
+                detail: {
+                    tabName: 'mark',
+                    totalPages: totalPages,
+                    error: error
+                }
+            });
+            document.dispatchEvent(errorEvent);
         }
     }
     
@@ -168,6 +210,13 @@ export function initializeAnnotator(): void {
         const chayaApp = (window as any).chayaApp;
         if (chayaApp) {
             chayaApp.updateAnnotations(annotations);
+        }
+    }
+
+    function updateAppProgress(percent: number, text: string, details: string): void {
+        const chayaApp = (window as any).chayaApp;
+        if (chayaApp && chayaApp.updateLoadingProgress) {
+            chayaApp.updateLoadingProgress(percent, text, details);
         }
     }
 
