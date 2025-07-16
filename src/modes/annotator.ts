@@ -322,51 +322,6 @@ export function initializeAnnotator(): void {
         setupAnnotationDrawing(annotationLayer, pageDiv, pageNumber);
     }
 
-    function loadAnnotationsFromJson(jsonData: any): void {
-        try {
-            // Check for unsaved changes before loading new annotations
-            if (hasUnsavedChanges && annotations.length > 0) {
-                const confirmed = confirm(
-                    'You have unsaved annotations that will be lost when loading new annotations. ' +
-                    'Do you want to continue loading the new annotations file?\n\n' +
-                    'Click OK to proceed (current annotations will be lost), or Cancel to keep current annotations.'
-                );
-                if (!confirmed) {
-                    return; // User chose to keep current annotations
-                }
-            }
-
-            // Use shared parsing function
-            const parsedAnnotations = parseAnnotationsFromJson(jsonData);
-
-            // Clear existing annotations and use parsed ones
-            annotations = parsedAnnotations;
-
-            console.log('Loaded annotations:', annotations);
-
-            // Clear all existing annotation boxes before rendering new ones
-            const existingBoxes = document.querySelectorAll('.annotation-box');
-            existingBoxes.forEach(box => box.remove());
-
-            // If PDF is already loaded, render the annotations
-            if (pdfContainer.children.length > 0) {
-                renderLoadedAnnotations();
-            } else {
-                // Store for when PDF is loaded
-                loadedAnnotations = jsonData;
-            }
-
-            // Update the annotation list
-            updateAnnotationList();
-
-            // Reset unsaved changes flag since we've loaded new data
-            hasUnsavedChanges = false;
-
-        } catch (error) {
-            console.error('Error loading annotations:', error);
-            alert('Error loading annotations: ' + error);
-        }
-    }
 
     function renderLoadedAnnotations(): void {
         annotations.forEach(annotation => {
