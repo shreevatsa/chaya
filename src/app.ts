@@ -465,8 +465,8 @@ class ChayaApp {
             const annotationsData = this.createAnnotationsJSON();
             zip.file("annotations.json", JSON.stringify(annotationsData, null, 2));
             
-            // Generate ZIP file
-            const chayaBlob = await zip.generateAsync({
+            // Generate ZIP file with proper MIME type
+            const zipBlob = await zip.generateAsync({
                 type: "blob",
                 compression: "DEFLATE",
                 compressionOptions: {
@@ -474,8 +474,13 @@ class ChayaApp {
                 }
             });
             
-            // Download the .chaya file
-            const fileName = this.state.pdfFile.name.replace(/\.pdf$/i, '.chaya');
+            // Create blob with application/zip MIME type to help browsers recognize it
+            const chayaBlob = new Blob([zipBlob], { type: 'application/zip' });
+            
+            // Download the .chaya file (use .zip for local development to avoid browser blocks)
+            const isDevelopment = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '[::1]';
+            const extension = isDevelopment ? '.chaya.zip' : '.chaya';
+            const fileName = this.state.pdfFile.name.replace(/\.pdf$/i, extension);
             const url = URL.createObjectURL(chayaBlob);
             const a = document.createElement('a');
             a.href = url;
@@ -484,6 +489,12 @@ class ChayaApp {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            
+            // Mark as saved since we just exported everything
+            this.state.hasUnsavedChanges = false;
+            
+            // Also notify the annotator that changes have been saved
+            this.notifyTabsSaved();
             
             console.log('Successfully created .chaya file:', fileName);
             
@@ -620,8 +631,19 @@ class ChayaApp {
         this.state.hasUnsavedChanges = true;
     }
 
+    public syncAnnotations(annotations: SharedAnnotation[]): void {
+        // Update annotations without marking as unsaved (for sync operations)
+        this.state.loadedAnnotations = annotations;
+    }
+
     public markAsSaved(): void {
         this.state.hasUnsavedChanges = false;
+    }
+
+    private notifyTabsSaved(): void {
+        // Dispatch event to notify tabs that data has been saved
+        const savedEvent = new CustomEvent('documentSaved');
+        document.dispatchEvent(savedEvent);
     }
 
     private async initializeMarkTab(): Promise<void> {

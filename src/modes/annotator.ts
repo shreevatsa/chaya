@@ -45,6 +45,12 @@ export function initializeAnnotator(): void {
         handleDataReady(pdfDocument, loadedAnnotations, annotationsFileName, pdfFileName);
     });
 
+    // Listen for document saved event to reset unsaved changes flag
+    document.addEventListener('documentSaved', () => {
+        hasUnsavedChanges = false;
+        console.log('Mark tab: Document saved, unsaved changes flag reset');
+    });
+
     // Set up event listeners
     setupEventListeners();
     
@@ -131,7 +137,11 @@ export function initializeAnnotator(): void {
     function syncWithAppState(): void {
         const chayaApp = (window as any).chayaApp;
         if (chayaApp) {
-            chayaApp.updateAnnotations(annotations);
+            if (hasUnsavedChanges) {
+                chayaApp.updateAnnotations(annotations);
+            } else {
+                chayaApp.syncAnnotations(annotations);
+            }
         }
     }
 
