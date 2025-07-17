@@ -133,7 +133,7 @@ Used custom events for tab communication:
 ### Phase 2 Possibilities
 1. **Web Launcher** - Standalone page for opening .chaya files
 2. **Browser Extension** - Native file association for .chaya files
-3. **Application Bundling** - Embed Bookchop app inside .chaya files
+3. **Application Bundling** - Embed Chaya app inside .chaya files
 4. **Enhanced Metadata** - Version tracking, creation timestamps
 5. **Edit Tab Implementation** - ProseMirror integration with region references
 

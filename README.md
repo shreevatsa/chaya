@@ -1,11 +1,11 @@
-# bookchop
+# Chaya
 
-`bookchop` is a client-side web tool for annotating regions in PDF documents and viewing them.
+**Chaya** is a client-side web application for document processing with a three-mode workflow: region annotation, text extraction, and presentation viewing.
 
 ## Features
 
-### Annotator (`annotator.html`)
-- **PDF Upload & Rendering**: Load any PDF file for annotation using PDF.js
+### 📝 Mark Tab
+- **PDF Upload & Rendering**: Load PDF files or existing .chaya packages using PDF.js
 - **Interactive Annotation Creation**: Draw bounding boxes by clicking and dragging
 - **AI-Assisted Annotation**: Use Gemini API to automatically generate annotations with customizable prompts
 - **Resizable & Movable Annotations**: Select annotations to resize (8 handles) or drag to reposition
@@ -15,10 +15,14 @@
   - Bidirectional hover highlighting between PDF and sidebar
   - Individual delete buttons for each annotation
 - **Label Editing**: Double-click annotations to edit labels
-- **Save/Load Workflow**: Save annotations as JSON files and reload them for further editing
+- **Save/Load Workflow**: Save annotations as .chaya files and reload them for further editing
 - **Resolution Independence**: All coordinates stored as fractions for consistent display
 
-### Viewer (`viewer.html`)
+### ✏️ Edit Tab
+- **Coming Soon**: OCR and text correction functionality
+- **Planned Features**: Region-by-region text extraction and proofreading
+
+### 📖 Read Tab
 - **Cropped Region Display**: Extract and display only the annotated regions from PDFs
 - **Navigation**: Quick navigation between annotation regions with hover highlighting
 - **Annotation Summary**: Overview of all loaded annotations with click-to-scroll functionality
@@ -36,7 +40,7 @@
    npm test
    ```
 
-3. **Open `annotator.html`** in your browser and start annotating!
+3. **Open `index.html`** in your browser and start using Chaya!
 
 ## Usage Guide
 
@@ -72,10 +76,10 @@
 - **Save**: Click "Save Annotations" to download a JSON file named after your PDF
 - **Load**: Use "Load Existing Annotations" to continue editing previously saved work
 
-### Using the Viewer
-1. Open `viewer.html` in your browser
-2. Upload both a PDF file and its corresponding annotations JSON file
-3. Click "Load and View" to extract annotated regions
+### Using the Read Tab
+1. Open `index.html` in your browser
+2. Upload a PDF file or .chaya package
+3. Navigate to the Read tab to view annotated regions
 4. Use the navigation buttons to jump between regions
 5. Hover over navigation buttons to highlight regions
 
@@ -102,9 +106,9 @@
 - **Playwright**: Browser automation testing
 - **Gemini API**: AI-powered annotation generation
 
-## Data Format (`annotations.json`)
+## Data Format (`.chaya` files)
 
-The "contract" between the annotator and the viewer is the `annotations.json` file. This file stores the user-generated data.
+The Chaya application uses `.chaya` files (ZIP archives) to store PDF documents and their annotations. The annotation data within these files stores the user-generated region information.
 
 ### Structure
 
@@ -141,10 +145,12 @@ The "contract" between the annotator and the viewer is the `annotations.json` fi
 
 ### Project Structure
 ```
-bookchop/
+chaya/
 ├── src/
-│   ├── annotator.ts      # Main annotation functionality
-│   ├── viewer.ts         # Cropped region viewer
+│   ├── app.ts            # Main application entry point
+│   ├── modes/
+│   │   ├── annotator.ts  # Mark tab functionality
+│   │   └── viewer.ts     # Read tab functionality
 │   ├── ai-engine.ts      # Headless AI annotation engine
 │   ├── ai-orchestrator.ts # Browser-AI integration layer
 │   ├── pdf-utils.ts      # Shared PDF.js utilities
@@ -153,8 +159,7 @@ bookchop/
 ├── tests/
 │   └── basic.spec.ts     # Playwright browser tests
 ├── dist/                 # Built JavaScript and CSS
-├── annotator.html        # Annotation interface
-├── viewer.html           # Viewer interface
+├── index.html            # Main application interface
 └── test.pdf              # Sample PDF for testing
 ```
 
@@ -167,11 +172,12 @@ bookchop/
 ### Code Organization
 
 #### Core Modules
-1. **Annotator** (`src/annotator.ts`): Main annotation interface with PDF rendering, interactive creation, editing, and management
-2. **Viewer** (`src/viewer.ts`): Cropped region extraction and display for annotation review
-3. **AI Engine** (`src/ai-engine.ts`): Headless AI annotation service with pluggable engine architecture
-4. **AI Orchestrator** (`src/ai-orchestrator.ts`): Browser integration layer handling prompts, API keys, and few-shot examples
-5. **PDF Utils** (`src/pdf-utils.ts`): Shared utilities for PDF.js initialization and annotation parsing
+1. **App** (`src/app.ts`): Main application orchestration and tab management
+2. **Annotator** (`src/modes/annotator.ts`): Mark tab functionality with PDF rendering, interactive creation, editing, and management
+3. **Viewer** (`src/modes/viewer.ts`): Read tab functionality for cropped region extraction and display
+4. **AI Engine** (`src/ai-engine.ts`): Headless AI annotation service with pluggable engine architecture
+5. **AI Orchestrator** (`src/ai-orchestrator.ts`): Browser integration layer handling prompts, API keys, and few-shot examples
+6. **PDF Utils** (`src/pdf-utils.ts`): Shared utilities for PDF.js initialization and annotation parsing
 
 #### Key Systems
 - **PDF Rendering**: Canvas-based rendering with annotation overlay layers

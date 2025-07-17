@@ -1,7 +1,7 @@
 # .chaya Format Implementation Plan
 
 ## Overview
-Implementation plan for creating self-contained `.chaya` files that package the PDF, annotations, and Bookchop application together in a single ZIP-based format (similar to EPUB or Office documents).
+Implementation plan for creating self-contained `.chaya` files that package the PDF, annotations, and Chaya application together in a single ZIP-based format (similar to EPUB or Office documents).
 
 ## Architecture Goals
 - **Single-file portability**: Everything in one `.chaya` file
@@ -64,7 +64,7 @@ async function exportAsChayaFile() {
 <!-- New file: launcher.html -->
 <!DOCTYPE html>
 <html>
-<head><title>Bookchop Launcher</title></head>
+<head><title>Chaya Launcher</title></head>
 <body>
   <div id="upload-zone">
     <h1>Open .chaya File</h1>
@@ -107,7 +107,7 @@ export async function loadChayaFile(file: File): Promise<void> {
 ```typescript
 // Add to existing files
 enum AppMode {
-  STANDALONE = 'standalone',  // Normal bookchop.app usage
+  STANDALONE = 'standalone',  // Normal chaya.app usage
   EMBEDDED = 'embedded'       // Running from .chaya file
 }
 
@@ -143,7 +143,7 @@ function initializeApp() {
 // New: extension/manifest.json
 {
   "manifest_version": 3,
-  "name": "Bookchop File Handler",
+  "name": "Chaya File Handler",
   "version": "1.0",
   "permissions": ["activeTab"],
   "action": {
@@ -162,7 +162,7 @@ function initializeApp() {
 // Detect .chaya file access
 if (location.href.endsWith('.chaya')) {
   // Redirect to web launcher
-  const launcherUrl = `https://bookchop.app/launcher?fileUrl=${encodeURIComponent(location.href)}`;
+  const launcherUrl = `https://chaya.app/launcher?fileUrl=${encodeURIComponent(location.href)}`;
   location.replace(launcherUrl);
 }
 ```
@@ -198,7 +198,7 @@ module.exports = {
 ## Phase 6: File Structure Changes
 
 ```
-bookchop/
+chaya/
 ├── src/
 │   ├── annotator.ts          # Modified: add export functionality
 │   ├── viewer.ts             # Modified: add embedded mode
@@ -222,7 +222,7 @@ bookchop/
 
 ### 7.1 Website Structure
 ```
-bookchop.app/
+chaya.app/
 ├── /                         # Existing annotator
 ├── /viewer                   # Existing viewer  
 ├── /launcher                 # New: .chaya file opener
@@ -241,8 +241,8 @@ bookchop.app/
 document.chaya  (ZIP file)
 ├── manifest.json     # Metadata, version info
 ├── app/
-│   ├── index.html    # Bookchop annotator
-│   ├── viewer.html   # Bookchop viewer  
+│   ├── index.html    # Chaya annotator
+│   ├── viewer.html   # Chaya viewer  
 │   ├── app.js        # All JavaScript bundled
 │   └── app.css       # All styles bundled
 ├── document.pdf      # Original PDF (no encoding overhead!)
@@ -257,7 +257,7 @@ document.chaya  (ZIP file)
   "originalFilename": "document.pdf",
   "chayaFormatVersion": "1.0",
   "application": {
-    "name": "Bookchop",
+    "name": "Chaya",
     "version": "1.0.0"
   }
 }
@@ -268,12 +268,12 @@ document.chaya  (ZIP file)
 ### Flow 1: With Extension (Seamless)
 1. User double-clicks `document.chaya`
 2. Extension captures the file
-3. Extension opens `bookchop.app/launcher` with file reference
+3. Extension opens `chaya.app/launcher` with file reference
 4. Web app loads the file directly
 5. **Result**: Native file association experience
 
 ### Flow 2: Without Extension (Still Works)
-1. User visits `bookchop.app/launcher`
+1. User visits `chaya.app/launcher`
 2. User drags/uploads `document.chaya` file
 3. Web app unzips and loads embedded app
 4. **Result**: Universal access, no installation required

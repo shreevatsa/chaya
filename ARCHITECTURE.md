@@ -4,15 +4,24 @@
 
 ### Main Components
 
-#### 1. PDF Rendering System
-- **Entry Point**: `renderPage()` function in `annotator.ts`
+#### 1. Unified Application Structure
+- **Entry Point**: `index.html` with tab-based navigation
+- **App Orchestration**: `src/app.ts` manages tab switching and data flow
 - **Dependencies**: PDF.js (loaded via CDN)
+- **Key Concepts**:
+  - Single HTML file with three functional tabs
+  - Event-driven communication between tabs
+  - Unified document loading (.chaya files and PDFs)
+  - Fractional coordinate system (0.0-1.0) for resolution independence
+
+#### 2. PDF Rendering System
+- **Implementation**: Shared across Mark and Read tabs
 - **Key Concepts**:
   - Each PDF page becomes a `<div class="page">` container
   - Canvas element for PDF rendering
-  - Annotation overlay layer for interactive elements
-  - AI annotation button per page
-  - Fractional coordinate system (0.0-1.0) for resolution independence
+  - Annotation overlay layer for interactive elements (Mark tab)
+  - AI annotation button per page (Mark tab)
+  - Cropped region extraction (Read tab)
 
 #### 2. Annotation Creation Pipeline  
 ```
@@ -40,53 +49,71 @@ AI: User clicks AI button → Prompt dialog → API call → Parse response → 
 - **Label Editing**: Double-click to edit annotation labels
 - **Bidirectional Highlighting**: Hover effects between PDF and sidebar
 
-#### 4. Annotation Management
+#### 4. Tab Management System
+- **Tab Navigation**: Three tabs (Mark, Edit, Read) with unified interface
+- **Data Flow**: Events coordinate data sharing between tabs
+- **State Management**: Each tab maintains its own state while sharing document data
+- **Mark Tab**: Annotation creation and editing
+- **Edit Tab**: OCR and text correction (coming soon)
+- **Read Tab**: Presentation and review of annotated regions
+
+#### 5. Annotation Management
 - **Reactive UI**: List automatically rebuilds when annotations change
 - **Organization**: Annotations grouped by page number
 - **Interactions**: Click to select, hover to highlight, delete buttons
 - **Navigation**: Click sidebar items to scroll to annotations
 - **Individual Operations**: Delete buttons for removing specific annotations
 
-#### 5. AI Engine Architecture
+#### 6. AI Engine Architecture
 - **Pluggable Design**: Abstract `AIEngine` interface allows different AI providers
 - **Current Implementation**: `GeminiEngine` with Google Gemini API
 - **Request Structure**: Base64 images, prompts, optional few-shot examples
 - **Response Parsing**: Structured JSON with fallback to markdown extraction
 - **Error Handling**: User-friendly error messages and retry logic
 
-#### 6. AI Orchestrator
+#### 7. AI Orchestrator
 - **Browser Integration**: Bridges UI interactions with headless AI engine
 - **State Management**: API key persistence, prompt dialogs, loading states
 - **Few-shot Examples**: Automatically gathers examples from previously annotated pages
 - **Coordinate Validation**: Ensures AI-generated coordinates are within valid bounds
 
-#### 7. Viewer System
+#### 8. Read Tab (Viewer System)
 - **Cropped Extraction**: `extractAnnotationRegion()` creates canvas crops of annotations
 - **Region Display**: Shows only annotated portions with labels and page info
 - **Navigation**: Quick-jump buttons with hover highlighting
-- **File Loading**: Separate interface for PDF + JSON file pairs
+- **Integration**: Shares data with Mark tab through unified document loading
 
-#### 8. Serialization System
-- **Save Format**: JSON with metadata + annotations grouped by page
+#### 9. Serialization System
+- **Save Format**: .chaya files (ZIP archives) containing PDF and JSON annotations
 - **Load Process**: Validation → data extraction → visual rendering
-- **Filename Convention**: Uses original PDF filename with `.json` extension
+- **Filename Convention**: Uses original PDF filename with `.chaya` extension
 - **Shared Utilities**: `pdf-utils.ts` provides parsing and validation functions
 
 ### State Management
 
-#### Global State Variables
+#### Application State
 ```typescript
+// App-level state (src/app.ts)
+let currentTab: string = 'mark';              // Active tab
+let loadedPdfDocument: any = null;            // Shared PDF document
+let loadedAnnotations: Annotation[] = [];     // Shared annotation data
+
+// Mark tab state (src/modes/annotator.ts)
 let annotations: Annotation[] = [];           // Master annotation data
 let selectedAnnotation: HTMLDivElement | null = null;  // Currently selected DOM element
 let selectedAnnotationData: Annotation | null = null;  // Currently selected data
 let isResizing: boolean = false;              // Resize operation state
 let isDragging: boolean = false;              // Drag operation state
+
+// Read tab state (src/modes/viewer.ts)
+let loadedAnnotations: Annotation[] = [];     // Local copy for display
 ```
 
 #### Data Flow
 1. **User Action** → **Event Handler** → **State Update** → **DOM Update** → **List Update**
-2. All state changes trigger `updateAnnotationList()` to keep UI in sync
-3. Coordinate conversions happen at interaction boundaries (user input → data storage)
+2. **Tab Communication**: Custom events coordinate data sharing between tabs
+3. All state changes trigger respective update functions to keep UI in sync
+4. Coordinate conversions happen at interaction boundaries (user input → data storage)
 
 ### Key Design Patterns
 
@@ -152,11 +179,11 @@ interface Annotation {
 
 ### Extension Points
 
-#### Adding New Annotation Types
-1. Extend `Annotation` interface with new properties
-2. Update serialization format (increment version number)
-3. Add new interaction handlers in `makeAnnotationInteractive()`
-4. Update annotation list display in `updateAnnotationList()`
+#### Adding New Tabs
+1. Create new mode file in `src/modes/` directory
+2. Add tab UI elements to `index.html`
+3. Register tab in `src/app.ts` tab management system
+4. Implement data sharing events if needed
 
 #### Adding New File Formats
 1. Create new serialization functions following existing pattern
@@ -185,10 +212,10 @@ interface Annotation {
 - **Cross-Browser**: Can be configured for multiple browser engines
 
 #### Test Organization
-- **Basic Functionality**: PDF loading, annotation creation, UI presence
-- **Interactive Features**: Resize/drag functionality, selection
-- **Data Integrity**: Save/load workflows, coordinate conversion
-- **Error Handling**: Invalid inputs, edge cases
+- **Basic Functionality**: PDF loading, annotation creation, UI presence, tab switching
+- **Interactive Features**: Resize/drag functionality, selection, tab navigation
+- **Data Integrity**: Save/load workflows, coordinate conversion, .chaya file handling
+- **Error Handling**: Invalid inputs, edge cases, tab communication failures
 
 #### Continuous Integration Ready
 - **Headless Mode**: Tests run without GUI for CI/CD

@@ -1,13 +1,13 @@
 # Three-Mode Document Processing Workflow
 
 ## Overview
-Evolution of Bookchop from a simple annotation tool into a comprehensive document digitization pipeline with three distinct modes for processing documents from raw PDF to polished HTML presentation.
+Chaya is a comprehensive document digitization pipeline with three distinct modes for processing documents from raw PDF to polished HTML presentation.
 
 ## Application Modes
 
 ### **Mode 1: Region Marking & Classification**
 **Purpose**: Spatial layout and semantic meaning  
-**Current State**: Enhanced version of `annotator.html`
+**Current State**: Implemented in Mark tab of unified application
 
 #### Functionality:
 - Upload PDF or existing .chaya file
@@ -40,7 +40,7 @@ Evolution of Bookchop from a simple annotation tool into a comprehensive documen
 
 ### **Mode 2: OCR & Text Correction**
 **Purpose**: Text extraction and accuracy  
-**Current State**: New functionality to be built
+**Current State**: Planned for Edit tab (not yet implemented)
 
 #### Functionality:
 - Take classified regions from Mode 1
@@ -75,7 +75,7 @@ Evolution of Bookchop from a simple annotation tool into a comprehensive documen
 
 ### **Mode 3: Presentation Viewer**
 **Purpose**: Final document presentation and export  
-**Current State**: Evolution of `viewer.html`
+**Current State**: Implemented in Read tab of unified application
 
 #### Functionality:
 - Beautiful HTML rendering of processed document
@@ -115,11 +115,13 @@ Evolution of Bookchop from a simple annotation tool into a comprehensive documen
 
 ### **File Organization:**
 ```
-bookchop.app/
-├── /                    # Mode 1: Region marking & classification
-├── /ocr                 # Mode 2: OCR & text correction
-├── /view               # Mode 3: Presentation viewer
-└── /launcher           # .chaya file opener
+chaya/
+├── index.html          # Unified application with three tabs
+├── src/app.ts          # Main application orchestration
+├── src/modes/
+│   ├── annotator.ts    # Mode 1: Region marking & classification
+│   └── viewer.ts       # Mode 3: Presentation viewer
+└── [Edit mode planned for future implementation]
 ```
 
 ### **Navigation Flow:**
@@ -219,21 +221,22 @@ Upload PDF/Chaya → Mark Regions → OCR Text → View Result
 - 🔢 Page numbers (small, corner regions)
 - 📅 Dates (temporal information)
 
-## Implementation Priority
+## Implementation Status
 
-### **Phase 1**: Enhance current annotator with semantic types
-- Add type selection to annotation creation
-- Update sidebar to show types with icons
-- Modify .chaya format to include semanticType field
+### **Phase 1**: ✅ Completed
+- Unified application with tab-based navigation
+- Mark tab for region annotation and classification
+- Read tab for presentation viewing
+- .chaya file format for document packages
 
-### **Phase 2**: Build OCR workflow page
-- Create new `/ocr` route
-- Implement region-by-region OCR interface
-- Add text correction capabilities
+### **Phase 2**: 🔄 In Progress
+- Edit tab placeholder exists in UI
+- OCR workflow design documented
+- Implementation planned for future development
 
-### **Phase 3**: Enhance viewer for presentation
-- Transform current viewer into presentation mode
-- Add bidirectional linking
-- Implement export functionality
+### **Phase 3**: ✅ Completed
+- Read tab provides presentation mode
+- Bidirectional navigation between annotations
+- .chaya file export functionality
 
-This three-mode approach transforms Bookchop into a complete document digitization pipeline while maintaining clear separation of concerns and optimal user experience for each task.
+This three-mode approach provides a complete document digitization pipeline while maintaining clear separation of concerns and optimal user experience for each task.
