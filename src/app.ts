@@ -1,9 +1,17 @@
-import { initializePdfjs, waitForPdfjs, parseAnnotationsFromJson, Annotation as SharedAnnotation } from './pdf-utils.js';
+import { waitForPdfjs, parseAnnotationsFromJson, Annotation as SharedAnnotation } from './pdf-utils.js';
 
 // JSZip is loaded globally via script tag in the HTML
 declare const JSZip: any;
 
 // Initialize PDF.js
+async function initializePdfjs(): Promise<void> {
+    const pdfjs = await waitForPdfjs();
+    // Set the worker source for pdf.js. This is required for the library to work.
+    if (pdfjs?.GlobalWorkerOptions) {
+        pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    console.log('PDF.js initialized; worker src set to:', pdfjs.GlobalWorkerOptions?.workerSrc);
+}
 initializePdfjs();
 
 // Application state
@@ -35,7 +43,7 @@ class ChayaApp {
         this.initializeCentralizedFileLoading();
         this.initializeMarkTab();
         this.initializeReadTab();
-        
+
         // Start with Mark tab
         this.switchToTab('mark');
     }
@@ -47,7 +55,7 @@ class ChayaApp {
 
         markBtn.addEventListener('click', () => this.switchToTab('mark'));
         readBtn.addEventListener('click', () => this.switchToTab('read'));
-        
+
         // Edit tab is disabled for now
         editBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -279,7 +287,7 @@ class ChayaApp {
             }
 
             this.updateLoadingProgress(30, 'Rendering pages...', 'Processing PDF pages for display');
-            
+
             // Mark as loaded
             this.state.documentLoaded = true;
             this.state.hasUnsavedChanges = false;
@@ -289,7 +297,7 @@ class ChayaApp {
 
             // Notify tabs that data is ready and wait for rendering to complete
             this.notifyTabsDataReady();
-            
+
             // Listen for rendering completion
             this.waitForRenderingComplete();
 
@@ -309,12 +317,12 @@ class ChayaApp {
         const loadingDetails = document.getElementById('app-loading-details') as HTMLDivElement;
 
         const clampedPercent = Math.max(0, Math.min(100, percent));
-        
+
         progressBar.style.width = `${clampedPercent}%`;
         loadingPercent.textContent = `${Math.round(clampedPercent)}%`;
         loadingText.textContent = text;
         loadingDetails.textContent = details;
-        
+
         // Update progress bar color based on status
         if (clampedPercent === 100) {
             progressBar.className = 'bg-green-600 h-2 rounded-full transition-all duration-300';
@@ -346,20 +354,20 @@ class ChayaApp {
     // .chaya file handling methods (placeholder implementations)
     private async loadChayaFile(file: File): Promise<void> {
         const loadingDiv = document.getElementById('app-loading') as HTMLDivElement;
-        
+
         try {
             console.log('Loading .chaya file:', file.name);
-            
+
             // Show loading progress
             loadingDiv.classList.remove('hidden');
             this.updateLoadingProgress(0, 'Loading .chaya file...', 'Reading ZIP file...');
-            
+
             // Read ZIP file
             const zip = new JSZip();
             const zipContent = await zip.loadAsync(file);
-            
+
             this.updateLoadingProgress(20, 'Extracting files...', 'Validating .chaya format...');
-            
+
             // Validate required files
             const requiredFiles = ['manifest.json', 'document.pdf', 'annotations.json'];
             for (const requiredFile of requiredFiles) {
@@ -367,62 +375,62 @@ class ChayaApp {
                     throw new Error(`Invalid .chaya file: missing ${requiredFile}`);
                 }
             }
-            
+
             this.updateLoadingProgress(40, 'Reading manifest...', 'Validating format version...');
-            
+
             // Read and validate manifest
             const manifestText = await zipContent.file('manifest.json')!.async('string');
             const manifest = JSON.parse(manifestText);
             console.log('Manifest:', manifest);
-            
+
             this.updateLoadingProgress(60, 'Extracting PDF...', 'Loading document content...');
-            
+
             // Extract PDF data
             const pdfArrayBuffer = await zipContent.file('document.pdf')!.async('arraybuffer');
             const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
             const pdfFile = new File([pdfBlob], manifest.originalFilename || 'document.pdf', {
                 type: 'application/pdf'
             });
-            
+
             this.updateLoadingProgress(80, 'Loading annotations...', 'Parsing annotation data...');
-            
+
             // Extract annotations
             const annotationsText = await zipContent.file('annotations.json')!.async('string');
             const annotationsData = JSON.parse(annotationsText);
             const annotations = parseAnnotationsFromJson(annotationsData);
-            
+
             this.updateLoadingProgress(90, 'Initializing document...', 'Setting up PDF viewer...');
-            
+
             // Update state
             this.state.pdfFile = pdfFile;
             this.state.annotationsFile = null; // Not needed for .chaya files
             this.state.loadedAnnotations = annotations;
             this.state.loadedAnnotationsFileName = file.name;
-            
+
             // Load PDF document
             const pdfjs = await waitForPdfjs();
             const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
             this.state.pdfDocument = await loadingTask.promise;
-            
+
             this.updateLoadingProgress(95, 'Finalizing...', 'Preparing user interface...');
-            
+
             // Mark as loaded
             this.state.documentLoaded = true;
             this.state.hasUnsavedChanges = false;
-            
+
             // Update slot UI to download mode
             this.updateSlotUI();
-            
+
             this.updateLoadingProgress(100, 'Complete!', 'Chaya file loaded successfully');
-            
+
             // Notify tabs that data is ready
             this.notifyTabsDataReady();
-            
+
             // Listen for rendering completion
             this.waitForRenderingComplete();
-            
+
             console.log('Successfully loaded .chaya file:', file.name);
-            
+
         } catch (error) {
             console.error('Error loading .chaya file:', error);
             this.updateLoadingProgress(0, 'Error loading .chaya file', `Failed: ${error}`);
@@ -440,10 +448,10 @@ class ChayaApp {
 
         try {
             console.log('Creating .chaya file...');
-            
+
             // Create ZIP file
             const zip = new JSZip();
-            
+
             // Add manifest.json
             const manifest = {
                 version: "1.0",
@@ -456,15 +464,15 @@ class ChayaApp {
                 }
             };
             zip.file("manifest.json", JSON.stringify(manifest, null, 2));
-            
+
             // Add original PDF
             const pdfArrayBuffer = await this.readFileAsArrayBuffer(this.state.pdfFile);
             zip.file("document.pdf", pdfArrayBuffer);
-            
+
             // Add annotations.json
             const annotationsData = this.createAnnotationsJSON();
             zip.file("annotations.json", JSON.stringify(annotationsData, null, 2));
-            
+
             // Generate ZIP file with proper MIME type
             const zipBlob = await zip.generateAsync({
                 type: "blob",
@@ -473,10 +481,10 @@ class ChayaApp {
                     level: 9
                 }
             });
-            
+
             // Create blob with application/zip MIME type to help browsers recognize it
             const chayaBlob = new Blob([zipBlob], { type: 'application/zip' });
-            
+
             // Download the .chaya file (use .zip for local development to avoid browser blocks)
             const isDevelopment = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '[::1]';
             const extension = isDevelopment ? '.chaya.zip' : '.chaya';
@@ -489,15 +497,15 @@ class ChayaApp {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            
+
             // Mark as saved since we just exported everything
             this.state.hasUnsavedChanges = false;
-            
+
             // Also notify the annotator that changes have been saved
             this.notifyTabsSaved();
-            
+
             console.log('Successfully created .chaya file:', fileName);
-            
+
         } catch (error) {
             console.error('Error creating .chaya file:', error);
             alert('Error creating .chaya file: ' + error);
@@ -544,7 +552,7 @@ class ChayaApp {
 
     private async downloadPdfFile(): Promise<void> {
         if (!this.state.pdfFile) return;
-        
+
         // Download the original PDF file
         const url = URL.createObjectURL(this.state.pdfFile);
         const a = document.createElement('a');
@@ -561,26 +569,26 @@ class ChayaApp {
         const handleRenderingComplete = (event: Event) => {
             const customEvent = event as CustomEvent;
             const { tabName, totalPages, error } = customEvent.detail;
-            
+
             if (error) {
                 console.error(`Rendering failed for ${tabName} tab: ${error}`);
             } else {
                 console.log(`Rendering complete for ${tabName} tab: ${totalPages} pages`);
             }
-            
+
             // Hide loading after a short delay (progress should already be at 100% with "Complete!" text)
             const loadingDiv = document.getElementById('app-loading') as HTMLDivElement;
             setTimeout(() => {
                 console.log('Hiding loading progress bar');
                 loadingDiv.classList.add('hidden');
             }, 1000);
-            
+
             // Remove the event listener
             document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
         };
-        
+
         document.addEventListener('tabRenderingComplete', handleRenderingComplete);
-        
+
         // Add a timeout in case rendering gets stuck
         const timeoutId = setTimeout(() => {
             console.warn('Rendering timeout - hiding progress bar anyway');
@@ -588,14 +596,14 @@ class ChayaApp {
             loadingDiv.classList.add('hidden');
             document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
         }, 300000); // 5 minutes timeout
-        
+
         // Store timeout ID to cancel it when rendering completes normally
         const originalHandler = handleRenderingComplete;
         const wrappedHandler = (event: Event) => {
             clearTimeout(timeoutId);
             originalHandler(event);
         };
-        
+
         document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
         document.addEventListener('tabRenderingComplete', wrappedHandler);
     }
@@ -611,7 +619,7 @@ class ChayaApp {
             }
         });
         document.dispatchEvent(activeTabEvent);
-        
+
         console.log(`Notified ${this.state.currentTab} tab that data is ready`);
     }
 

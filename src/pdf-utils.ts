@@ -5,20 +5,6 @@
 // PDF.js is loaded globally via script tag in the HTML
 declare const pdfjsLib: any;
 
-export interface Annotation {
-    id: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    label: string;
-    pageNumber: number;
-    // Optional fields for enhanced AI annotations
-    semanticType?: string;
-    wordIndices?: number[];
-    ocrText?: string;
-}
-
 // Wait for PDF.js to be available before using it
 export function waitForPdfjs(): Promise<any> {
     return new Promise((resolve) => {
@@ -37,22 +23,27 @@ export function waitForPdfjs(): Promise<any> {
     });
 }
 
-// Initialize PDF.js when it's ready - complex setup worth sharing
-export async function initializePdfjs(): Promise<void> {
-    const pdfjs = await waitForPdfjs();
-    // Set the worker source for pdf.js. This is required for the library to work.
-    if (pdfjs?.GlobalWorkerOptions) {
-        pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
-    console.log('PDF.js initialized, worker src set to:', pdfjs.GlobalWorkerOptions?.workerSrc);
+// TODO: Rename `Annotation` to `Region`
+export interface Annotation {
+    id: string;
+    pageNumber: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    label: string;
+    // Optional fields for enhanced AI annotations
+    semanticType?: string;
+    wordIndices?: number[];
+    ocrText?: string;
 }
 
-
-// Load and parse annotations from JSON data
+// A string like `pk0n4cu0z` (using 0.7098903088646241 = 0.pk0n4cu0zoe)
 export function generateId(): string {
     return 'annotation_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
+// Load and parse annotations from JSON data
 export function parseAnnotationsFromJson(jsonData: any): Annotation[] {
     // Validate the JSON structure
     if (!jsonData.metadata || !jsonData.annotationsByPage) {
@@ -60,23 +51,24 @@ export function parseAnnotationsFromJson(jsonData: any): Annotation[] {
     }
 
     console.log('Loading annotations from JSON:', jsonData);
-    
+
     const annotations: Annotation[] = [];
-    
+
     // Convert loaded annotations to our internal format
     Object.keys(jsonData.annotationsByPage).forEach(pageKey => {
         const pageNumber = parseInt(pageKey);
         const pageAnnotations = jsonData.annotationsByPage[pageKey];
-        
+
         pageAnnotations.forEach((ann: any) => {
             const annotation: Annotation = {
-                id: ann.id || ('annotation_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)),
+                id: ann.id || generateId(),
+                pageNumber: pageNumber,
                 x: ann.x,
                 y: ann.y,
                 width: ann.width,
                 height: ann.height,
                 label: ann.label,
-                pageNumber: pageNumber
+                ocrText: ann.ocrText,
             };
             annotations.push(annotation);
         });

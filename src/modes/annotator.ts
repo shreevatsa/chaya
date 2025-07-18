@@ -1,7 +1,7 @@
 // Mark tab functionality - region annotation on PDF
 // This is essentially the existing annotator.ts functionality adapted for the unified app
 
-import { initializePdfjs, waitForPdfjs, parseAnnotationsFromJson, Annotation as SharedAnnotation, generateId } from '../pdf-utils.js';
+import { Annotation as SharedAnnotation, generateId } from '../pdf-utils.js';
 import { runAIAssistedAnnotation } from '../ai-orchestrator.js';
 
 // Use shared annotation interface
@@ -27,7 +27,7 @@ let selectedAnnotationData: Annotation | null = null;
 
 export function initializeAnnotator(): void {
     console.log('Initializing Mark tab (annotator)');
-    
+
     // Get DOM elements
     const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
     const annotationList = document.getElementById('annotation-list') as HTMLDivElement;
@@ -53,32 +53,32 @@ export function initializeAnnotator(): void {
 
     // Set up event listeners
     setupEventListeners();
-    
+
     function handleDataReady(pdfDocument: any, loadedAnnotations: Annotation[], annotationsFileName: string | null, pdfFileName: string | null): void {
         console.log('Mark tab: Data ready', { pdfDocument, loadedAnnotations, annotationsFileName, pdfFileName });
-        
+
         // Update global state
         annotations = loadedAnnotations || [];
         loadedAnnotationsFileName = annotationsFileName;
         hasUnsavedChanges = false;
-        
+
         // Clear container and render PDF
         const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
         pdfContainer.innerHTML = '';
-        
+
         // Render PDF pages
         renderPdfPages(pdfDocument, pdfContainer);
-        
+
         // Update annotation list
         updateAnnotationList();
     }
-    
+
     async function renderPdfPages(pdfDocument: any, container: HTMLDivElement): Promise<void> {
         const containerWidth = container.offsetWidth;
         const totalPages = pdfDocument.numPages;
-        
+
         console.log(`Starting to render ${totalPages} pages...`);
-        
+
         try {
             for (let i = 1; i <= totalPages; i++) {
                 // Update progress during rendering (30% to 100% = 70% of the progress bar)
@@ -86,22 +86,22 @@ export function initializeAnnotator(): void {
                 const isLastPage = i === totalPages;
                 const statusText = isLastPage ? 'Complete!' : `Rendering page ${i} of ${totalPages}...`;
                 const detailText = isLastPage ? 'PDF ready for annotation' : `Processing page ${i}`;
-                
+
                 console.log(`Rendering page ${i}/${totalPages}, progress: ${progress.toFixed(1)}%`);
                 updateAppProgress(progress, statusText, detailText);
-                
+
                 await renderPage(pdfDocument, i, containerWidth);
                 console.log(`Page ${i} rendered successfully`);
             }
-            
+
             console.log(`All ${totalPages} pages rendered successfully`);
-            
+
             // Render loaded annotations if any
             if (annotations.length > 0) {
                 console.log('Rendering loaded annotations...');
                 renderLoadedAnnotations();
             }
-            
+
             // Notify app that rendering is complete (but don't update progress since we already did)
             console.log('Dispatching rendering complete event');
             const renderingCompleteEvent = new CustomEvent('tabRenderingComplete', {
@@ -111,11 +111,11 @@ export function initializeAnnotator(): void {
                 }
             });
             document.dispatchEvent(renderingCompleteEvent);
-            
+
         } catch (error) {
             console.error('Error during PDF page rendering:', error);
             updateAppProgress(0, 'Error rendering pages', `Failed at page: ${error}`);
-            
+
             // Still notify completion even on error
             const errorEvent = new CustomEvent('tabRenderingComplete', {
                 detail: {
@@ -127,7 +127,7 @@ export function initializeAnnotator(): void {
             document.dispatchEvent(errorEvent);
         }
     }
-    
+
     function setupEventListeners(): void {
         // Event listeners for annotation functionality would go here
         // (Save functionality moved to .chaya download)
@@ -208,7 +208,7 @@ export function initializeAnnotator(): void {
         aiButton.style.fontFamily = 'sans-serif';
         aiButton.textContent = '🤖 AI Annotate';
         aiButton.title = 'Use AI to automatically annotate this page';
-        
+
         aiButton.addEventListener('click', async () => {
             const newAnnotations = await runAIAssistedAnnotation(pageDiv, pageNumber, annotations, getCanvasForPage);
             if (newAnnotations) {
@@ -246,7 +246,7 @@ export function initializeAnnotator(): void {
         };
 
         await page.render(renderContext).promise;
-        
+
         // Only append to container after the page is fully rendered
         pdfContainer.appendChild(pageDiv);
 
@@ -429,10 +429,10 @@ export function initializeAnnotator(): void {
 
                 // Remove the temporary annotation
                 overlay.removeChild(currentAnnotation);
-                
+
                 // Create proper annotation box using the same path as loaded annotations
                 createAnnotationBox(overlay, pageDiv, annotation);
-                
+
                 // Auto-select the newly created annotation so user can resize it immediately
                 const newAnnotationBox = overlay.querySelector(`[data-annotation-id="${annotation.id}"]`) as HTMLDivElement;
                 if (newAnnotationBox) {

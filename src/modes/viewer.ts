@@ -1,13 +1,13 @@
 // Read tab functionality - presentation view of annotated documents
 // This is essentially the existing viewer.ts functionality adapted for the unified app
 
-import { initializePdfjs, waitForPdfjs, parseAnnotationsFromJson, Annotation } from '../pdf-utils.js';
+import { Annotation } from '../pdf-utils.js';
 
 let loadedAnnotations: Annotation[] = [];
 
 export function initializeViewer(): void {
     console.log('Initializing Read tab (viewer)');
-    
+
     // Get DOM elements
     const pdfContainer = document.getElementById('read-pdf-container') as HTMLDivElement;
     const loadingMessage = document.getElementById('read-loading-message') as HTMLDivElement;
@@ -28,13 +28,13 @@ export function initializeViewer(): void {
 
     function handleDataReady(pdfDocument: any, annotations: Annotation[], annotationsFileName: string | null, pdfFileName: string | null): void {
         console.log('Read tab: Data ready', { pdfDocument, annotations, annotationsFileName, pdfFileName });
-        
+
         // Update local state
         loadedAnnotations = annotations || [];
-        
+
         // Clear container
         pdfContainer.innerHTML = '';
-        
+
         // Check if we have both PDF and annotations
         if (!pdfDocument || !annotations || annotations.length === 0) {
             pdfContainer.innerHTML = `
@@ -47,17 +47,17 @@ export function initializeViewer(): void {
             annotationList.innerHTML = '';
             return;
         }
-        
+
         // Display the annotated regions
         displayAnnotatedRegions(pdfDocument, annotations);
-        
+
         // Update annotation list
         updateAnnotationList();
     }
 
     async function displayAnnotatedRegions(pdfDocument: any, annotations: Annotation[]): Promise<void> {
         loadingMessage.textContent = 'Extracting annotated regions...';
-        
+
         for (let i = 0; i < annotations.length; i++) {
             const annotation = annotations[i];
             console.log(`Extracting region ${i + 1}/${annotations.length}: ${annotation.label}`);
@@ -65,10 +65,10 @@ export function initializeViewer(): void {
             const regionDiv = await extractAnnotationRegion(pdfDocument, annotation);
             pdfContainer.appendChild(regionDiv);
         }
-        
+
         loadingMessage.textContent = '';
         console.log('All annotation regions extracted successfully');
-        
+
         // Notify app that rendering is complete
         const renderingCompleteEvent = new CustomEvent('tabRenderingComplete', {
             detail: {
