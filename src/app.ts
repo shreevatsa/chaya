@@ -220,6 +220,14 @@ class ChayaApp {
         });
     }
 
+    /**
+     * Load a raw PDF and, if provided, a separate annotations JSON file.
+     *
+     * This is the "legacy" workflow used when the user uploads a plain
+     * PDF document (and optionally an annotations file). The method reads
+     * those files, initializes PDF.js and populates the application state
+     * so that other tabs can render the document.
+     */
     private async loadFiles(): Promise<void> {
         if (!this.state.pdfFile) return;
 
@@ -278,7 +286,13 @@ class ChayaApp {
         }
     }
 
-    // .chaya file handling methods (placeholder implementations)
+    // .chaya file handling methods
+    /**
+     * Load a `.chaya` package. A .chaya file is a ZIP archive containing
+     * the original PDF, annotations and a manifest. This method extracts
+     * those components and then follows the same initialization steps as
+     * `loadFiles()`.
+     */
     private async loadChayaFile(file: File): Promise<void> {
         const loadingDiv = document.getElementById('app-loading') as HTMLDivElement;
 
