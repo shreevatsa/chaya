@@ -1,8 +1,8 @@
 // Mark tab functionality - region annotation on PDF
 // This is essentially the existing annotator.ts functionality adapted for the unified app
 
-import { Annotation as SharedAnnotation, generateId } from '../pdf-utils.js';
-import { runAIAssistedAnnotation } from '../ai-orchestrator.js';
+import { Annotation as SharedAnnotation, generateId } from './pdf-utils.js';
+import { runAIAssistedAnnotation } from './ai-orchestrator.js';
 
 // Use shared annotation interface
 type Annotation = SharedAnnotation;

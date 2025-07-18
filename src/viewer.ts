@@ -1,7 +1,7 @@
 // Read tab functionality - presentation view of annotated documents
 // This is essentially the existing viewer.ts functionality adapted for the unified app
 
-import { Annotation } from '../pdf-utils.js';
+import { Annotation } from './pdf-utils.js';
 
 let loadedAnnotations: Annotation[] = [];
 
