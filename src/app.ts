@@ -48,8 +48,9 @@ class ChayaApp {
 
     // === PUBLIC API (Interface for tabs to use) ===
     constructor() {
-        this.initializeTabSwitching();
-        this.initializeCentralizedFileLoading();
+        this.initializeTabSwitchingEventListeners();
+        this.setupFileInputListeners();
+        this.updateSlotUI();
         this.initializeMarkTab();
         this.initializeReadTab();
 
@@ -105,7 +106,8 @@ class ChayaApp {
     }
 
     // === TAB MANAGEMENT ===
-    private initializeTabSwitching(): void {
+    // Clicking on Mark/Edit/Read should call `switchToTab('mark')` etc.
+    private initializeTabSwitchingEventListeners(): void {
         const markBtn = document.getElementById('mark-tab-btn') as HTMLButtonElement;
         const editBtn = document.getElementById('edit-tab-btn') as HTMLButtonElement;
         const readBtn = document.getElementById('read-tab-btn') as HTMLButtonElement;
@@ -181,15 +183,6 @@ class ChayaApp {
         // Pass the shared state access to the tab
         const { initializeViewer } = await import('./modes/viewer.js');
         initializeViewer();
-    }
-
-    // === FILE OPERATIONS ===    
-    private initializeCentralizedFileLoading(): void {
-        // Set up file input event listeners (these don't change)
-        this.setupFileInputListeners();
-
-        // Initial UI update
-        this.updateSlotUI();
     }
 
     private setupFileInputListeners(): void {
