@@ -1,18 +1,25 @@
-import { waitForPdfjs, parseAnnotationsFromJson, Annotation as SharedAnnotation } from './pdf-utils.js';
+import { Annotation, parseAnnotationsFromJson } from './pdf-utils.js';
 
 // JSZip is loaded globally via script tag in the HTML
 declare const JSZip: any;
 
+// PDF.js is loaded globally via script tag in the HTML
+declare const pdfjsLib: any; // Only used via `waitForPdfjs` below.
+// Wait for PDF.js to be available before using it
+async function waitForPdfjs(): Promise<any> {
+    while (typeof pdfjsLib == 'undefined') {
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    return pdfjsLib;
+}
 // Initialize PDF.js
-async function initializePdfjs(): Promise<void> {
+(async function (): Promise<void> {
     const pdfjs = await waitForPdfjs();
-    // Set the worker source for pdf.js. This is required for the library to work.
     if (pdfjs?.GlobalWorkerOptions) {
         pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
     console.log('PDF.js initialized; worker src set to:', pdfjs.GlobalWorkerOptions?.workerSrc);
-}
-initializePdfjs();
+})();
 
 // Application state
 interface AppState {
@@ -20,7 +27,7 @@ interface AppState {
     documentLoaded: boolean;
     pdfFile: File | null;
     annotationsFile: File | null;
-    loadedAnnotations: SharedAnnotation[];
+    loadedAnnotations: Annotation[];
     loadedAnnotationsFileName: string | null;
     pdfDocument: any | null;
     hasUnsavedChanges: boolean;
@@ -634,12 +641,12 @@ class ChayaApp {
         };
     }
 
-    public updateAnnotations(annotations: SharedAnnotation[]): void {
+    public updateAnnotations(annotations: Annotation[]): void {
         this.state.loadedAnnotations = annotations;
         this.state.hasUnsavedChanges = true;
     }
 
-    public syncAnnotations(annotations: SharedAnnotation[]): void {
+    public syncAnnotations(annotations: Annotation[]): void {
         // Update annotations without marking as unsaved (for sync operations)
         this.state.loadedAnnotations = annotations;
     }

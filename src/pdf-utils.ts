@@ -2,27 +2,6 @@
  * Shared PDF utilities - only complex functionality worth abstracting
  */
 
-// PDF.js is loaded globally via script tag in the HTML
-declare const pdfjsLib: any;
-
-// Wait for PDF.js to be available before using it
-export function waitForPdfjs(): Promise<any> {
-    return new Promise((resolve) => {
-        if (typeof pdfjsLib !== 'undefined') {
-            resolve(pdfjsLib);
-        } else {
-            const check = () => {
-                if (typeof pdfjsLib !== 'undefined') {
-                    resolve(pdfjsLib);
-                } else {
-                    setTimeout(check, 10);
-                }
-            };
-            check();
-        }
-    });
-}
-
 // TODO: Rename `Annotation` to `Region`
 export interface Annotation {
     id: string;
