@@ -34,6 +34,7 @@ interface AppState {
 }
 
 class ChayaApp {
+    // === STATE ===
     private state: AppState = {
         currentTab: 'mark',
         documentLoaded: false,
@@ -45,6 +46,7 @@ class ChayaApp {
         hasUnsavedChanges: false
     };
 
+    // === PUBLIC API (Interface for tabs to use) ===
     constructor() {
         this.initializeTabSwitching();
         this.initializeCentralizedFileLoading();
@@ -54,7 +56,55 @@ class ChayaApp {
         // Start with Mark tab
         this.switchToTab('mark');
     }
+    // Public methods for tabs to access shared state
+    public getSharedState() {
+        return {
+            pdfDocument: this.state.pdfDocument,
+            annotations: this.state.loadedAnnotations,
+            annotationsFileName: this.state.loadedAnnotationsFileName,
+            pdfFileName: this.state.pdfFile?.name,
+            documentLoaded: this.state.documentLoaded
+        };
+    }
 
+    public updateAnnotations(annotations: Annotation[]): void {
+        this.state.loadedAnnotations = annotations;
+        this.state.hasUnsavedChanges = true;
+    }
+
+    public syncAnnotations(annotations: Annotation[]): void {
+        // Update annotations without marking as unsaved (for sync operations)
+        this.state.loadedAnnotations = annotations;
+    }
+
+    public markAsSaved(): void {
+        this.state.hasUnsavedChanges = false;
+    }
+
+    public updateLoadingProgress(percent: number, text: string, details: string): void {
+        const loadingText = document.getElementById('app-loading-text') as HTMLSpanElement;
+        const loadingPercent = document.getElementById('app-loading-percent') as HTMLSpanElement;
+        const progressBar = document.getElementById('app-progress-bar') as HTMLDivElement;
+        const loadingDetails = document.getElementById('app-loading-details') as HTMLDivElement;
+
+        const clampedPercent = Math.max(0, Math.min(100, percent));
+
+        progressBar.style.width = `${clampedPercent}%`;
+        loadingPercent.textContent = `${Math.round(clampedPercent)}%`;
+        loadingText.textContent = text;
+        loadingDetails.textContent = details;
+
+        // Update progress bar color based on status
+        if (clampedPercent === 100) {
+            progressBar.className = 'bg-green-600 h-2 rounded-full transition-all duration-300';
+        } else if (clampedPercent === 0 && text.includes('Error')) {
+            progressBar.className = 'bg-red-600 h-2 rounded-full transition-all duration-300';
+        } else {
+            progressBar.className = 'bg-blue-600 h-2 rounded-full transition-all duration-300';
+        }
+    }
+
+    // === TAB MANAGEMENT ===
     private initializeTabSwitching(): void {
         const markBtn = document.getElementById('mark-tab-btn') as HTMLButtonElement;
         const editBtn = document.getElementById('edit-tab-btn') as HTMLButtonElement;
@@ -119,6 +169,21 @@ class ChayaApp {
         console.log(`Switched to ${tab} tab`);
     }
 
+    private async initializeMarkTab(): Promise<void> {
+        // Import and initialize the mark tab functionality
+        // Pass the shared state access to the tab
+        const { initializeAnnotator } = await import('./modes/annotator.js');
+        initializeAnnotator();
+    }
+
+    private async initializeReadTab(): Promise<void> {
+        // Import and initialize the read tab functionality  
+        // Pass the shared state access to the tab
+        const { initializeViewer } = await import('./modes/viewer.js');
+        initializeViewer();
+    }
+
+    // === FILE OPERATIONS ===    
     private initializeCentralizedFileLoading(): void {
         // Set up file input event listeners (these don't change)
         this.setupFileInputListeners();
@@ -154,109 +219,6 @@ class ChayaApp {
                 }
             });
         }
-    }
-
-    private updateSlotUI(): void {
-        const chayaSlot = document.getElementById('chaya-slot') as HTMLDivElement;
-        const pdfSlot = document.getElementById('pdf-slot') as HTMLDivElement;
-        const documentFilename = document.getElementById('document-filename') as HTMLDivElement;
-
-        if (this.state.documentLoaded) {
-            // Download mode
-            const filename = this.state.pdfFile?.name || 'document';
-            documentFilename.textContent = `Document: ${filename}`;
-            documentFilename.classList.remove('hidden');
-
-            // Update .chaya slot - preserve file input
-            const chayaInput = chayaSlot.querySelector('#chaya-upload') as HTMLInputElement;
-            chayaSlot.innerHTML = `
-                <div class="download-slot border-2 border-blue-500 bg-blue-50 rounded-lg p-8 text-center hover:bg-blue-100 transition-colors cursor-pointer">
-                    <div class="text-4xl mb-3">📦</div>
-                    <div class="text-sm font-medium text-blue-700 mb-1">Download .chaya</div>
-                    <div class="text-xs text-blue-600">Complete package</div>
-                </div>
-            `;
-            if (chayaInput) {
-                chayaSlot.appendChild(chayaInput);
-            }
-
-            // Update .pdf slot - preserve file input
-            const pdfInput = pdfSlot.querySelector('#pdf-upload') as HTMLInputElement;
-            pdfSlot.innerHTML = `
-                <div class="download-slot border-2 border-gray-500 bg-gray-50 rounded-lg p-8 text-center hover:bg-gray-100 transition-colors cursor-pointer">
-                    <div class="text-4xl mb-3">📄</div>
-                    <div class="text-sm font-medium text-gray-700 mb-1">Download .pdf</div>
-                    <div class="text-xs text-gray-600">Original document</div>
-                </div>
-            `;
-            if (pdfInput) {
-                pdfSlot.appendChild(pdfInput);
-            }
-        } else {
-            // Upload mode
-            documentFilename.classList.add('hidden');
-
-            // Reset .chaya slot - preserve file input
-            const chayaInput = chayaSlot.querySelector('#chaya-upload') as HTMLInputElement;
-            chayaSlot.innerHTML = `
-                <div class="upload-slot border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
-                    <div class="text-4xl mb-3">📦</div>
-                    <div class="text-sm font-medium text-gray-700 mb-1">Upload .chaya</div>
-                    <div class="text-xs text-gray-500">Complete package</div>
-                </div>
-            `;
-            if (chayaInput) {
-                chayaSlot.appendChild(chayaInput);
-            }
-
-            // Reset .pdf slot - preserve file input
-            const pdfInput = pdfSlot.querySelector('#pdf-upload') as HTMLInputElement;
-            pdfSlot.innerHTML = `
-                <div class="upload-slot border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
-                    <div class="text-4xl mb-3">📄</div>
-                    <div class="text-sm font-medium text-gray-700 mb-1">Upload .pdf</div>
-                    <div class="text-xs text-gray-500">Start from scratch</div>
-                </div>
-            `;
-            if (pdfInput) {
-                pdfSlot.appendChild(pdfInput);
-            }
-        }
-
-        // Re-attach event listeners after updating innerHTML
-        this.attachSlotEventListeners();
-    }
-
-    private attachSlotEventListeners(): void {
-        const chayaSlot = document.getElementById('chaya-slot') as HTMLDivElement;
-        const pdfSlot = document.getElementById('pdf-slot') as HTMLDivElement;
-
-        // Remove existing event listeners by replacing elements
-        chayaSlot.onclick = () => {
-            if (!this.state.documentLoaded) {
-                const chayaUpload = document.getElementById('chaya-upload') as HTMLInputElement;
-                if (chayaUpload) {
-                    chayaUpload.click();
-                } else {
-                    console.error('chaya-upload element not found');
-                }
-            } else {
-                this.downloadChayaFile();
-            }
-        };
-
-        pdfSlot.onclick = () => {
-            if (!this.state.documentLoaded) {
-                const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
-                if (pdfUpload) {
-                    pdfUpload.click();
-                } else {
-                    console.error('pdf-upload element not found');
-                }
-            } else {
-                this.downloadPdfFile();
-            }
-        };
     }
 
     private async loadFiles(): Promise<void> {
@@ -315,47 +277,6 @@ class ChayaApp {
                 loadingDiv.classList.add('hidden');
             }, 3000);
         }
-    }
-
-    public updateLoadingProgress(percent: number, text: string, details: string): void {
-        const loadingText = document.getElementById('app-loading-text') as HTMLSpanElement;
-        const loadingPercent = document.getElementById('app-loading-percent') as HTMLSpanElement;
-        const progressBar = document.getElementById('app-progress-bar') as HTMLDivElement;
-        const loadingDetails = document.getElementById('app-loading-details') as HTMLDivElement;
-
-        const clampedPercent = Math.max(0, Math.min(100, percent));
-
-        progressBar.style.width = `${clampedPercent}%`;
-        loadingPercent.textContent = `${Math.round(clampedPercent)}%`;
-        loadingText.textContent = text;
-        loadingDetails.textContent = details;
-
-        // Update progress bar color based on status
-        if (clampedPercent === 100) {
-            progressBar.className = 'bg-green-600 h-2 rounded-full transition-all duration-300';
-        } else if (clampedPercent === 0 && text.includes('Error')) {
-            progressBar.className = 'bg-red-600 h-2 rounded-full transition-all duration-300';
-        } else {
-            progressBar.className = 'bg-blue-600 h-2 rounded-full transition-all duration-300';
-        }
-    }
-
-    private readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target?.result as ArrayBuffer);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsArrayBuffer(file);
-        });
-    }
-
-    private readFileAsText(file: File): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target?.result as string);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsText(file);
-        });
     }
 
     // .chaya file handling methods (placeholder implementations)
@@ -571,6 +492,130 @@ class ChayaApp {
         URL.revokeObjectURL(url);
     }
 
+    // === UI MANAGEMENT ===
+    private updateSlotUI(): void {
+        const chayaSlot = document.getElementById('chaya-slot') as HTMLDivElement;
+        const pdfSlot = document.getElementById('pdf-slot') as HTMLDivElement;
+        const documentFilename = document.getElementById('document-filename') as HTMLDivElement;
+
+        if (this.state.documentLoaded) {
+            // Download mode
+            const filename = this.state.pdfFile?.name || 'document';
+            documentFilename.textContent = `Document: ${filename}`;
+            documentFilename.classList.remove('hidden');
+
+            // Update .chaya slot - preserve file input
+            const chayaInput = chayaSlot.querySelector('#chaya-upload') as HTMLInputElement;
+            chayaSlot.innerHTML = `
+                <div class="download-slot border-2 border-blue-500 bg-blue-50 rounded-lg p-8 text-center hover:bg-blue-100 transition-colors cursor-pointer">
+                    <div class="text-4xl mb-3">📦</div>
+                    <div class="text-sm font-medium text-blue-700 mb-1">Download .chaya</div>
+                    <div class="text-xs text-blue-600">Complete package</div>
+                </div>
+            `;
+            if (chayaInput) {
+                chayaSlot.appendChild(chayaInput);
+            }
+
+            // Update .pdf slot - preserve file input
+            const pdfInput = pdfSlot.querySelector('#pdf-upload') as HTMLInputElement;
+            pdfSlot.innerHTML = `
+                <div class="download-slot border-2 border-gray-500 bg-gray-50 rounded-lg p-8 text-center hover:bg-gray-100 transition-colors cursor-pointer">
+                    <div class="text-4xl mb-3">📄</div>
+                    <div class="text-sm font-medium text-gray-700 mb-1">Download .pdf</div>
+                    <div class="text-xs text-gray-600">Original document</div>
+                </div>
+            `;
+            if (pdfInput) {
+                pdfSlot.appendChild(pdfInput);
+            }
+        } else {
+            // Upload mode
+            documentFilename.classList.add('hidden');
+
+            // Reset .chaya slot - preserve file input
+            const chayaInput = chayaSlot.querySelector('#chaya-upload') as HTMLInputElement;
+            chayaSlot.innerHTML = `
+                <div class="upload-slot border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
+                    <div class="text-4xl mb-3">📦</div>
+                    <div class="text-sm font-medium text-gray-700 mb-1">Upload .chaya</div>
+                    <div class="text-xs text-gray-500">Complete package</div>
+                </div>
+            `;
+            if (chayaInput) {
+                chayaSlot.appendChild(chayaInput);
+            }
+
+            // Reset .pdf slot - preserve file input
+            const pdfInput = pdfSlot.querySelector('#pdf-upload') as HTMLInputElement;
+            pdfSlot.innerHTML = `
+                <div class="upload-slot border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
+                    <div class="text-4xl mb-3">📄</div>
+                    <div class="text-sm font-medium text-gray-700 mb-1">Upload .pdf</div>
+                    <div class="text-xs text-gray-500">Start from scratch</div>
+                </div>
+            `;
+            if (pdfInput) {
+                pdfSlot.appendChild(pdfInput);
+            }
+        }
+
+        // Re-attach event listeners after updating innerHTML
+        this.attachSlotEventListeners();
+    }
+
+    private attachSlotEventListeners(): void {
+        const chayaSlot = document.getElementById('chaya-slot') as HTMLDivElement;
+        const pdfSlot = document.getElementById('pdf-slot') as HTMLDivElement;
+
+        // Remove existing event listeners by replacing elements
+        chayaSlot.onclick = () => {
+            if (!this.state.documentLoaded) {
+                const chayaUpload = document.getElementById('chaya-upload') as HTMLInputElement;
+                if (chayaUpload) {
+                    chayaUpload.click();
+                } else {
+                    console.error('chaya-upload element not found');
+                }
+            } else {
+                this.downloadChayaFile();
+            }
+        };
+
+        pdfSlot.onclick = () => {
+            if (!this.state.documentLoaded) {
+                const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
+                if (pdfUpload) {
+                    pdfUpload.click();
+                } else {
+                    console.error('pdf-upload element not found');
+                }
+            } else {
+                this.downloadPdfFile();
+            }
+        };
+    }
+
+    // === UTILITIES ===
+    private readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as ArrayBuffer);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    private readFileAsText(file: File): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsText(file);
+        });
+    }
+
+
     private waitForRenderingComplete(): void {
         // Listen for rendering completion from the active tab
         const handleRenderingComplete = (event: Event) => {
@@ -630,30 +675,6 @@ class ChayaApp {
         console.log(`Notified ${this.state.currentTab} tab that data is ready`);
     }
 
-    // Public methods for tabs to access shared state
-    public getSharedState() {
-        return {
-            pdfDocument: this.state.pdfDocument,
-            annotations: this.state.loadedAnnotations,
-            annotationsFileName: this.state.loadedAnnotationsFileName,
-            pdfFileName: this.state.pdfFile?.name,
-            documentLoaded: this.state.documentLoaded
-        };
-    }
-
-    public updateAnnotations(annotations: Annotation[]): void {
-        this.state.loadedAnnotations = annotations;
-        this.state.hasUnsavedChanges = true;
-    }
-
-    public syncAnnotations(annotations: Annotation[]): void {
-        // Update annotations without marking as unsaved (for sync operations)
-        this.state.loadedAnnotations = annotations;
-    }
-
-    public markAsSaved(): void {
-        this.state.hasUnsavedChanges = false;
-    }
 
     private notifyTabsSaved(): void {
         // Dispatch event to notify tabs that data has been saved
@@ -661,19 +682,7 @@ class ChayaApp {
         document.dispatchEvent(savedEvent);
     }
 
-    private async initializeMarkTab(): Promise<void> {
-        // Import and initialize the mark tab functionality
-        // Pass the shared state access to the tab
-        const { initializeAnnotator } = await import('./modes/annotator.js');
-        initializeAnnotator();
-    }
 
-    private async initializeReadTab(): Promise<void> {
-        // Import and initialize the read tab functionality  
-        // Pass the shared state access to the tab
-        const { initializeViewer } = await import('./modes/viewer.js');
-        initializeViewer();
-    }
 }
 
 // Initialize the app when DOM is ready
