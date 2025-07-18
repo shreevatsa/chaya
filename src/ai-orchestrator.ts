@@ -4,7 +4,7 @@
 // This file is the bridge between the browser UI and the headless AI engine.
 // It handles DOM interactions, user prompts, and orchestrates the AI workflow.
 
-import { AIEngine, GeminiEngine, AIAnnotationRequest } from './ai-engine.js';
+import { annotateWithGemini, AIAnnotationRequest } from './ai-engine.js';
 import { Annotation as SharedAnnotation, generateId } from './pdf-utils.js';
 
 // Use the shared Annotation type from the project
@@ -80,12 +80,10 @@ export async function runAIAssistedAnnotation(
         return null; // Could not prepare the request
     }
 
-    // 6. Instantiate the engine and run the annotation process.
-    const engine: AIEngine = new GeminiEngine(geminiApiKey);
-
+    // 6. Call the Gemini API to get annotations
     try {
-        console.log("Orchestrator: Calling AI engine for multi-page processing...");
-        const response = await engine.annotate(request);
+        console.log("Orchestrator: Calling Gemini API for multi-page processing...");
+        const response = await annotateWithGemini(geminiApiKey, request);
         console.log("Orchestrator: AI engine returned successfully.");
 
         // 7. Convert the engine's response into the application's annotation format.
@@ -189,7 +187,7 @@ async function getWordLevelOCR(canvas: HTMLCanvasElement, apiKey: string): Promi
 }
 
 /**
- * Prepares the request object needed by the AIEngine for multiple pages.
+ * Prepares the request object needed for the Gemini API for multiple pages.
  */
 async function prepareMultiPageAnnotationRequest(
     pageNumbers: number[],
