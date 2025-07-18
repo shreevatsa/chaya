@@ -29,6 +29,15 @@ function documentGetElementById<T extends HTMLElement>(id: string): T {
     return element;
 }
 
+function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as ArrayBuffer);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(file);
+    });
+}
+
 // Application state
 interface AppState {
     currentTab: 'mark' | 'edit' | 'read';  // Which tab of the app is active
@@ -160,15 +169,11 @@ class ChayaApp {
     }
 
     private async initializeMarkTab(): Promise<void> {
-        // Import and initialize the mark tab functionality
-        // Pass the shared state access to the tab
         const { initializeAnnotator } = await import('./modes/annotator.js');
         initializeAnnotator();
     }
 
     private async initializeReadTab(): Promise<void> {
-        // Import and initialize the read tab functionality  
-        // Pass the shared state access to the tab
         const { initializeViewer } = await import('./modes/viewer.js');
         initializeViewer();
     }
@@ -190,22 +195,19 @@ class ChayaApp {
             const file = target.files?.[0];
             if (file) {
                 this.state.pdfFile = file;
-                this.state.loadedAnnotations = [];
-                this.state.loadedAnnotationsFileName = null;
-                await this.loadFiles();
+                await this.loadPdfFile();
             }
         });
     }
 
     /**
-     * Load a raw PDF and, if provided, a separate annotations JSON file.
+     * Load a raw PDF file.
      *
-     * This is the "legacy" workflow used when the user uploads a plain
-     * PDF document (and optionally an annotations file). The method reads
-     * those files, initializes PDF.js and populates the application state
+     * This is the workflow used when the user uploads just a PDF document.
+     * The method reads those files, initializes PDF.js and populates the application state
      * so that other tabs can render the document.
      */
-    private async loadFiles(): Promise<void> {
+    private async loadPdfFile(): Promise<void> {
         if (!this.state.pdfFile) return;
 
         const loadingDiv = documentGetElementById<HTMLDivElement>('app-loading');
@@ -216,18 +218,12 @@ class ChayaApp {
             this.updateLoadingProgress(0, 'Loading PDF...', 'Reading PDF file...');
 
             // Load PDF
-            const pdfArrayBuffer = await this.readFileAsArrayBuffer(this.state.pdfFile);
-            this.updateLoadingProgress(10, 'Processing PDF...', 'Initializing PDF.js...');
+            const pdfArrayBuffer = await readFileAsArrayBuffer(this.state.pdfFile);
+            this.updateLoadingProgress(10, 'Processing PDF...', 'Initializing PDF.js and document...');
 
             const pdfjs = await waitForPdfjs();
             const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
             this.state.pdfDocument = await loadingTask.promise;
-
-            this.updateLoadingProgress(20, 'Loading annotations...', 'Processing annotation file...');
-
-            // Load annotations if provided
-            this.state.loadedAnnotations = [];
-            this.state.loadedAnnotationsFileName = null;
 
             this.updateLoadingProgress(30, 'Rendering pages...', 'Processing PDF pages for display');
 
@@ -258,7 +254,7 @@ class ChayaApp {
      * Load a `.chaya` package. A .chaya file is a ZIP archive containing
      * the original PDF, annotations and a manifest. This method extracts
      * those components and then follows the same initialization steps as
-     * `loadFiles()`.
+     * `loadPdfFile()`.
      */
     private async loadChayaFile(file: File): Promise<void> {
         const loadingDiv = documentGetElementById<HTMLDivElement>('app-loading');
@@ -373,7 +369,7 @@ class ChayaApp {
             zip.file("manifest.json", JSON.stringify(manifest, null, 2));
 
             // Add original PDF
-            const pdfArrayBuffer = await this.readFileAsArrayBuffer(this.state.pdfFile);
+            const pdfArrayBuffer = await readFileAsArrayBuffer(this.state.pdfFile);
             zip.file("document.pdf", pdfArrayBuffer);
 
             // Add annotations.json
@@ -392,10 +388,8 @@ class ChayaApp {
             // Create blob with application/zip MIME type to help browsers recognize it
             const chayaBlob = new Blob([zipBlob], { type: 'application/zip' });
 
-            // Download the .chaya file (use .zip for local development to avoid browser blocks)
-            const isDevelopment = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '[::1]';
-            const extension = isDevelopment ? '.chaya.zip' : '.chaya';
-            const fileName = this.state.pdfFile.name.replace(/\.pdf$/i, extension);
+            // Download the .chaya file
+            const fileName = this.state.pdfFile.name.replace(/\.pdf$/i, '.chaya');
             const url = URL.createObjectURL(chayaBlob);
             const a = document.createElement('a');
             a.href = url;
@@ -553,25 +547,6 @@ class ChayaApp {
     }
 
     // === UTILITIES ===
-    private readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target?.result as ArrayBuffer);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsArrayBuffer(file);
-        });
-    }
-
-    private readFileAsText(file: File): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target?.result as string);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsText(file);
-        });
-    }
-
-
     private waitForRenderingComplete(): void {
         // Listen for rendering completion from the active tab
         const handleRenderingComplete = (event: Event) => {
