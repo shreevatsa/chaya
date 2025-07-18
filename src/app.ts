@@ -21,6 +21,16 @@ async function waitForPdfjs(): Promise<any> {
     console.log('PDF.js initialized; worker src set to:', pdfjs.GlobalWorkerOptions?.workerSrc);
 })();
 
+/*
+function documentGetElementById<T extends HTMLElement>(id: string): T {
+    const element = document.getElementById(id) as T;
+    if (!element) {
+        throw new Error(`Required element with id '${id}' not found`);
+    }
+    return element;
+}
+*/
+
 // Application state
 interface AppState {
     currentTab: 'mark' | 'edit' | 'read';
@@ -48,9 +58,9 @@ class ChayaApp {
 
     // === PUBLIC API (Interface for tabs to use) ===
     constructor() {
-        this.initializeTabSwitchingEventListeners();
         this.setupFileInputListeners();
         this.updateSlotUI();
+        this.setupTabSwitchingEventListeners();
         this.initializeMarkTab();
         this.initializeReadTab();
 
@@ -107,7 +117,7 @@ class ChayaApp {
 
     // === TAB MANAGEMENT ===
     // Clicking on Mark/Edit/Read should call `switchToTab('mark')` etc.
-    private initializeTabSwitchingEventListeners(): void {
+    private setupTabSwitchingEventListeners(): void {
         const markBtn = document.getElementById('mark-tab-btn') as HTMLButtonElement;
         const editBtn = document.getElementById('edit-tab-btn') as HTMLButtonElement;
         const readBtn = document.getElementById('read-tab-btn') as HTMLButtonElement;
@@ -189,29 +199,25 @@ class ChayaApp {
         const chayaUpload = document.getElementById('chaya-upload') as HTMLInputElement;
         const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
 
-        if (chayaUpload) {
-            chayaUpload.addEventListener('change', async (event) => {
-                const target = event.target as HTMLInputElement;
-                const file = target.files?.[0];
-                if (file) {
-                    await this.loadChayaFile(file);
-                }
-            });
-        }
+        chayaUpload?.addEventListener('change', async (event) => {
+            const target = event.target as HTMLInputElement;
+            const file = target.files?.[0];
+            if (file) {
+                await this.loadChayaFile(file);
+            }
+        });
 
-        if (pdfUpload) {
-            pdfUpload.addEventListener('change', async (event) => {
-                const target = event.target as HTMLInputElement;
-                const file = target.files?.[0];
-                if (file) {
-                    this.state.pdfFile = file;
-                    this.state.annotationsFile = null;
-                    this.state.loadedAnnotations = [];
-                    this.state.loadedAnnotationsFileName = null;
-                    await this.loadFiles();
-                }
-            });
-        }
+        pdfUpload?.addEventListener('change', async (event) => {
+            const target = event.target as HTMLInputElement;
+            const file = target.files?.[0];
+            if (file) {
+                this.state.pdfFile = file;
+                this.state.annotationsFile = null;
+                this.state.loadedAnnotations = [];
+                this.state.loadedAnnotationsFileName = null;
+                await this.loadFiles();
+            }
+        });
     }
 
     private async loadFiles(): Promise<void> {
