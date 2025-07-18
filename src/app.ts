@@ -31,10 +31,9 @@ function documentGetElementById<T extends HTMLElement>(id: string): T {
 
 // Application state
 interface AppState {
-    currentTab: 'mark' | 'edit' | 'read';
-    documentLoaded: boolean;
+    currentTab: 'mark' | 'edit' | 'read';  // Which tab of the app is active
+    documentLoaded: boolean;  // Whether the document (PDF or Chaya) has been loaded yet
     pdfFile: File | null;
-    annotationsFile: File | null;
     loadedAnnotations: Annotation[];
     loadedAnnotationsFileName: string | null;
     pdfDocument: any | null;
@@ -47,7 +46,6 @@ class ChayaApp {
         currentTab: 'mark',
         documentLoaded: false,
         pdfFile: null,
-        annotationsFile: null,
         loadedAnnotations: [],
         loadedAnnotationsFileName: null,
         pdfDocument: null,
@@ -192,7 +190,6 @@ class ChayaApp {
             const file = target.files?.[0];
             if (file) {
                 this.state.pdfFile = file;
-                this.state.annotationsFile = null;
                 this.state.loadedAnnotations = [];
                 this.state.loadedAnnotationsFileName = null;
                 await this.loadFiles();
@@ -229,14 +226,8 @@ class ChayaApp {
             this.updateLoadingProgress(20, 'Loading annotations...', 'Processing annotation file...');
 
             // Load annotations if provided
-            if (this.state.annotationsFile) {
-                const annotationsText = await this.readFileAsText(this.state.annotationsFile);
-                const annotationsData = JSON.parse(annotationsText);
-                this.state.loadedAnnotations = parseAnnotationsFromJson(annotationsData);
-            } else {
-                this.state.loadedAnnotations = [];
-                this.state.loadedAnnotationsFileName = null;
-            }
+            this.state.loadedAnnotations = [];
+            this.state.loadedAnnotationsFileName = null;
 
             this.updateLoadingProgress(30, 'Rendering pages...', 'Processing PDF pages for display');
 
@@ -320,7 +311,6 @@ class ChayaApp {
 
             // Update state
             this.state.pdfFile = pdfFile;
-            this.state.annotationsFile = null; // Not needed for .chaya files
             this.state.loadedAnnotations = annotations;
             this.state.loadedAnnotationsFileName = file.name;
 
