@@ -1,42 +1,67 @@
 # Chaya
 
-**Chaya** is a client-side web application for document processing with a three-mode workflow: region annotation, text extraction, and presentation viewing.
+**Chaya** is an application for digitizing scanned books, i.e. to “transcribe” a PDF file into paragraphs (etc.) that remain associated with regions of the original pages. I think of it as "OCR without OCR", or "OCR for people who don't trust OCR" ("verifiable OCR").
 
-## Features
+It is designed for (scanned) PDFs that are mostly lines of text (paragraphs, headings, verses, footnotes: not illustrations, math, tables, forms).
 
-### 📝 Mark Tab
-- **PDF Upload & Rendering**: Load PDF files or existing .chaya packages using PDF.js
-- **Interactive Annotation Creation**: Draw bounding boxes by clicking and dragging
-- **AI-Assisted Annotation**: Use Gemini API to automatically generate annotations with customizable prompts
-- **Resizable & Movable Annotations**: Select annotations to resize (8 handles) or drag to reposition
-- **Annotation Management**: 
-  - Sidebar showing all annotations organized by page
-  - Click annotations in list to select and scroll to them on PDF
+The workflow is to upload a PDF, mark regions on each page (optionally assisted by AI), then name and re-order these regions, optionally running OCR on them. The result can be saved to a `.chaya` file, which can at any time be opened again in the application for reading or editing. (TODO #23: or exported to other formats)
+
+Chaya is a client-side web application, with no backend dependencies (except the optional API providers for OCR and AI assistance).
+
+## Data format
+
+A `.chaya` file is a package (a ZIP file) containing (the original PDF) + (marked regions) + metadata.
+
+All coordinates are stored as fractions (numbers between 0.0 and 1.0) of the PDF page's width and height, for consistent display.
+
+## UI details
+
+- Upload and download happens via the same two buttons (one for `.chaya` files and one for `.pdf` files): click one of them to upload, work on the doc, then click one of them to download. So this can be used in various ways:
+  - Upload a PDF file, to start a new project.
+  - Download a `.chaya` package.
+  - Upload a `.chaya` file, to continue or edit an existing project.
+  - Upload a `.chaya` file and download the `.pdf` file from it.
+
+### Mark tab
+
+- Interactively draw bounding boxes by clicking and dragging on PDF pages. 
+  - Double click on a bounding box to give it a name (label).
+  - Handles to drag (reposition) or resize these regions.
+
+- Sidebar showing all marked regions, organized by page
   - Bidirectional hover highlighting between PDF and sidebar
-  - Individual delete buttons for each annotation
-- **Label Editing**: Double-click annotations to edit labels
-- **Save/Load Workflow**: Save annotations as .chaya files and reload them for further editing
-- **Resolution Independence**: All coordinates stored as fractions for consistent display
+  - Click on a region to select and scroll to it
+  - Click on a delete symbol to delete a marked region
 
-### ✏️ Edit Tab
-- **Coming Soon**: OCR and text correction functionality
-- **Planned Features**: Region-by-region text extraction and proofreading
+- AI-assisted regions:
+  - Optionally can use OCR+LLM (Google Cloud Vision + Gemini) to automatically draw bounding boxes on up to 5 pages at once. (The OCR is used to get precise word-level bounding boxes; seems to make a big difference in quality.)
+  - Few-shot learning from previously marked pages.
+  - Can also get types and OCR text here (TODO #29).
 
-### 📖 Read Tab
-- **Cropped Region Display**: Extract and display only the annotated regions from PDFs
-- **Navigation**: Quick navigation between annotation regions with hover highlighting
-- **Annotation Summary**: Overview of all loaded annotations with click-to-scroll functionality
+### ✏️ Edit tab (coming soon)
+- Structuring and ordering these marked regions.
+- OCR and text correction.
+
+### 📖 Read tab
+- Displays only the marked regions from PDFs
+- Nice HTML document with each region toggle-able between text and source image.
+
+-------
+
+**(Text below this line is not yet human-verified.)**
+
+-------
 
 ## Quick Start
 
 1. **Build the project**:
-   ```bash
+   ```sh
    npm install
    npm run build
    ```
 
 2. **Run tests**:
-   ```bash
+   ```sh
    npm test
    ```
 
@@ -60,9 +85,12 @@
 5. AI will analyze the page and generate annotations automatically
 6. Review and edit the generated annotations as needed
 
-**AI Features:**
+**Advanced AI Features**
+- **Multi-page Processing**: Annotate up to 5 pages simultaneously
+- **Dual API Integration**: Combines Gemini AI with Google Vision OCR
+- **Word-level Precision**: Uses OCR data to generate pixel-accurate bounding boxes
 - **Few-shot Learning**: AI learns from your existing annotations on other pages
-- **Customizable Prompts**: Tailor the AI behavior for different document types
+- **Semantic Understanding**: Generates semantic types and descriptive labels
 - **Smart Integration**: New AI annotations appear in sidebar and are fully interactive
 
 ### Editing Annotations  
@@ -76,12 +104,12 @@
 - **Save**: Click "Save Annotations" to download a JSON file named after your PDF
 - **Load**: Use "Load Existing Annotations" to continue editing previously saved work
 
-### Using the Read Tab
+### Complete Workflow
 1. Open `index.html` in your browser
 2. Upload a PDF file or .chaya package
-3. Navigate to the Read tab to view annotated regions
-4. Use the navigation buttons to jump between regions
-5. Hover over navigation buttons to highlight regions
+3. Use the Mark tab to mark regions manually or with AI assistance
+4. **Review**: Use Read tab to view extracted regions and navigate between annotations
+5. **Download**: Use the two-slot interface to download complete `.chaya` packages or original PDFs
 
 ### Annotation List Features
 - **Navigation**: Click any annotation in the list to select and scroll to it
@@ -90,27 +118,47 @@
 - **Position Info**: Each annotation shows its relative position as percentages
 - **Auto-selection**: Newly created annotations are automatically selected for immediate editing
 
-## Core Architecture
+## Architecture
 
 **This project is designed with simplicity and maintainability as primary goals.** It follows a client-side-only architecture, meaning it does not require a backend server and can be hosted on any static web hosting service (e.g., GitHub Pages, Cloudflare Pages).
 
-**Design Principles**:
+**Core Principles**:
 - **Zero Backend Dependencies**: Everything runs in the browser using modern web APIs
-- **Static Hosting**: Deploy anywhere that serves static files
-- **Self-Contained**: All processing happens client-side using PDF.js
+- **Static Hosting Ready**: Deploy anywhere that serves static files
+- **Self-Contained Packages**: .chaya files contain everything needed to view documents
+- **Production-Ready**: Comprehensive error handling, loading states, and user feedback
 
 **Technology Stack**:
 - **PDF.js** (via CDN): PDF rendering and manipulation
-- **TypeScript**: Type-safe development  
-- **Tailwind CSS**: Utility-first styling
+- **JSZip** (via CDN): .chaya file packaging and extraction
+- **TypeScript**: Type-safe development with comprehensive interfaces
+- **Tailwind CSS**: Utility-first styling for responsive design
 - **Playwright**: Browser automation testing
-- **Gemini API**: AI-powered annotation generation
+- **Gemini API**: Advanced AI-powered annotation generation
+- **Google Vision API**: Precise OCR and word-level text detection
+
+**Key Features**:
+- **Event-Driven Architecture**: Custom events coordinate between tabs
+- **Centralized State Management**: `ChayaApp` class manages application state
+- **Progressive Loading**: Detailed progress indicators with status updates
+- **Error Recovery**: Comprehensive error handling throughout the application
 
 ## Data Format (`.chaya` files)
 
-The Chaya application uses `.chaya` files (ZIP archives) to store PDF documents and their annotations. The annotation data within these files stores the user-generated region information.
+Chaya uses `.chaya` files (ZIP archives) as complete document packages containing:
+- **Original PDF**: Raw binary data with zero encoding overhead
+- **Annotations**: JSON data with fractional coordinates and metadata
+- **Manifest**: Version info, creation timestamps, and format metadata
 
-### Structure
+### .chaya Package Structure
+```
+document.chaya (ZIP file)
+├── manifest.json      # Metadata and version info
+├── document.pdf       # Original PDF (raw binary)
+└── annotations.json   # Annotation data with enhanced features
+```
+
+### Enhanced Annotation Data Structure
 
 ```json
 {
@@ -127,7 +175,10 @@ The Chaya application uses `.chaya` files (ZIP archives) to store PDF documents 
         "y": 0.152,
         "width": 0.800,
         "height": 0.085,
-        "label": "heading: Chapter 1"
+        "label": "heading: Chapter 1",
+        "semanticType": "title",
+        "wordIndices": [0, 1, 2],
+        "ocrText": "Chapter 1 Introduction"
       }
     ]
   }
@@ -169,15 +220,55 @@ chaya/
 - `npm run test:headed` - Run tests with browser UI visible
 - `npm run test:ui` - Run tests with Playwright's test runner UI
 
+### Implementation Status
+- ✅ **Two-slot upload/download interface** with dynamic mode switching
+- ✅ **Complete .chaya file format** with ZIP packaging and manifest
+- ✅ **Advanced AI annotation** with multi-page processing and dual APIs
+- ✅ **Interactive annotation tools** with 8-handle resize and drag
+- ✅ **Bidirectional highlighting system** between PDF and sidebar
+- ✅ **Production-ready features** including error handling and loading states
+- ✅ **Event-driven tab communication** with centralized state management
+- ✅ **Word-level OCR integration** for precise bounding box generation
+
 ### Code Organization
 
 #### Core Modules
-1. **App** (`src/app.ts`): Main application orchestration and tab management
-2. **Annotator** (`src/modes/annotator.ts`): Mark tab functionality with PDF rendering, interactive creation, editing, and management
-3. **Viewer** (`src/modes/viewer.ts`): Read tab functionality for cropped region extraction and display
-4. **AI Engine** (`src/ai-engine.ts`): Headless AI annotation service with pluggable engine architecture
-5. **AI Orchestrator** (`src/ai-orchestrator.ts`): Browser integration layer handling prompts, API keys, and few-shot examples
-6. **PDF Utils** (`src/pdf-utils.ts`): Shared utilities for PDF.js initialization and annotation parsing
+1. **App** (`src/app.ts`): 
+   - Centralized application state management
+   - Two-slot upload/download interface
+   - Tab switching and data coordination
+   - .chaya file packaging and extraction
+   - Progress tracking and error handling
+
+2. **Annotator** (`src/modes/annotator.ts`): 
+   - Interactive PDF annotation creation
+   - 8-handle resize and drag functionality
+   - Bidirectional highlighting system
+   - AI-assisted annotation integration
+   - Auto-selection and visual feedback
+
+3. **Viewer** (`src/modes/viewer.ts`): 
+   - Cropped region extraction and display
+   - Navigation with hover highlighting
+   - Annotation summary interface
+
+4. **AI Engine** (`src/ai-engine.ts`): 
+   - Headless AI annotation service
+   - Pluggable engine architecture
+   - JSON response parsing with fallbacks
+   - Multi-round annotation processing
+
+5. **AI Orchestrator** (`src/ai-orchestrator.ts`): 
+   - Multi-page processing coordination
+   - Dual API integration (Gemini + Google Vision)
+   - Word-level OCR data transformation
+   - Few-shot example generation
+   - Precise bounding box calculation
+
+6. **PDF Utils** (`src/pdf-utils.ts`): 
+   - PDF.js initialization and worker setup
+   - Annotation parsing with enhanced features
+   - Shared type definitions and utilities
 
 #### Key Systems
 - **PDF Rendering**: Canvas-based rendering with annotation overlay layers

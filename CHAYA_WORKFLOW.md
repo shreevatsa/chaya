@@ -1,7 +1,7 @@
 # Chaya Document Processing Workflow
 
 ## Overview
-Chaya is a comprehensive document digitization pipeline that transforms PDFs into rich, structured digital documents. It uses a three-tab workflow (Mark, Edit, Read) where users progressively enhance documents while maintaining full bidirectional traceability between original and processed content.
+Chaya is a comprehensive document digitization application that transforms PDFs into rich, annotated digital documents. It features a unified interface with two-slot upload/download functionality and three-tab workflow (Mark, Edit, Read) for progressive document enhancement with full bidirectional traceability.
 
 ## Core Philosophy
 
@@ -20,14 +20,22 @@ Every piece of enhanced content maintains a link to its original PDF location, a
 ### **Tab 1: Mark** 
 **Purpose**: Define spatial regions and semantic structure
 
-**Interface**: PDF viewer with annotation overlay
-- Upload PDF or existing .chaya file
-- Draw bounding boxes around content regions
-- Assign semantic types (title, paragraph, verse, footnote, etc.)
-- AI-assisted region detection
+**Interface**: Advanced PDF annotation system with two-slot upload
+- Upload PDF or existing .chaya file via dynamic two-slot interface
+- Draw bounding boxes with interactive creation tools
+- Advanced AI-assisted annotation with multi-page processing:
+  - Dual API integration (Gemini + Google Vision)
+  - Word-level OCR for precise bounding boxes
+  - Few-shot learning from existing annotations
+  - Up to 5 pages processed simultaneously
+- Professional annotation tools:
+  - 8-handle resize and drag functionality
+  - Auto-selection of newly created annotations
+  - Bidirectional highlighting between PDF and sidebar
+  - Label editing via double-click
 - Visual indicators for different content types
 
-**Output**: Spatial layout data with semantic classification
+**Output**: Enhanced spatial layout data with semantic classification, OCR text, and word indices
 
 ### **Tab 2: Edit**
 **Purpose**: Extract and enhance textual content
@@ -50,18 +58,50 @@ Every piece of enhanced content maintains a link to its original PDF location, a
 ### **Tab 3: Read**
 **Purpose**: Beautiful presentation with source traceability
 
-**Interface**: Clean reading experience with toggle capabilities
-- Rendered document with professional typography
-- Each region can toggle between "enhanced" and "original" views
-- Export to HTML, PDF, or other formats
-- Navigation aids and document outline
-- Seamless switching between processed text and source images
+**Interface**: Currently displays cropped regions, with planned enhancements:
+- **Current**: Extracted annotated regions displayed as individual images with navigation
+- **Planned**: Toggle between "enhanced" and "original" views
+- **Planned**: Export to HTML, PDF, or other formats
+- **Planned**: Full document presentation with professional typography
+- Navigation aids with hover highlighting (implemented)
+- Click-to-scroll functionality between regions (implemented)
 
-**Unique Feature**: Granular original/enhanced toggling - any piece of text can instantly show its original PDF appearance for verification or preference.
+**Unique Planned Feature**: Granular original/enhanced toggling - any piece of text can instantly show its original PDF appearance for verification or preference.
 
 ## Data Architecture
 
-### **Single JSON Document with Separation of Concerns**
+### **Complete .chaya Package Format (Current Implementation)**
+```
+document.chaya (ZIP file)
+├── manifest.json      # Version info, creation timestamps, original filename
+├── document.pdf       # Original PDF (raw binary, zero encoding overhead)
+└── annotations.json   # Enhanced annotation data
+```
+
+### **Enhanced Annotation Data Structure (Current)**
+```json
+{
+  "metadata": {
+    "sourcePdf": "document.pdf",
+    "annotationVersion": "1.1",
+    "annotatedAt": "2025-07-16T10:00:00Z"
+  },
+  "annotationsByPage": {
+    "1": [
+      {
+        "id": "region1",
+        "x": 0.1, "y": 0.2, "width": 0.8, "height": 0.1,
+        "label": "Chapter heading",
+        "semanticType": "title",
+        "wordIndices": [0, 1, 2],
+        "ocrText": "Chapter 1 Introduction"
+      }
+    ]
+  }
+}
+```
+
+### **Planned Enhanced Data Structure (Future Edit Tab)**
 ```json
 {
   "version": "2.0",
@@ -78,11 +118,13 @@ Every piece of enhanced content maintains a link to its original PDF location, a
       "pageNumber": 1,
       "x": 0.1, "y": 0.2, "width": 0.8, "height": 0.1,
       "semanticType": "title",
-      "label": "Chapter heading"
+      "label": "Chapter heading",
+      "wordIndices": [0, 1, 2],
+      "ocrText": "Chapter 1 Introduction"
     }
   ],
   
-  // Textual/content data (Edit tab)
+  // Textual/content data (Edit tab - planned)
   "content": {
     "prosemirrorDoc": {
       "type": "doc",
@@ -108,9 +150,9 @@ Every piece of enhanced content maintains a link to its original PDF location, a
 ```
 
 ### **Data Evolution Through Workflow**
-1. **Mark stage**: Only `regions[]` exists
-2. **Edit stage**: Add `content.prosemirrorDoc` with region references
-3. **Read stage**: Render content with toggle capabilities
+1. **Mark stage (Current)**: Enhanced annotation data with spatial layout, semantic types, OCR text, and word indices
+2. **Edit stage (Planned)**: Add `content.prosemirrorDoc` with region references
+3. **Read stage**: Currently displays extracted regions; planned to render full content with toggle capabilities
 
 ## Technical Architecture
 
@@ -244,35 +286,40 @@ When I was young...         [PDF crop image]
 - 📖 Annotations (secondary text)
 - 🔢 Page numbers (minimal styling)
 
-## Implementation Phases
+## Implementation Status
 
-### **Phase 1: Basic Tab Structure**
-- Create unified HTML with three tabs
-- Basic tab switching with state persistence
-- Mark tab: Current annotator functionality
-- Edit tab: Placeholder ("Coming soon")
-- Read tab: Enhanced viewer functionality
+### **Phase 1: ✅ Completed - Advanced Tab Structure**
+- ✅ Unified HTML with three tabs and two-slot interface
+- ✅ Advanced tab switching with centralized state management
+- ✅ Mark tab: Professional annotation functionality with AI integration
+- ✅ Edit tab: Placeholder with detailed planned features
+- ✅ Read tab: Enhanced viewer with cropped region display
 
-### **Phase 2: Semantic Types**
-- Add semantic type selection to Mark tab
-- Visual indicators for different types
-- Enhanced data format with semanticType field
+### **Phase 2: ✅ Completed - Enhanced Annotation System**
+- ✅ Semantic type support in annotation data structure
+- ✅ Advanced AI annotation with multi-page processing
+- ✅ Word-level OCR integration for precise bounding boxes
+- ✅ Interactive annotation tools with 8-handle resize/drag
+- ✅ Bidirectional highlighting between PDF and sidebar
 
-### **Phase 3: ProseMirror Integration**
-- Build Edit tab with rich text editor
-- Implement region mark system
-- Auto-populate from OCR
-- Bidirectional region highlighting
+### **Phase 3: ✅ Completed - .chaya Package Format**
+- ✅ Complete ZIP-based file format implementation
+- ✅ Self-contained document packages with manifest
+- ✅ Two-slot upload/download interface
+- ✅ Progress tracking and error handling
+- ✅ Development and production environment support
 
-### **Phase 4: Enhanced Read Experience**
-- Original/enhanced toggle functionality
-- Export capabilities
-- Professional presentation styling
+### **Phase 4: 🔄 Planned - ProseMirror Integration**
+- 🔄 Build Edit tab with rich text editor
+- 🔄 Implement region mark system
+- 🔄 Auto-populate from OCR
+- 🔄 Bidirectional region highlighting in editor
 
-### **Phase 5: .chaya Format**
-- ZIP-based file format
-- Self-contained document packages
-- Application bundling and embedding
+### **Phase 5: 🔄 Planned - Enhanced Read Experience**
+- 🔄 Original/enhanced toggle functionality
+- 🔄 Export capabilities (HTML, PDF)
+- 🔄 Professional presentation styling
+- 🔄 Full document rendering with typography
 
 ## Key Innovations
 

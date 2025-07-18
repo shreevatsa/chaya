@@ -1,198 +1,165 @@
-# .chaya Format Implementation Plan
+# .chaya Format Implementation - Current Status
 
 ## Overview
-Implementation plan for creating self-contained `.chaya` files that package the PDF, annotations, and Chaya application together in a single ZIP-based format (similar to EPUB or Office documents).
+✅ **COMPLETED**: Self-contained `.chaya` files that package PDF, annotations, and metadata in a single ZIP-based format have been successfully implemented.
 
-## Architecture Goals
-- **Single-file portability**: Everything in one `.chaya` file
-- **Zero encoding overhead**: PDF stays as raw binary in ZIP
-- **Universal access**: Works with or without browser extension
-- **Progressive enhancement**: Extension provides native file associations
-- **Backwards compatibility**: Existing PDF+JSON workflow unchanged
+## ✅ Implemented Architecture
+- ✅ **Single-file portability**: Everything in one `.chaya` file
+- ✅ **Zero encoding overhead**: PDF stays as raw binary in ZIP
+- ✅ **Universal access**: Works in any modern browser
+- ✅ **Two-slot interface**: Dynamic upload/download workflow
+- ✅ **Backwards compatibility**: Supports both PDF and .chaya workflows
 
-## Phase 1: Core ZIP Export/Import Infrastructure
+## ✅ Implemented: Core ZIP Export/Import Infrastructure
 
-### 1.1 Add ZIP Dependencies
-```javascript
-// Add to package.json
-"dependencies": {
-  "jszip": "^3.10.1"
-}
+### ✅ ZIP Dependencies
+```html
+<!-- Loaded via CDN in index.html -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 ```
 
-### 1.2 Create Bundling System
+### ✅ Implemented Export System
 ```typescript
-// New file: src/bundler.ts
-export async function bundleApplication(): Promise<{
-  indexHtml: string,
-  viewerHtml: string, 
-  bundledJs: string,
-  bundledCss: string
-}> {
-  // Inline all dependencies into self-contained HTML files
-  // Bundle all JS modules into single file
-  // Bundle all CSS into single file
-}
-```
-
-### 1.3 Modify Export System
-```typescript
-// Update annotator.ts
-async function exportAsChayaFile() {
+// In src/app.ts - ChayaApp class
+private async downloadChayaFile(): Promise<void> {
   const zip = new JSZip();
   
-  // Bundle application
-  const bundle = await bundleApplication();
-  zip.file("app/index.html", bundle.indexHtml);
-  zip.file("app/viewer.html", bundle.viewerHtml);
-  zip.file("app/app.js", bundle.bundledJs);
-  zip.file("app/app.css", bundle.bundledCss);
+  // Add manifest with metadata
+  const manifest = {
+    version: "1.0",
+    created: new Date().toISOString(),
+    originalFilename: this.state.pdfFile.name,
+    chayaFormatVersion: "1.0",
+    application: { name: "Chaya", version: "1.0.0" }
+  };
+  zip.file("manifest.json", JSON.stringify(manifest, null, 2));
   
-  // Add document data
-  zip.file("document.pdf", getCurrentPdfBuffer());
-  zip.file("annotations.json", JSON.stringify(getCurrentAnnotations()));
-  zip.file("manifest.json", createManifest());
+  // Add original PDF (raw binary)
+  zip.file("document.pdf", await this.readFileAsArrayBuffer(this.state.pdfFile));
   
-  downloadFile(`${pdfName}.chaya`, await zip.generateAsync({type: "blob"}));
+  // Add annotations with enhanced data
+  zip.file("annotations.json", JSON.stringify(this.createAnnotationsJSON(), null, 2));
+  
+  // Generate and download
+  const zipBlob = await zip.generateAsync({type: "blob", compression: "DEFLATE"});
+  // Auto-download with proper filename
 }
 ```
 
-## Phase 2: .chaya File Loader
+### ✅ Implemented Import System
+```typescript
+// In src/app.ts - ChayaApp class
+private async loadChayaFile(file: File): Promise<void> {
+  const zip = new JSZip();
+  const zipContent = await zip.loadAsync(file);
+  
+  // Validate and extract all components
+  const manifest = JSON.parse(await zipContent.file('manifest.json').async('string'));
+  const pdfArrayBuffer = await zipContent.file('document.pdf').async('arraybuffer');
+  const annotations = JSON.parse(await zipContent.file('annotations.json').async('string'));
+  
+  // Reconstruct document state
+  // Full progress tracking and error handling
+}
+```
 
-### 2.1 Create Web Launcher Interface
+## ✅ Implemented: Integrated .chaya File Loader
+
+### ✅ Two-Slot Interface (No separate launcher needed)
 ```html
-<!-- New file: launcher.html -->
-<!DOCTYPE html>
-<html>
-<head><title>Chaya Launcher</title></head>
-<body>
-  <div id="upload-zone">
-    <h1>Open .chaya File</h1>
-    <input type="file" accept=".chaya" id="chaya-upload">
-    <div class="drop-zone">Drop .chaya file here</div>
+<!-- In index.html - Dynamic two-slot interface -->
+<div class="flex gap-6 justify-center">
+  <!-- .chaya Slot -->
+  <div id="chaya-slot" class="flex-1 max-w-xs">
+    <div class="upload-slot">📦 Upload .chaya</div>
+    <input type="file" id="chaya-upload" accept=".chaya,.zip">
   </div>
-  <div id="app-container" style="display: none;">
-    <!-- Dynamic content loaded here -->
+  
+  <!-- OR Separator -->
+  <div class="flex items-center">OR</div>
+  
+  <!-- .pdf Slot -->
+  <div id="pdf-slot" class="flex-1 max-w-xs">
+    <div class="upload-slot">📄 Upload .pdf</div>
+    <input type="file" id="pdf-upload" accept=".pdf">
   </div>
-</body>
-</html>
+</div>
 ```
 
-### 2.2 Implement .chaya Loader
+### ✅ Implemented Unified Loader
 ```typescript
-// New file: src/chaya-loader.ts
-export async function loadChayaFile(file: File): Promise<void> {
-  const zip = await JSZip.loadAsync(file);
-  
-  // Extract and validate manifest
-  const manifest = JSON.parse(await zip.file("manifest.json").async("string"));
-  
-  // Load application files
-  const indexHtml = await zip.file("app/index.html").async("string");
-  const appJs = await zip.file("app/app.js").async("string");
-  const appCss = await zip.file("app/app.css").async("string");
-  
-  // Load document data
-  const pdfBuffer = await zip.file("document.pdf").async("arraybuffer");
-  const annotations = JSON.parse(await zip.file("annotations.json").async("string"));
-  
-  // Inject into current page
-  injectAndRunApplication(indexHtml, appJs, appCss, pdfBuffer, annotations);
+// In src/app.ts - Integrated into main application
+private async loadChayaFile(file: File): Promise<void> {
+  // Full ZIP extraction with progress tracking
+  // Validates manifest, extracts PDF and annotations
+  // Reconstructs complete document state
+  // Updates UI to download mode
+  // Comprehensive error handling
 }
 ```
 
-## Phase 3: Application Mode Detection
+## ✅ Implemented: Dynamic Interface Mode Detection
 
-### 3.1 Detect Runtime Mode
+### ✅ Smart Mode Detection
 ```typescript
-// Add to existing files
-enum AppMode {
-  STANDALONE = 'standalone',  // Normal chaya.app usage
-  EMBEDDED = 'embedded'       // Running from .chaya file
+// In src/app.ts - Dynamic UI state management
+interface AppState {
+  documentLoaded: boolean;  // Determines upload vs download mode
+  // ... other state
 }
 
-function detectAppMode(): AppMode {
-  return window.CHAYA_EMBEDDED_DATA ? AppMode.EMBEDDED : AppMode.STANDALONE;
-}
-```
-
-### 3.2 Modify UI Based on Mode
-```typescript
-// Update annotator.ts and viewer.ts
-function initializeApp() {
-  const mode = detectAppMode();
-  
-  if (mode === AppMode.EMBEDDED) {
-    // Hide file upload UI
-    hideFileUploadControls();
-    // Load embedded data
-    loadEmbeddedData();
-    // Show "embedded mode" indicator
-    showEmbeddedModeUI();
+// Dynamic UI switching
+private updateSlotUI(): void {
+  if (this.state.documentLoaded) {
+    // Download mode - show download slots
+    this.showDownloadInterface();
   } else {
-    // Normal standalone mode
-    showFileUploadControls();
+    // Upload mode - show upload slots
+    this.showUploadInterface();
   }
 }
 ```
 
-## Phase 4: Browser Extension
-
-### 4.1 Extension Manifest
-```json
-// New: extension/manifest.json
-{
-  "manifest_version": 3,
-  "name": "Chaya File Handler",
-  "version": "1.0",
-  "permissions": ["activeTab"],
-  "action": {
-    "default_popup": "popup.html"
-  },
-  "content_scripts": [{
-    "matches": ["file://*.chaya"],
-    "js": ["content.js"]
-  }]
-}
+### ✅ Implemented Smart UI Adaptation
+```typescript
+// Automatic mode switching based on document state
+// Upload mode: Shows upload slots for PDF/.chaya
+// Download mode: Shows download slots for .chaya/.pdf
+// Preserves file input elements during UI updates
+// Proper event listener management
 ```
 
-### 4.2 Extension Logic
-```javascript
-// New: extension/content.js
-// Detect .chaya file access
-if (location.href.endsWith('.chaya')) {
-  // Redirect to web launcher
-  const launcherUrl = `https://chaya.app/launcher?fileUrl=${encodeURIComponent(location.href)}`;
-  location.replace(launcherUrl);
-}
-```
+## 🔄 Future Enhancement: Browser Extension
 
-## Phase 5: Build System Updates
+### 🔄 Planned Extension Features
+- Native .chaya file association
+- Double-click to open .chaya files
+- Integration with OS file system
+- Enhanced sharing capabilities
 
-### 5.1 Update Build Scripts
+**Current Status**: Not implemented - the web application works universally without requiring extensions
+
+## ✅ Implemented: Streamlined Build System
+
+### ✅ Current Build Configuration
 ```json
-// Update package.json
+// package.json - Simplified build process
 {
   "scripts": {
-    "build": "npm run build:app && npm run build:launcher && npm run build:extension",
-    "build:app": "tsc && postcss ./src/input.css -o ./dist/output.css",
-    "build:launcher": "webpack --config launcher.webpack.js",
-    "build:extension": "cp -r extension/ dist/extension/"
+    "build": "tsc && postcss ./src/input.css -o ./dist/output.css",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui"
   }
 }
 ```
 
-### 5.2 Add Bundling Configuration
-```javascript
-// New: launcher.webpack.js
-module.exports = {
-  entry: './src/launcher.ts',
-  output: {
-    filename: 'launcher.js',
-    path: path.resolve(__dirname, 'dist')
-  },
-  // Bundle everything into single file for embedding
-};
+### ✅ CDN-Based Dependencies
+```html
+<!-- No bundling needed - dependencies loaded via CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script type="module" src="./dist/app.js"></script>
 ```
 
 ## Phase 6: File Structure Changes

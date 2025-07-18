@@ -5,13 +5,14 @@
 ### Main Components
 
 #### 1. Unified Application Structure
-- **Entry Point**: `index.html` with tab-based navigation
-- **App Orchestration**: `src/app.ts` manages tab switching and data flow
-- **Dependencies**: PDF.js (loaded via CDN)
+- **Entry Point**: `index.html` for upload/download interface and tab-based navigation
+- **App Orchestration**: `ChayaApp` class in `src/app.ts` manages all application state and coordination
+- **Dependencies**: PDF.js, JSZip (both loaded via CDN)
 - **Key Concepts**:
   - Single HTML file with three functional tabs
-  - Event-driven communication between tabs
-  - Unified document loading (.chaya files and PDFs)
+  - Event-driven communication between tabs with custom events
+  - Complete .chaya file packaging with ZIP format
+  - Centralized state management with progress tracking
   - Fractional coordinate system (0.0-1.0) for resolution independence
 
 #### 2. PDF Rendering System
@@ -67,15 +68,20 @@ AI: User clicks AI button → Prompt dialog → API call → Parse response → 
 #### 6. AI Engine Architecture
 - **Pluggable Design**: Abstract `AIEngine` interface allows different AI providers
 - **Current Implementation**: `GeminiEngine` with Google Gemini API
-- **Request Structure**: Base64 images, prompts, optional few-shot examples
-- **Response Parsing**: Structured JSON with fallback to markdown extraction
+- **Multi-page Processing**: Handles up to 5 pages simultaneously
+- **Request Structure**: Base64 images, enhanced prompts with OCR data, few-shot examples
+- **Response Parsing**: Structured JSON with coordinate transformation and fallback parsing
 - **Error Handling**: User-friendly error messages and retry logic
 
 #### 7. AI Orchestrator
 - **Browser Integration**: Bridges UI interactions with headless AI engine
+- **Dual API Integration**: Coordinates Gemini AI with Google Vision OCR
+- **Multi-page Coordination**: Processes up to 5 pages with shared context
+- **Word-level OCR**: Transforms Vision API data for precise bounding box generation
 - **State Management**: API key persistence, prompt dialogs, loading states
 - **Few-shot Examples**: Automatically gathers examples from previously annotated pages
-- **Coordinate Validation**: Ensures AI-generated coordinates are within valid bounds
+- **Coordinate Transformation**: Converts between different coordinate systems (pixels, fractions, normalized)
+- **Enhanced Annotations**: Generates semantic types, word indices, and OCR text
 
 #### 8. Read Tab (Viewer System)
 - **Cropped Extraction**: `extractAnnotationRegion()` creates canvas crops of annotations
@@ -84,36 +90,47 @@ AI: User clicks AI button → Prompt dialog → API call → Parse response → 
 - **Integration**: Shares data with Mark tab through unified document loading
 
 #### 9. Serialization System
-- **Save Format**: .chaya files (ZIP archives) containing PDF and JSON annotations
-- **Load Process**: Validation → data extraction → visual rendering
-- **Filename Convention**: Uses original PDF filename with `.chaya` extension
+- **Save Format**: .chaya files (ZIP archives) containing PDF, JSON annotations, and manifest
+- **Load Process**: ZIP extraction → validation → data extraction → visual rendering
+- **Manifest Structure**: Version info, creation timestamps, original filename
+- **Development Support**: Automatic `.chaya.zip` extension for localhost development
+- **MIME Type Handling**: Proper `application/zip` content type for browser compatibility
+- **Error Recovery**: Comprehensive validation with user-friendly error messages
 - **Shared Utilities**: `pdf-utils.ts` provides parsing and validation functions
 
 ### State Management
 
 #### Application State
 ```typescript
-// App-level state (src/app.ts)
-let currentTab: string = 'mark';              // Active tab
-let loadedPdfDocument: any = null;            // Shared PDF document
-let loadedAnnotations: Annotation[] = [];     // Shared annotation data
+// ChayaApp class state (src/app.ts)
+interface AppState {
+    currentTab: 'mark' | 'edit' | 'read';       // Active tab
+    documentLoaded: boolean;                    // Document upload status
+    pdfFile: File | null;                      // Uploaded PDF file
+    loadedAnnotations: SharedAnnotation[];     // Shared annotation data
+    pdfDocument: any | null;                   // PDF.js document object
+    hasUnsavedChanges: boolean;                // Change tracking
+}
 
 // Mark tab state (src/modes/annotator.ts)
-let annotations: Annotation[] = [];           // Master annotation data
-let selectedAnnotation: HTMLDivElement | null = null;  // Currently selected DOM element
-let selectedAnnotationData: Annotation | null = null;  // Currently selected data
-let isResizing: boolean = false;              // Resize operation state
-let isDragging: boolean = false;              // Drag operation state
+let annotations: Annotation[] = [];                    // Master annotation data
+let selectedAnnotation: HTMLDivElement | null = null; // Currently selected DOM element
+let selectedAnnotationData: Annotation | null = null; // Currently selected data
+let isResizing: boolean = false;                      // Resize operation state
+let isDragging: boolean = false;                      // Drag operation state
+let hasUnsavedChanges: boolean = false;               // Local change tracking
 
 // Read tab state (src/modes/viewer.ts)
-let loadedAnnotations: Annotation[] = [];     // Local copy for display
+let loadedAnnotations: Annotation[] = [];             // Local copy for display
 ```
 
 #### Data Flow
 1. **User Action** → **Event Handler** → **State Update** → **DOM Update** → **List Update**
-2. **Tab Communication**: Custom events coordinate data sharing between tabs
-3. All state changes trigger respective update functions to keep UI in sync
-4. Coordinate conversions happen at interaction boundaries (user input → data storage)
+2. **Tab Communication**: Custom events (`markTabDataReady`, `readTabDataReady`, `documentSaved`) coordinate data sharing
+3. **State Synchronization**: `updateAnnotations()` for changes vs `syncAnnotations()` for routine updates
+4. **Progress Tracking**: Detailed loading states with percentage and status messages
+5. **Error Handling**: Comprehensive error recovery with user-friendly messages
+6. Coordinate conversions happen at interaction boundaries (user input → data storage)
 
 ### Key Design Patterns
 
@@ -176,6 +193,13 @@ interface Annotation {
 - **Type Safety**: TypeScript catches most issues at compile time
 - **Console Logging**: Detailed logging for debugging
 - **Test Coverage**: Playwright tests catch runtime issues
+
+#### 10. Two-Slot Interface System
+- **Dynamic Mode Switching**: Upload mode ↔ Download mode based on document state
+- **File Input Preservation**: Maintains DOM elements during UI updates
+- **Event Coordination**: Proper event listener management with re-attachment
+- **Visual Feedback**: Clear indication of available actions (upload vs download)
+- **Seamless Workflow**: Upload → Annotate → Download complete packages
 
 ### Extension Points
 
