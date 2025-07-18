@@ -77,5 +77,3 @@ export function parseAnnotationsFromJson(jsonData: any): Annotation[] {
     console.log('Loaded annotations:', annotations);
     return annotations;
 }
-
-
