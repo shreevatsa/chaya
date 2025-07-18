@@ -73,28 +73,14 @@ class ChayaApp {
         this.switchToTab('mark');
     }
     // Public methods for tabs to access shared state
-    public getSharedState() {
-        return {
-            pdfDocument: this.state.pdfDocument,
-            annotations: this.state.loadedAnnotations,
-            annotationsFileName: this.state.loadedAnnotationsFileName,
-            pdfFileName: this.state.pdfFile?.name,
-            documentLoaded: this.state.documentLoaded
-        };
-    }
-
     public updateAnnotations(annotations: Annotation[]): void {
         this.state.loadedAnnotations = annotations;
         this.state.hasUnsavedChanges = true;
     }
 
+    // Update annotations without marking as unsaved (for sync operations)
     public syncAnnotations(annotations: Annotation[]): void {
-        // Update annotations without marking as unsaved (for sync operations)
         this.state.loadedAnnotations = annotations;
-    }
-
-    public markAsSaved(): void {
-        this.state.hasUnsavedChanges = false;
     }
 
     public updateLoadingProgress(percent: number, text: string, details: string): void {
@@ -179,18 +165,14 @@ class ChayaApp {
     }
 
     private setupFileInputListeners(): void {
-        const chayaUpload = documentGetElementById<HTMLInputElement>('chaya-upload');
-        const pdfUpload = documentGetElementById<HTMLInputElement>('pdf-upload');
-
-        chayaUpload.addEventListener('change', async (event) => {
+        documentGetElementById<HTMLInputElement>('chaya-upload').addEventListener('change', async (event) => {
             const target = event.target as HTMLInputElement;
             const file = target.files?.[0];
             if (file) {
                 await this.loadChayaFile(file);
             }
         });
-
-        pdfUpload.addEventListener('change', async (event) => {
+        documentGetElementById<HTMLInputElement>('pdf-upload').addEventListener('change', async (event) => {
             const target = event.target as HTMLInputElement;
             const file = target.files?.[0];
             if (file) {
@@ -270,7 +252,7 @@ class ChayaApp {
             const zip = new JSZip();
             const zipContent = await zip.loadAsync(file);
 
-            this.updateLoadingProgress(20, 'Extracting files...', 'Validating .chaya format...');
+            this.updateLoadingProgress(5, 'Extracting files...', 'Validating .chaya format...');
 
             // Validate required files
             const requiredFiles = ['manifest.json', 'document.pdf', 'annotations.json'];
@@ -280,14 +262,14 @@ class ChayaApp {
                 }
             }
 
-            this.updateLoadingProgress(40, 'Reading manifest...', 'Validating format version...');
+            this.updateLoadingProgress(10, 'Reading manifest...', 'Validating format version...');
 
             // Read and validate manifest
             const manifestText = await zipContent.file('manifest.json')!.async('string');
             const manifest = JSON.parse(manifestText);
             console.log('Manifest:', manifest);
 
-            this.updateLoadingProgress(60, 'Extracting PDF...', 'Loading document content...');
+            this.updateLoadingProgress(15, 'Extracting PDF...', 'Loading document content...');
 
             // Extract PDF data
             const pdfArrayBuffer = await zipContent.file('document.pdf')!.async('arraybuffer');
@@ -296,14 +278,14 @@ class ChayaApp {
                 type: 'application/pdf'
             });
 
-            this.updateLoadingProgress(80, 'Loading annotations...', 'Parsing annotation data...');
+            this.updateLoadingProgress(20, 'Loading annotations...', 'Parsing annotation data...');
 
             // Extract annotations
             const annotationsText = await zipContent.file('annotations.json')!.async('string');
             const annotationsData = JSON.parse(annotationsText);
             const annotations = parseAnnotationsFromJson(annotationsData);
 
-            this.updateLoadingProgress(90, 'Initializing document...', 'Setting up PDF viewer...');
+            this.updateLoadingProgress(25, 'Initializing document...', 'Setting up PDF viewer...');
 
             // Update state
             this.state.pdfFile = pdfFile;
@@ -315,7 +297,7 @@ class ChayaApp {
             const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
             this.state.pdfDocument = await loadingTask.promise;
 
-            this.updateLoadingProgress(95, 'Finalizing...', 'Preparing user interface...');
+            this.updateLoadingProgress(30, 'Finalizing...', 'Preparing user interface...');
 
             // Mark as loaded
             this.state.documentLoaded = true;
@@ -621,7 +603,6 @@ class ChayaApp {
 
 // Initialize the app when DOM is ready
 let appInstance: ChayaApp;
-
 document.addEventListener('DOMContentLoaded', () => {
     appInstance = new ChayaApp();
     // Make app instance globally accessible for tabs
