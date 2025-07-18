@@ -21,7 +21,6 @@ async function waitForPdfjs(): Promise<any> {
     console.log('PDF.js initialized; worker src set to:', pdfjs.GlobalWorkerOptions?.workerSrc);
 })();
 
-/*
 function documentGetElementById<T extends HTMLElement>(id: string): T {
     const element = document.getElementById(id) as T;
     if (!element) {
@@ -29,7 +28,6 @@ function documentGetElementById<T extends HTMLElement>(id: string): T {
     }
     return element;
 }
-*/
 
 // Application state
 interface AppState {
@@ -93,18 +91,13 @@ class ChayaApp {
     }
 
     public updateLoadingProgress(percent: number, text: string, details: string): void {
-        const loadingText = document.getElementById('app-loading-text') as HTMLSpanElement;
-        const loadingPercent = document.getElementById('app-loading-percent') as HTMLSpanElement;
-        const progressBar = document.getElementById('app-progress-bar') as HTMLDivElement;
-        const loadingDetails = document.getElementById('app-loading-details') as HTMLDivElement;
-
         const clampedPercent = Math.max(0, Math.min(100, percent));
 
+        documentGetElementById<HTMLSpanElement>('app-loading-text').textContent = text;
+        documentGetElementById<HTMLSpanElement>('app-loading-percent').textContent = `${Math.round(clampedPercent)}%`;
+        documentGetElementById<HTMLDivElement>('app-loading-details').textContent = details;
+        const progressBar = documentGetElementById<HTMLDivElement>('app-progress-bar');
         progressBar.style.width = `${clampedPercent}%`;
-        loadingPercent.textContent = `${Math.round(clampedPercent)}%`;
-        loadingText.textContent = text;
-        loadingDetails.textContent = details;
-
         // Update progress bar color based on status
         if (clampedPercent === 100) {
             progressBar.className = 'bg-green-600 h-2 rounded-full transition-all duration-300';
@@ -118,18 +111,10 @@ class ChayaApp {
     // === TAB MANAGEMENT ===
     // Clicking on Mark/Edit/Read should call `switchToTab('mark')` etc.
     private setupTabSwitchingEventListeners(): void {
-        const markBtn = document.getElementById('mark-tab-btn') as HTMLButtonElement;
-        const editBtn = document.getElementById('edit-tab-btn') as HTMLButtonElement;
-        const readBtn = document.getElementById('read-tab-btn') as HTMLButtonElement;
-
-        markBtn.addEventListener('click', () => this.switchToTab('mark'));
-        readBtn.addEventListener('click', () => this.switchToTab('read'));
-
+        documentGetElementById<HTMLButtonElement>('mark-tab-btn').addEventListener('click', () => this.switchToTab('mark'));
+        documentGetElementById<HTMLButtonElement>('read-tab-btn').addEventListener('click', () => this.switchToTab('read'));
         // Edit tab is disabled for now
-        editBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            // Could show a modal about coming soon feature
-        });
+        documentGetElementById<HTMLButtonElement>('edit-tab-btn').addEventListener('click', (e) => { e.preventDefault(); });
     }
 
     private switchToTab(tab: 'mark' | 'edit' | 'read'): void {
@@ -149,17 +134,12 @@ class ChayaApp {
         });
 
         // Show target tab
-        const targetTab = document.getElementById(`${tab}-tab`);
-        if (targetTab) {
-            targetTab.classList.remove('hidden');
-        }
+        documentGetElementById(`${tab}-tab`).classList.remove('hidden');
 
         // Activate target button
-        const targetBtn = document.getElementById(`${tab}-tab-btn`);
-        if (targetBtn && tab !== 'edit') { // Edit tab stays disabled
-            targetBtn.classList.add('active', 'bg-blue-100', 'text-blue-700');
-            targetBtn.classList.remove('text-gray-600', 'hover:text-gray-800');
-        }
+        const targetBtn = documentGetElementById(`${tab}-tab-btn`);
+        targetBtn.classList.add('active', 'bg-blue-100', 'text-blue-700');
+        targetBtn.classList.remove('text-gray-600', 'hover:text-gray-800');
 
         // If we have loaded data, notify the newly active tab
         if (this.state.documentLoaded && this.state.pdfDocument) {
@@ -196,10 +176,10 @@ class ChayaApp {
     }
 
     private setupFileInputListeners(): void {
-        const chayaUpload = document.getElementById('chaya-upload') as HTMLInputElement;
-        const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
+        const chayaUpload = documentGetElementById<HTMLInputElement>('chaya-upload');
+        const pdfUpload = documentGetElementById<HTMLInputElement>('pdf-upload');
 
-        chayaUpload?.addEventListener('change', async (event) => {
+        chayaUpload.addEventListener('change', async (event) => {
             const target = event.target as HTMLInputElement;
             const file = target.files?.[0];
             if (file) {
@@ -207,7 +187,7 @@ class ChayaApp {
             }
         });
 
-        pdfUpload?.addEventListener('change', async (event) => {
+        pdfUpload.addEventListener('change', async (event) => {
             const target = event.target as HTMLInputElement;
             const file = target.files?.[0];
             if (file) {
@@ -231,11 +211,7 @@ class ChayaApp {
     private async loadFiles(): Promise<void> {
         if (!this.state.pdfFile) return;
 
-        const loadingDiv = document.getElementById('app-loading') as HTMLDivElement;
-        const loadingText = document.getElementById('app-loading-text') as HTMLSpanElement;
-        const loadingPercent = document.getElementById('app-loading-percent') as HTMLSpanElement;
-        const progressBar = document.getElementById('app-progress-bar') as HTMLDivElement;
-        const loadingDetails = document.getElementById('app-loading-details') as HTMLDivElement;
+        const loadingDiv = documentGetElementById<HTMLDivElement>('app-loading');
 
         try {
             // Show loading progress
@@ -294,7 +270,7 @@ class ChayaApp {
      * `loadFiles()`.
      */
     private async loadChayaFile(file: File): Promise<void> {
-        const loadingDiv = document.getElementById('app-loading') as HTMLDivElement;
+        const loadingDiv = documentGetElementById<HTMLDivElement>('app-loading');
 
         try {
             console.log('Loading .chaya file:', file.name);
@@ -507,9 +483,9 @@ class ChayaApp {
 
     // === UI MANAGEMENT ===
     private updateSlotUI(): void {
-        const chayaSlot = document.getElementById('chaya-slot') as HTMLDivElement;
-        const pdfSlot = document.getElementById('pdf-slot') as HTMLDivElement;
-        const documentFilename = document.getElementById('document-filename') as HTMLDivElement;
+        const chayaSlot = documentGetElementById<HTMLDivElement>('chaya-slot');
+        const pdfSlot = documentGetElementById<HTMLDivElement>('pdf-slot');
+        const documentFilename = documentGetElementById<HTMLDivElement>('document-filename');
 
         if (this.state.documentLoaded) {
             // Download mode
@@ -518,7 +494,6 @@ class ChayaApp {
             documentFilename.classList.remove('hidden');
 
             // Update .chaya slot - preserve file input
-            const chayaInput = chayaSlot.querySelector('#chaya-upload') as HTMLInputElement;
             chayaSlot.innerHTML = `
                 <div class="download-slot border-2 border-blue-500 bg-blue-50 rounded-lg p-8 text-center hover:bg-blue-100 transition-colors cursor-pointer">
                     <div class="text-4xl mb-3">📦</div>
@@ -526,12 +501,9 @@ class ChayaApp {
                     <div class="text-xs text-blue-600">Complete package</div>
                 </div>
             `;
-            if (chayaInput) {
-                chayaSlot.appendChild(chayaInput);
-            }
+            chayaSlot.appendChild(documentGetElementById<HTMLInputElement>('chaya-upload'));
 
             // Update .pdf slot - preserve file input
-            const pdfInput = pdfSlot.querySelector('#pdf-upload') as HTMLInputElement;
             pdfSlot.innerHTML = `
                 <div class="download-slot border-2 border-gray-500 bg-gray-50 rounded-lg p-8 text-center hover:bg-gray-100 transition-colors cursor-pointer">
                     <div class="text-4xl mb-3">📄</div>
@@ -539,15 +511,12 @@ class ChayaApp {
                     <div class="text-xs text-gray-600">Original document</div>
                 </div>
             `;
-            if (pdfInput) {
-                pdfSlot.appendChild(pdfInput);
-            }
+            pdfSlot.appendChild(documentGetElementById<HTMLInputElement>('pdf-upload'));
         } else {
             // Upload mode
             documentFilename.classList.add('hidden');
 
             // Reset .chaya slot - preserve file input
-            const chayaInput = chayaSlot.querySelector('#chaya-upload') as HTMLInputElement;
             chayaSlot.innerHTML = `
                 <div class="upload-slot border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
                     <div class="text-4xl mb-3">📦</div>
@@ -555,12 +524,9 @@ class ChayaApp {
                     <div class="text-xs text-gray-500">Complete package</div>
                 </div>
             `;
-            if (chayaInput) {
-                chayaSlot.appendChild(chayaInput);
-            }
+            chayaSlot.appendChild(documentGetElementById<HTMLInputElement>('chaya-upload'));
 
             // Reset .pdf slot - preserve file input
-            const pdfInput = pdfSlot.querySelector('#pdf-upload') as HTMLInputElement;
             pdfSlot.innerHTML = `
                 <div class="upload-slot border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
                     <div class="text-4xl mb-3">📄</div>
@@ -568,9 +534,7 @@ class ChayaApp {
                     <div class="text-xs text-gray-500">Start from scratch</div>
                 </div>
             `;
-            if (pdfInput) {
-                pdfSlot.appendChild(pdfInput);
-            }
+            pdfSlot.appendChild(documentGetElementById<HTMLInputElement>('pdf-upload'));
         }
 
         // Re-attach event listeners after updating innerHTML
@@ -578,31 +542,20 @@ class ChayaApp {
     }
 
     private attachSlotEventListeners(): void {
-        const chayaSlot = document.getElementById('chaya-slot') as HTMLDivElement;
-        const pdfSlot = document.getElementById('pdf-slot') as HTMLDivElement;
-
-        // Remove existing event listeners by replacing elements
-        chayaSlot.onclick = () => {
+        // Either upload or download
+        documentGetElementById<HTMLDivElement>('chaya-slot').onclick = () => {
             if (!this.state.documentLoaded) {
-                const chayaUpload = document.getElementById('chaya-upload') as HTMLInputElement;
-                if (chayaUpload) {
-                    chayaUpload.click();
-                } else {
-                    console.error('chaya-upload element not found');
-                }
+                const chayaUpload = documentGetElementById<HTMLInputElement>('chaya-upload');
+                chayaUpload.click();
             } else {
                 this.downloadChayaFile();
             }
         };
 
-        pdfSlot.onclick = () => {
+        documentGetElementById<HTMLDivElement>('pdf-slot').onclick = () => {
             if (!this.state.documentLoaded) {
-                const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
-                if (pdfUpload) {
-                    pdfUpload.click();
-                } else {
-                    console.error('pdf-upload element not found');
-                }
+                const pdfUpload = documentGetElementById<HTMLInputElement>('pdf-upload');
+                pdfUpload.click();
             } else {
                 this.downloadPdfFile();
             }
@@ -642,7 +595,7 @@ class ChayaApp {
             }
 
             // Hide loading after a short delay (progress should already be at 100% with "Complete!" text)
-            const loadingDiv = document.getElementById('app-loading') as HTMLDivElement;
+            const loadingDiv = documentGetElementById<HTMLDivElement>('app-loading');
             setTimeout(() => {
                 console.log('Hiding loading progress bar');
                 loadingDiv.classList.add('hidden');
@@ -657,8 +610,7 @@ class ChayaApp {
         // Add a timeout in case rendering gets stuck
         const timeoutId = setTimeout(() => {
             console.warn('Rendering timeout - hiding progress bar anyway');
-            const loadingDiv = document.getElementById('app-loading') as HTMLDivElement;
-            loadingDiv.classList.add('hidden');
+            documentGetElementById<HTMLDivElement>('app-loading').classList.add('hidden');
             document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
         }, 300000); // 5 minutes timeout
 
