@@ -38,7 +38,7 @@ function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
     });
 }
 
-// Application state
+// Application state. Used only in declaration of `ChayaApp`'s `state`.
 interface AppState {
     currentTab: 'mark' | 'edit' | 'read';  // Which tab of the app is active
     documentLoaded: boolean;  // Whether the document (PDF or Chaya) has been loaded yet
@@ -478,6 +478,7 @@ class ChayaApp {
             documentFilename.classList.remove('hidden');
 
             // Update .chaya slot - preserve file input
+            const chayaInput = documentGetElementById<HTMLInputElement>('chaya-upload');
             chayaSlot.innerHTML = `
                 <div class="download-slot border-2 border-blue-500 bg-blue-50 rounded-lg p-8 text-center hover:bg-blue-100 transition-colors cursor-pointer">
                     <div class="text-4xl mb-3">📦</div>
@@ -485,9 +486,10 @@ class ChayaApp {
                     <div class="text-xs text-blue-600">Complete package</div>
                 </div>
             `;
-            chayaSlot.appendChild(documentGetElementById<HTMLInputElement>('chaya-upload'));
+            chayaSlot.appendChild(chayaInput);
 
             // Update .pdf slot - preserve file input
+            const pdfInput = documentGetElementById<HTMLInputElement>('pdf-upload');
             pdfSlot.innerHTML = `
                 <div class="download-slot border-2 border-gray-500 bg-gray-50 rounded-lg p-8 text-center hover:bg-gray-100 transition-colors cursor-pointer">
                     <div class="text-4xl mb-3">📄</div>
@@ -495,12 +497,13 @@ class ChayaApp {
                     <div class="text-xs text-gray-600">Original document</div>
                 </div>
             `;
-            pdfSlot.appendChild(documentGetElementById<HTMLInputElement>('pdf-upload'));
+            pdfSlot.appendChild(pdfInput);
         } else {
             // Upload mode
             documentFilename.classList.add('hidden');
 
             // Reset .chaya slot - preserve file input
+            const chayaInput = documentGetElementById<HTMLInputElement>('chaya-upload');
             chayaSlot.innerHTML = `
                 <div class="upload-slot border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
                     <div class="text-4xl mb-3">📦</div>
@@ -508,9 +511,10 @@ class ChayaApp {
                     <div class="text-xs text-gray-500">Complete package</div>
                 </div>
             `;
-            chayaSlot.appendChild(documentGetElementById<HTMLInputElement>('chaya-upload'));
+            chayaSlot.appendChild(chayaInput);
 
             // Reset .pdf slot - preserve file input
+            const pdfInput = documentGetElementById<HTMLInputElement>('pdf-upload');
             pdfSlot.innerHTML = `
                 <div class="upload-slot border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer">
                     <div class="text-4xl mb-3">📄</div>
@@ -518,7 +522,7 @@ class ChayaApp {
                     <div class="text-xs text-gray-500">Start from scratch</div>
                 </div>
             `;
-            pdfSlot.appendChild(documentGetElementById<HTMLInputElement>('pdf-upload'));
+            pdfSlot.appendChild(pdfInput);
         }
 
         // Re-attach event listeners after updating innerHTML
