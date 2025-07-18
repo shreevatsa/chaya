@@ -155,12 +155,12 @@ class ChayaApp {
     }
 
     private async initializeMarkTab(): Promise<void> {
-        const { initializeAnnotator } = await import('./modes/annotator.js');
+        const { initializeAnnotator } = await import('./annotator.js');
         initializeAnnotator();
     }
 
     private async initializeReadTab(): Promise<void> {
-        const { initializeViewer } = await import('./modes/viewer.js');
+        const { initializeViewer } = await import('./viewer.js');
         initializeViewer();
     }
 
