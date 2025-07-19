@@ -1,4 +1,4 @@
-import { Annotation, parseAnnotationsFromJson } from './pdf-utils.js';
+import { Annotation } from './pdf-utils.js';
 
 // JSZip is loaded globally via script tag in the HTML
 declare const JSZip: any;
@@ -283,7 +283,7 @@ class ChayaApp {
             // Extract annotations
             const annotationsText = await zipContent.file('annotations.json')!.async('string');
             const annotationsData = JSON.parse(annotationsText);
-            const annotations = parseAnnotationsFromJson(annotationsData);
+            const annotations = Annotation.parseFromJson(annotationsData);
 
             this.updateLoadingProgress(25, 'Initializing document...', 'Setting up PDF viewer...');
 
