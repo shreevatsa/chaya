@@ -1,15 +1,9 @@
 // Mark tab functionality - region annotation on PDF
-// This is essentially the existing annotator.ts functionality adapted for the unified app
 
-import { Annotation as SharedAnnotation, generateId } from './pdf-utils.js';
+import { Annotation, generateId } from './pdf-utils.js';
 import { runAIAssistedAnnotation } from './ai-orchestrator.js';
 
-// Use shared annotation interface
-type Annotation = SharedAnnotation;
-
 let annotations: Annotation[] = [];
-let loadedAnnotations: any = null; // Store loaded annotations until PDF is ready
-let loadedAnnotationsFileName: string | null = null; // Track filename of loaded annotations
 let isDrawing = false;
 let startX = 0;
 let startY = 0;
@@ -41,8 +35,8 @@ export function initializeAnnotator(): void {
     // Listen for mark tab specific data ready event
     document.addEventListener('markTabDataReady', (event: Event) => {
         const customEvent = event as CustomEvent;
-        const { pdfDocument, annotations: loadedAnnotations, annotationsFileName, pdfFileName } = customEvent.detail;
-        handleDataReady(pdfDocument, loadedAnnotations, annotationsFileName, pdfFileName);
+        const { pdfDocument, annotations: loadedAnnotations } = customEvent.detail;
+        handleDataReady(pdfDocument, loadedAnnotations);
     });
 
     // Listen for document saved event to reset unsaved changes flag
@@ -51,15 +45,11 @@ export function initializeAnnotator(): void {
         console.log('Mark tab: Document saved, unsaved changes flag reset');
     });
 
-    // Set up event listeners
-    setupEventListeners();
-
-    function handleDataReady(pdfDocument: any, loadedAnnotations: Annotation[], annotationsFileName: string | null, pdfFileName: string | null): void {
-        console.log('Mark tab: Data ready', { pdfDocument, loadedAnnotations, annotationsFileName, pdfFileName });
+    function handleDataReady(pdfDocument: any, loadedAnnotations: Annotation[]): void {
+        console.log('Mark tab: Data ready', { pdfDocument, loadedAnnotations });
 
         // Update global state
         annotations = loadedAnnotations || [];
-        loadedAnnotationsFileName = annotationsFileName;
         hasUnsavedChanges = false;
 
         // Clear container and render PDF
@@ -99,10 +89,18 @@ export function initializeAnnotator(): void {
             // Render loaded annotations if any
             if (annotations.length > 0) {
                 console.log('Rendering loaded annotations...');
-                renderLoadedAnnotations();
+                annotations.forEach(annotation => {
+                    const pageDiv = pdfContainer.querySelector(`[data-page-number="${annotation.pageNumber}"]`) as HTMLDivElement;
+                    if (pageDiv) {
+                        const annotationLayer = pageDiv.querySelector('.annotation-layer') as HTMLDivElement;
+                        if (annotationLayer) {
+                            createAnnotationBox(annotationLayer, pageDiv, annotation);
+                        }
+                    }
+                });
             }
 
-            // Notify app that rendering is complete (but don't update progress since we already did)
+            // Notify app that rendering is complete
             console.log('Dispatching rendering complete event');
             const renderingCompleteEvent = new CustomEvent('tabRenderingComplete', {
                 detail: {
@@ -126,11 +124,6 @@ export function initializeAnnotator(): void {
             });
             document.dispatchEvent(errorEvent);
         }
-    }
-
-    function setupEventListeners(): void {
-        // Event listeners for annotation functionality would go here
-        // (Save functionality moved to .chaya download)
     }
 
     // Helper functions for annotation management
@@ -240,32 +233,18 @@ export function initializeAnnotator(): void {
         pageDiv.appendChild(annotationLayer);
         pageDiv.appendChild(aiButton);
 
+        // Only append to container after the page is fully rendered
         const renderContext = {
             canvasContext: context!,
             viewport: viewport
         };
-
         await page.render(renderContext).promise;
-
-        // Only append to container after the page is fully rendered
         pdfContainer.appendChild(pageDiv);
 
         // Add mouse event listeners for annotation drawing
         setupAnnotationDrawing(annotationLayer, pageDiv, pageNumber);
     }
 
-
-    function renderLoadedAnnotations(): void {
-        annotations.forEach(annotation => {
-            const pageDiv = pdfContainer.querySelector(`[data-page-number="${annotation.pageNumber}"]`) as HTMLDivElement;
-            if (pageDiv) {
-                const annotationLayer = pageDiv.querySelector('.annotation-layer') as HTMLDivElement;
-                if (annotationLayer) {
-                    createAnnotationBox(annotationLayer, pageDiv, annotation);
-                }
-            }
-        });
-    }
 
     function updateAnnotationList(): void {
         // Update count

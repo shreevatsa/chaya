@@ -105,9 +105,8 @@ class ChayaApp {
     // Clicking on Mark/Edit/Read should call `switchToTab('mark')` etc.
     private setupTabSwitchingEventListeners(): void {
         documentGetElementById<HTMLButtonElement>('mark-tab-btn').addEventListener('click', () => this.switchToTab('mark'));
+        documentGetElementById<HTMLButtonElement>('edit-tab-btn').addEventListener('click', () => this.switchToTab('edit'));
         documentGetElementById<HTMLButtonElement>('read-tab-btn').addEventListener('click', () => this.switchToTab('read'));
-        // Edit tab is disabled for now
-        documentGetElementById<HTMLButtonElement>('edit-tab-btn').addEventListener('click', (e) => { e.preventDefault(); });
     }
 
     private switchToTab(tab: 'mark' | 'edit' | 'read'): void {
@@ -396,7 +395,7 @@ class ChayaApp {
     }
 
     private createAnnotationsJSON(): any {
-        // Create annotations JSON structure according to the spec
+        // Create annotations JSON structure for saving to the file.
         const annotationsData = {
             metadata: {
                 sourcePdf: this.state.pdfFile?.name || 'unknown.pdf',

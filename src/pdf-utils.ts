@@ -1,8 +1,4 @@
-/**
- * Shared PDF utilities - only complex functionality worth abstracting
- */
-
-// TODO: Rename `Annotation` to `Region`
+// TODO: Rename `Annotation` to `MarkedRegion`
 export interface Annotation {
     id: string;
     pageNumber: number;
@@ -18,7 +14,7 @@ export interface Annotation {
 }
 
 export namespace Annotation {
-    // Load and parse annotations from JSON data
+    // Load and parse annotations from JSON data as saved to .chaya file.
     export function parseFromJson(jsonData: any): Annotation[] {
         // Validate the JSON structure
         if (!jsonData.metadata || !jsonData.annotationsByPage) {
@@ -54,7 +50,7 @@ export namespace Annotation {
     }
 }
 
-// A string like `pk0n4cu0z` (using 0.7098903088646241 = 0.pk0n4cu0zoe)
+// A string like `annotation_1753194399461_735zr5zix` (via 0.19688771398906768 = 0.735zr5zix73)
 export function generateId(): string {
     return 'annotation_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
