@@ -1,6 +1,6 @@
 // Mark tab functionality - region annotation on PDF
 
-import { Annotation, generateId, appState } from './models.js';
+import { Annotation, appState } from './models.js';
 import { runAIAssistedAnnotation } from './ai-orchestrator.js';
 import { updateLoadingProgress } from './actions.js';
 
@@ -384,7 +384,7 @@ export function initializeAnnotator(): void {
                 const pageHeight = pageDiv.offsetHeight;
 
                 const annotation: Annotation = {
-                    id: generateId(),
+                    id: Annotation.generateRandomId(),
                     x: left / pageWidth,
                     y: top / pageHeight,
                     width: width / pageWidth,

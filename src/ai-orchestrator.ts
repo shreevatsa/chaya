@@ -5,7 +5,7 @@
 // It handles DOM interactions, user prompts, and orchestrates the AI workflow.
 
 import { annotateWithGemini, AIAnnotationRequest } from './ai-engine.js';
-import { Annotation, generateId } from './models.js';
+import { Annotation } from './models.js';
 
 /**
  * This is the main entry point called by the UI (annotator.ts).
@@ -357,7 +357,7 @@ function convertSingleRegionToAnnotation(region: any, pageNumber: number, vision
             const height = Math.max(0.01, (ymax - ymin) / canvas.height);
 
             return {
-                id: generateId(),
+                id: Annotation.generateRandomId(),
                 x, y, width, height,
                 label: region.label || 'AI Annotation',
                 semanticType: region.semanticType,
@@ -379,7 +379,7 @@ function convertSingleRegionToAnnotation(region: any, pageNumber: number, vision
         const height = Math.max(0.01, Math.min(1 - y, region.height || 0.1));
 
         return {
-            id: generateId(),
+            id: Annotation.generateRandomId(),
             x, y, width, height,
             label: region.label || 'AI Annotation',
             pageNumber: pageNumber
@@ -399,7 +399,7 @@ function convertSingleRegionToAnnotation(region: any, pageNumber: number, vision
     const height = Math.max(0.01, ymax - ymin);
 
     return {
-        id: generateId(),
+        id: Annotation.generateRandomId(),
         x, y, width, height,
         label: region.label || 'AI Annotation',
         semanticType: region.semanticType,

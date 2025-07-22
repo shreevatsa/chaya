@@ -32,7 +32,7 @@ export namespace Annotation {
 
             pageAnnotations.forEach((ann: any) => {
                 const annotation: Annotation = {
-                    id: ann.id || generateId(),
+                    id: ann.id || generateRandomId(),
                     pageNumber: pageNumber,
                     x: ann.x,
                     y: ann.y,
@@ -48,12 +48,13 @@ export namespace Annotation {
         console.log('Loaded annotations:', annotations);
         return annotations;
     }
+
+    // A string like `annotation_1753194399461_735zr5zix` (via 0.19688771398906768 = 0.735zr5zix73)
+    export function generateRandomId(): string {
+        return 'annotation_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
 }
 
-// A string like `annotation_1753194399461_735zr5zix` (via 0.19688771398906768 = 0.735zr5zix73)
-export function generateId(): string {
-    return 'annotation_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
 
 // Application state.
 interface AppState {
