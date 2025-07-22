@@ -5,7 +5,7 @@
 // It handles DOM interactions, user prompts, and orchestrates the AI workflow.
 
 import { annotateWithGemini, AIAnnotationRequest } from './ai-engine.js';
-import { Annotation as SharedAnnotation, generateId } from './pdf-utils.js';
+import { Annotation as SharedAnnotation, generateId } from './models.js';
 
 // Use the shared Annotation type from the project
 export type Annotation = SharedAnnotation;

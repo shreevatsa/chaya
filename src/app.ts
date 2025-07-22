@@ -1,4 +1,4 @@
-import { Annotation } from './pdf-utils.js';
+import { Annotation } from './models.js';
 import { initializeAnnotator } from './annotator.js';
 import { initializeViewer } from './viewer.js';
 

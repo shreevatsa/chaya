@@ -1,6 +1,6 @@
 // Mark tab functionality - region annotation on PDF
 
-import { Annotation, generateId } from './pdf-utils.js';
+import { Annotation, generateId } from './models.js';
 import { runAIAssistedAnnotation } from './ai-orchestrator.js';
 
 let annotations: Annotation[] = [];

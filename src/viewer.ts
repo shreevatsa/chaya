@@ -1,6 +1,6 @@
 // Read tab functionality - presentation view of annotated documents
 
-import { Annotation } from './pdf-utils.js';
+import { Annotation } from './models.js';
 
 let loadedAnnotations: Annotation[] = [];
 
