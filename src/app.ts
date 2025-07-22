@@ -1,4 +1,6 @@
 import { Annotation } from './pdf-utils.js';
+import { initializeAnnotator } from './annotator.js';
+import { initializeViewer } from './viewer.js';
 
 // JSZip is loaded globally via script tag in the HTML
 declare const JSZip: any;
@@ -66,8 +68,8 @@ class ChayaApp {
         this.setupFileInputListeners();
         this.updateSlotUI();
         this.setupTabSwitchingEventListeners();
-        this.initializeMarkTab();
-        this.initializeReadTab();
+        initializeAnnotator();
+        initializeViewer();
 
         // Start with Mark tab
         this.switchToTab('mark');
@@ -151,16 +153,6 @@ class ChayaApp {
         }
 
         console.log(`Switched to ${tab} tab`);
-    }
-
-    private async initializeMarkTab(): Promise<void> {
-        const { initializeAnnotator } = await import('./annotator.js');
-        initializeAnnotator();
-    }
-
-    private async initializeReadTab(): Promise<void> {
-        const { initializeViewer } = await import('./viewer.js');
-        initializeViewer();
     }
 
     private setupFileInputListeners(): void {
