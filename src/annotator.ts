@@ -2,6 +2,7 @@
 
 import { Annotation, generateId, appState } from './models.js';
 import { runAIAssistedAnnotation } from './ai-orchestrator.js';
+import { updateLoadingProgress } from './actions.js';
 
 let annotations: Annotation[] = [];
 let isDrawing = false;
@@ -78,7 +79,7 @@ export function initializeAnnotator(): void {
                 const detailText = isLastPage ? 'PDF ready for annotation' : `Processing page ${i}`;
 
                 console.log(`Rendering page ${i}/${totalPages}, progress: ${progress.toFixed(1)}%`);
-                updateAppProgress(progress, statusText, detailText);
+                updateLoadingProgress(progress, statusText, detailText);
 
                 await renderPage(pdfDocument, i, containerWidth);
                 console.log(`Page ${i} rendered successfully`);
@@ -112,7 +113,7 @@ export function initializeAnnotator(): void {
 
         } catch (error) {
             console.error('Error during PDF page rendering:', error);
-            updateAppProgress(0, 'Error rendering pages', `Failed at page: ${error}`);
+            updateLoadingProgress(0, 'Error rendering pages', `Failed at page: ${error}`);
 
             // Still notify completion even on error
             const errorEvent = new CustomEvent('tabRenderingComplete', {
@@ -131,13 +132,6 @@ export function initializeAnnotator(): void {
         appState.loadedAnnotations = annotations;
         if (hasUnsavedChanges) {
             appState.hasUnsavedChanges = true;
-        }
-    }
-
-    function updateAppProgress(percent: number, text: string, details: string): void {
-        const chayaApp = (window as any).chayaApp;
-        if (chayaApp && chayaApp.updateLoadingProgress) {
-            chayaApp.updateLoadingProgress(percent, text, details);
         }
     }
 

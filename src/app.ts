@@ -1,6 +1,7 @@
 import { Annotation, appState } from './models.js';
 import { initializeAnnotator } from './annotator.js';
 import { initializeViewer } from './viewer.js';
+import { documentGetElementById, updateLoadingProgress } from './actions.js';
 
 // JSZip is loaded globally via script tag in the HTML
 declare const JSZip: any;
@@ -22,14 +23,6 @@ async function waitForPdfjs(): Promise<any> {
     }
     console.log('PDF.js initialized; worker src set to:', pdfjs.GlobalWorkerOptions?.workerSrc);
 })();
-
-function documentGetElementById<T extends HTMLElement>(id: string): T {
-    const element = document.getElementById(id) as T;
-    if (!element) {
-        throw new Error(`Required element with id '${id}' not found`);
-    }
-    return element;
-}
 
 function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
     return new Promise((resolve, reject) => {
@@ -56,24 +49,6 @@ class ChayaApp {
     // Update annotations without marking as unsaved (for sync operations)
     public syncAnnotations(annotations: Annotation[]): void {
         appState.loadedAnnotations = annotations;
-    }
-
-    public updateLoadingProgress(percent: number, text: string, details: string): void {
-        const clampedPercent = Math.max(0, Math.min(100, percent));
-
-        documentGetElementById<HTMLSpanElement>('app-loading-text').textContent = text;
-        documentGetElementById<HTMLSpanElement>('app-loading-percent').textContent = `${Math.round(clampedPercent)}%`;
-        documentGetElementById<HTMLDivElement>('app-loading-details').textContent = details;
-        const progressBar = documentGetElementById<HTMLDivElement>('app-progress-bar');
-        progressBar.style.width = `${clampedPercent}%`;
-        // Update progress bar color based on status
-        if (clampedPercent === 100) {
-            progressBar.className = 'bg-green-600 h-2 rounded-full transition-all duration-300';
-        } else if (clampedPercent === 0 && text.includes('Error')) {
-            progressBar.className = 'bg-red-600 h-2 rounded-full transition-all duration-300';
-        } else {
-            progressBar.className = 'bg-blue-600 h-2 rounded-full transition-all duration-300';
-        }
     }
 
     // === TAB MANAGEMENT ===
@@ -161,17 +136,17 @@ class ChayaApp {
         try {
             // Show loading progress
             loadingDiv.classList.remove('hidden');
-            this.updateLoadingProgress(0, 'Loading PDF...', 'Reading PDF file...');
+            updateLoadingProgress(0, 'Loading PDF...', 'Reading PDF file...');
 
             // Load PDF
             const pdfArrayBuffer = await readFileAsArrayBuffer(appState.pdfFile);
-            this.updateLoadingProgress(10, 'Processing PDF...', 'Initializing PDF.js and document...');
+            updateLoadingProgress(10, 'Processing PDF...', 'Initializing PDF.js and document...');
 
             const pdfjs = await waitForPdfjs();
             const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
             appState.pdfDocument = await loadingTask.promise;
 
-            this.updateLoadingProgress(30, 'Rendering pages...', 'Processing PDF pages for display');
+            updateLoadingProgress(30, 'Rendering pages...', 'Processing PDF pages for display');
 
             // Mark as loaded
             appState.documentLoaded = true;
@@ -188,7 +163,7 @@ class ChayaApp {
 
         } catch (error) {
             console.error('Error loading files:', error);
-            this.updateLoadingProgress(0, 'Error loading files', `Failed: ${error}`);
+            updateLoadingProgress(0, 'Error loading files', `Failed: ${error}`);
             setTimeout(() => {
                 loadingDiv.classList.add('hidden');
             }, 3000);
@@ -210,13 +185,13 @@ class ChayaApp {
 
             // Show loading progress
             loadingDiv.classList.remove('hidden');
-            this.updateLoadingProgress(0, 'Loading .chaya file...', 'Reading ZIP file...');
+            updateLoadingProgress(0, 'Loading .chaya file...', 'Reading ZIP file...');
 
             // Read ZIP file
             const zip = new JSZip();
             const zipContent = await zip.loadAsync(file);
 
-            this.updateLoadingProgress(5, 'Extracting files...', 'Validating .chaya format...');
+            updateLoadingProgress(5, 'Extracting files...', 'Validating .chaya format...');
 
             // Validate required files
             const requiredFiles = ['manifest.json', 'document.pdf', 'annotations.json'];
@@ -226,14 +201,14 @@ class ChayaApp {
                 }
             }
 
-            this.updateLoadingProgress(10, 'Reading manifest...', 'Validating format version...');
+            updateLoadingProgress(10, 'Reading manifest...', 'Validating format version...');
 
             // Read and validate manifest
             const manifestText = await zipContent.file('manifest.json')!.async('string');
             const manifest = JSON.parse(manifestText);
             console.log('Manifest:', manifest);
 
-            this.updateLoadingProgress(15, 'Extracting PDF...', 'Loading document content...');
+            updateLoadingProgress(15, 'Extracting PDF...', 'Loading document content...');
 
             // Extract PDF data
             const pdfArrayBuffer = await zipContent.file('document.pdf')!.async('arraybuffer');
@@ -242,14 +217,14 @@ class ChayaApp {
                 type: 'application/pdf'
             });
 
-            this.updateLoadingProgress(20, 'Loading annotations...', 'Parsing annotation data...');
+            updateLoadingProgress(20, 'Loading annotations...', 'Parsing annotation data...');
 
             // Extract annotations
             const annotationsText = await zipContent.file('annotations.json')!.async('string');
             const annotationsData = JSON.parse(annotationsText);
             const annotations = Annotation.parseFromJson(annotationsData);
 
-            this.updateLoadingProgress(25, 'Initializing document...', 'Setting up PDF viewer...');
+            updateLoadingProgress(25, 'Initializing document...', 'Setting up PDF viewer...');
 
             // Update state
             appState.pdfFile = pdfFile;
@@ -261,7 +236,7 @@ class ChayaApp {
             const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
             appState.pdfDocument = await loadingTask.promise;
 
-            this.updateLoadingProgress(30, 'Finalizing...', 'Preparing user interface...');
+            updateLoadingProgress(30, 'Finalizing...', 'Preparing user interface...');
 
             // Mark as loaded
             appState.documentLoaded = true;
@@ -270,7 +245,7 @@ class ChayaApp {
             // Update slot UI to download mode
             this.updateSlotUI();
 
-            this.updateLoadingProgress(100, 'Complete!', 'Chaya file loaded successfully');
+            updateLoadingProgress(100, 'Complete!', 'Chaya file loaded successfully');
 
             // Notify tabs that data is ready
             this.notifyTabsDataReady();
@@ -282,7 +257,7 @@ class ChayaApp {
 
         } catch (error) {
             console.error('Error loading .chaya file:', error);
-            this.updateLoadingProgress(0, 'Error loading .chaya file', `Failed: ${error}`);
+            updateLoadingProgress(0, 'Error loading .chaya file', `Failed: ${error}`);
             setTimeout(() => {
                 loadingDiv.classList.add('hidden');
             }, 3000);
@@ -564,14 +539,6 @@ class ChayaApp {
 
 
 }
-
-// Initialize the app when DOM is ready
-let appInstance: ChayaApp;
-document.addEventListener('DOMContentLoaded', () => {
-    appInstance = new ChayaApp();
-    // Make app instance globally accessible for tabs
-    (window as any).chayaApp = appInstance;
-});
 
 // CSS for tab styling
 const style = document.createElement('style');
