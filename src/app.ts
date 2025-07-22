@@ -1,4 +1,4 @@
-import { Annotation } from './models.js';
+import { Annotation, appState } from './models.js';
 import { initializeAnnotator } from './annotator.js';
 import { initializeViewer } from './viewer.js';
 
@@ -40,29 +40,7 @@ function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
     });
 }
 
-// Application state. Used only in declaration of `ChayaApp`'s `state`.
-interface AppState {
-    currentTab: 'mark' | 'edit' | 'read';  // Which tab of the app is active
-    documentLoaded: boolean;  // Whether the document (PDF or Chaya) has been loaded yet
-    pdfFile: File | null;
-    loadedAnnotations: Annotation[];
-    loadedAnnotationsFileName: string | null;
-    pdfDocument: any | null;
-    hasUnsavedChanges: boolean;
-}
-
 class ChayaApp {
-    // === STATE ===
-    private state: AppState = {
-        currentTab: 'mark',
-        documentLoaded: false,
-        pdfFile: null,
-        loadedAnnotations: [],
-        loadedAnnotationsFileName: null,
-        pdfDocument: null,
-        hasUnsavedChanges: false
-    };
-
     // === PUBLIC API (Interface for tabs to use) ===
     constructor() {
         this.setupFileInputListeners();
@@ -74,15 +52,10 @@ class ChayaApp {
         // Start with Mark tab
         this.switchToTab('mark');
     }
-    // Public methods for tabs to access shared state
-    public updateAnnotations(annotations: Annotation[]): void {
-        this.state.loadedAnnotations = annotations;
-        this.state.hasUnsavedChanges = true;
-    }
 
     // Update annotations without marking as unsaved (for sync operations)
     public syncAnnotations(annotations: Annotation[]): void {
-        this.state.loadedAnnotations = annotations;
+        appState.loadedAnnotations = annotations;
     }
 
     public updateLoadingProgress(percent: number, text: string, details: string): void {
@@ -113,7 +86,7 @@ class ChayaApp {
 
     private switchToTab(tab: 'mark' | 'edit' | 'read'): void {
         // Update state
-        this.state.currentTab = tab;
+        appState.currentTab = tab;
 
         // Hide all tab content
         document.querySelectorAll('.tab-content').forEach(el => {
@@ -136,14 +109,14 @@ class ChayaApp {
         targetBtn.classList.remove('text-gray-600', 'hover:text-gray-800');
 
         // If we have loaded data, notify the newly active tab
-        if (this.state.documentLoaded && this.state.pdfDocument) {
+        if (appState.documentLoaded && appState.pdfDocument) {
             console.log(`Notifying newly active ${tab} tab with existing data`);
             const tabDataEvent = new CustomEvent(`${tab}TabDataReady`, {
                 detail: {
-                    pdfDocument: this.state.pdfDocument,
-                    annotations: this.state.loadedAnnotations,
-                    annotationsFileName: this.state.loadedAnnotationsFileName,
-                    pdfFileName: this.state.pdfFile?.name
+                    pdfDocument: appState.pdfDocument,
+                    annotations: appState.loadedAnnotations,
+                    annotationsFileName: appState.loadedAnnotationsFileName,
+                    pdfFileName: appState.pdfFile?.name
                 }
             });
             // Use setTimeout to ensure the tab switch visual update happens first
@@ -167,7 +140,7 @@ class ChayaApp {
             const target = event.target as HTMLInputElement;
             const file = target.files?.[0];
             if (file) {
-                this.state.pdfFile = file;
+                appState.pdfFile = file;
                 await this.loadPdfFile();
             }
         });
@@ -181,7 +154,7 @@ class ChayaApp {
      * so that other tabs can render the document.
      */
     private async loadPdfFile(): Promise<void> {
-        if (!this.state.pdfFile) return;
+        if (!appState.pdfFile) return;
 
         const loadingDiv = documentGetElementById<HTMLDivElement>('app-loading');
 
@@ -191,18 +164,18 @@ class ChayaApp {
             this.updateLoadingProgress(0, 'Loading PDF...', 'Reading PDF file...');
 
             // Load PDF
-            const pdfArrayBuffer = await readFileAsArrayBuffer(this.state.pdfFile);
+            const pdfArrayBuffer = await readFileAsArrayBuffer(appState.pdfFile);
             this.updateLoadingProgress(10, 'Processing PDF...', 'Initializing PDF.js and document...');
 
             const pdfjs = await waitForPdfjs();
             const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
-            this.state.pdfDocument = await loadingTask.promise;
+            appState.pdfDocument = await loadingTask.promise;
 
             this.updateLoadingProgress(30, 'Rendering pages...', 'Processing PDF pages for display');
 
             // Mark as loaded
-            this.state.documentLoaded = true;
-            this.state.hasUnsavedChanges = false;
+            appState.documentLoaded = true;
+            appState.hasUnsavedChanges = false;
 
             // Update slot UI to download mode
             this.updateSlotUI();
@@ -279,20 +252,20 @@ class ChayaApp {
             this.updateLoadingProgress(25, 'Initializing document...', 'Setting up PDF viewer...');
 
             // Update state
-            this.state.pdfFile = pdfFile;
-            this.state.loadedAnnotations = annotations;
-            this.state.loadedAnnotationsFileName = file.name;
+            appState.pdfFile = pdfFile;
+            appState.loadedAnnotations = annotations;
+            appState.loadedAnnotationsFileName = file.name;
 
             // Load PDF document
             const pdfjs = await waitForPdfjs();
             const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
-            this.state.pdfDocument = await loadingTask.promise;
+            appState.pdfDocument = await loadingTask.promise;
 
             this.updateLoadingProgress(30, 'Finalizing...', 'Preparing user interface...');
 
             // Mark as loaded
-            this.state.documentLoaded = true;
-            this.state.hasUnsavedChanges = false;
+            appState.documentLoaded = true;
+            appState.hasUnsavedChanges = false;
 
             // Update slot UI to download mode
             this.updateSlotUI();
@@ -317,7 +290,7 @@ class ChayaApp {
     }
 
     private async downloadChayaFile(): Promise<void> {
-        if (!this.state.pdfDocument || !this.state.pdfFile) {
+        if (!appState.pdfDocument || !appState.pdfFile) {
             alert('No document loaded to create .chaya file');
             return;
         }
@@ -332,7 +305,7 @@ class ChayaApp {
             const manifest = {
                 version: "1.0",
                 created: new Date().toISOString(),
-                originalFilename: this.state.pdfFile.name,
+                originalFilename: appState.pdfFile.name,
                 chayaFormatVersion: "1.0",
                 application: {
                     name: "Bookchop",
@@ -342,7 +315,7 @@ class ChayaApp {
             zip.file("manifest.json", JSON.stringify(manifest, null, 2));
 
             // Add original PDF
-            const pdfArrayBuffer = await readFileAsArrayBuffer(this.state.pdfFile);
+            const pdfArrayBuffer = await readFileAsArrayBuffer(appState.pdfFile);
             zip.file("document.pdf", pdfArrayBuffer);
 
             // Add annotations.json
@@ -362,7 +335,7 @@ class ChayaApp {
             const chayaBlob = new Blob([zipBlob], { type: 'application/zip' });
 
             // Download the .chaya file
-            const fileName = this.state.pdfFile.name.replace(/\.pdf$/i, '.chaya');
+            const fileName = appState.pdfFile.name.replace(/\.pdf$/i, '.chaya');
             const url = URL.createObjectURL(chayaBlob);
             const a = document.createElement('a');
             a.href = url;
@@ -373,7 +346,7 @@ class ChayaApp {
             URL.revokeObjectURL(url);
 
             // Mark as saved since we just exported everything
-            this.state.hasUnsavedChanges = false;
+            appState.hasUnsavedChanges = false;
 
             // Also notify the annotator that changes have been saved
             this.notifyTabsSaved();
@@ -390,7 +363,7 @@ class ChayaApp {
         // Create annotations JSON structure for saving to the file.
         const annotationsData = {
             metadata: {
-                sourcePdf: this.state.pdfFile?.name || 'unknown.pdf',
+                sourcePdf: appState.pdfFile?.name || 'unknown.pdf',
                 annotationVersion: "1.1",
                 annotatedAt: new Date().toISOString()
             },
@@ -405,7 +378,7 @@ class ChayaApp {
         };
 
         // Group annotations by page
-        this.state.loadedAnnotations.forEach(annotation => {
+        appState.loadedAnnotations.forEach(annotation => {
             const pageKey = annotation.pageNumber.toString();
             if (!annotationsData.annotationsByPage[pageKey]) {
                 annotationsData.annotationsByPage[pageKey] = [];
@@ -425,13 +398,13 @@ class ChayaApp {
     }
 
     private async downloadPdfFile(): Promise<void> {
-        if (!this.state.pdfFile) return;
+        if (!appState.pdfFile) return;
 
         // Download the original PDF file
-        const url = URL.createObjectURL(this.state.pdfFile);
+        const url = URL.createObjectURL(appState.pdfFile);
         const a = document.createElement('a');
         a.href = url;
-        a.download = this.state.pdfFile.name;
+        a.download = appState.pdfFile.name;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -444,9 +417,9 @@ class ChayaApp {
         const pdfSlot = documentGetElementById<HTMLDivElement>('pdf-slot');
         const documentFilename = documentGetElementById<HTMLDivElement>('document-filename');
 
-        if (this.state.documentLoaded) {
+        if (appState.documentLoaded) {
             // Download mode
-            const filename = this.state.pdfFile?.name || 'document';
+            const filename = appState.pdfFile?.name || 'document';
             documentFilename.textContent = `Document: ${filename}`;
             documentFilename.classList.remove('hidden');
 
@@ -505,7 +478,7 @@ class ChayaApp {
     private attachSlotEventListeners(): void {
         // Either upload or download
         documentGetElementById<HTMLDivElement>('chaya-slot').onclick = () => {
-            if (!this.state.documentLoaded) {
+            if (!appState.documentLoaded) {
                 const chayaUpload = documentGetElementById<HTMLInputElement>('chaya-upload');
                 chayaUpload.click();
             } else {
@@ -514,7 +487,7 @@ class ChayaApp {
         };
 
         documentGetElementById<HTMLDivElement>('pdf-slot').onclick = () => {
-            if (!this.state.documentLoaded) {
+            if (!appState.documentLoaded) {
                 const pdfUpload = documentGetElementById<HTMLInputElement>('pdf-upload');
                 pdfUpload.click();
             } else {
@@ -569,17 +542,17 @@ class ChayaApp {
 
     private notifyTabsDataReady(): void {
         // Only notify the currently active tab to avoid conflicts
-        const activeTabEvent = new CustomEvent(`${this.state.currentTab}TabDataReady`, {
+        const activeTabEvent = new CustomEvent(`${appState.currentTab}TabDataReady`, {
             detail: {
-                pdfDocument: this.state.pdfDocument,
-                annotations: this.state.loadedAnnotations,
-                annotationsFileName: this.state.loadedAnnotationsFileName,
-                pdfFileName: this.state.pdfFile?.name
+                pdfDocument: appState.pdfDocument,
+                annotations: appState.loadedAnnotations,
+                annotationsFileName: appState.loadedAnnotationsFileName,
+                pdfFileName: appState.pdfFile?.name
             }
         });
         document.dispatchEvent(activeTabEvent);
 
-        console.log(`Notified ${this.state.currentTab} tab that data is ready`);
+        console.log(`Notified ${appState.currentTab} tab that data is ready`);
     }
 
 

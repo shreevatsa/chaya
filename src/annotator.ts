@@ -1,6 +1,6 @@
 // Mark tab functionality - region annotation on PDF
 
-import { Annotation, generateId } from './models.js';
+import { Annotation, generateId, appState } from './models.js';
 import { runAIAssistedAnnotation } from './ai-orchestrator.js';
 
 let annotations: Annotation[] = [];
@@ -128,13 +128,9 @@ export function initializeAnnotator(): void {
 
     // Helper functions for annotation management
     function syncWithAppState(): void {
-        const chayaApp = (window as any).chayaApp;
-        if (chayaApp) {
-            if (hasUnsavedChanges) {
-                chayaApp.updateAnnotations(annotations);
-            } else {
-                chayaApp.syncAnnotations(annotations);
-            }
+        appState.loadedAnnotations = annotations;
+        if (hasUnsavedChanges) {
+            appState.hasUnsavedChanges = true;
         }
     }
 
