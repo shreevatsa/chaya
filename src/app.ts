@@ -36,9 +36,49 @@ function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
 class ChayaApp {
     // === PUBLIC API (Interface for tabs to use) ===
     constructor() {
-        this.setupFileInputListeners();
-        this.attachSlotEventListeners();
-        this.setupTabSwitchingEventListeners();
+        // Set up file input listeners
+        {
+            documentGetElementById<HTMLInputElement>('chaya-upload').addEventListener('change', async (event) => {
+                const target = event.target as HTMLInputElement;
+                const file = target.files?.[0];
+                console.log('Going to upload chaya file');
+                if (file) {
+                    await this.loadChayaFile(file);
+                }
+            });
+            documentGetElementById<HTMLInputElement>('pdf-upload').addEventListener('change', async (event) => {
+                const target = event.target as HTMLInputElement;
+                const file = target.files?.[0];
+                if (file) {
+                    await this.loadPdfFile(file);
+                }
+            });
+        }
+        // Set up slot event listeners: either upload or download
+        {
+            documentGetElementById<HTMLDivElement>('chaya-slot').onclick = () => {
+                if (!appState.documentLoaded) {
+                    const chayaUpload = documentGetElementById<HTMLInputElement>('chaya-upload');
+                    chayaUpload.click();
+                } else {
+                    this.downloadChayaFile();
+                }
+            };
+            documentGetElementById<HTMLDivElement>('pdf-slot').onclick = () => {
+                if (!appState.documentLoaded) {
+                    const pdfUpload = documentGetElementById<HTMLInputElement>('pdf-upload');
+                    pdfUpload.click();
+                } else {
+                    this.downloadPdfFile();
+                }
+            };
+        }
+        // Set up tab switching event listeners: clicking on Mark/Edit/Read should call `switchToTab('mark')` etc.
+        {
+            documentGetElementById<HTMLButtonElement>('mark-tab-btn').addEventListener('click', () => this.switchToTab('mark'));
+            documentGetElementById<HTMLButtonElement>('edit-tab-btn').addEventListener('click', () => this.switchToTab('edit'));
+            documentGetElementById<HTMLButtonElement>('read-tab-btn').addEventListener('click', () => this.switchToTab('read'));
+        }
         initializeAnnotator();
         initializeViewer();
 
@@ -47,13 +87,6 @@ class ChayaApp {
     }
 
     // === TAB MANAGEMENT ===
-    // Clicking on Mark/Edit/Read should call `switchToTab('mark')` etc.
-    private setupTabSwitchingEventListeners(): void {
-        documentGetElementById<HTMLButtonElement>('mark-tab-btn').addEventListener('click', () => this.switchToTab('mark'));
-        documentGetElementById<HTMLButtonElement>('edit-tab-btn').addEventListener('click', () => this.switchToTab('edit'));
-        documentGetElementById<HTMLButtonElement>('read-tab-btn').addEventListener('click', () => this.switchToTab('read'));
-    }
-
     private switchToTab(tab: 'mark' | 'edit' | 'read'): void {
         // Update state
         appState.currentTab = tab;
@@ -81,26 +114,44 @@ class ChayaApp {
         console.log(`Switched to ${tab} tab`);
     }
 
-    private setupFileInputListeners(): void {
-        documentGetElementById<HTMLInputElement>('chaya-upload').addEventListener('change', async (event) => {
-            const target = event.target as HTMLInputElement;
-            const file = target.files?.[0];
-            console.log('Going to upload chaya file');
-            if (file) {
-                await this.loadChayaFile(file);
-            }
-        });
-        documentGetElementById<HTMLInputElement>('pdf-upload').addEventListener('change', async (event) => {
-            const target = event.target as HTMLInputElement;
-            const file = target.files?.[0];
-            if (file) {
-                await this.loadPdfFile(file);
-            }
-        });
+    private async postLoading(pdfArrayBuffer: ArrayBuffer) {
+        updateLoadingProgress(10, 'Processing PDF...', 'Initializing PDF.js and document...');
+
+        const pdfjs = await waitForPdfjs();
+        const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
+        appState.pdfDocument = await loadingTask.promise;
+
+        updateLoadingProgress(30, 'Rendering pages...', 'Processing PDF pages for display');
+
+        // Mark as loaded
+        appState.documentLoaded = true;
+        appState.hasUnsavedChanges = false;
+
+        // Update slot UI to download mode
+        {
+            const documentFilename = documentGetElementById<HTMLDivElement>('document-filename');
+            documentFilename.textContent = `Document: ${appState.pdfFile?.name || 'document'}`;
+            documentFilename.classList.remove('hidden');
+            const chayaSlot = documentGetElementById<HTMLDivElement>('chaya-slot');
+            chayaSlot.querySelector('.upload-slot')?.classList.add('hidden');
+            chayaSlot.querySelector('.download-slot')?.classList.remove('hidden');
+            const pdfSlot = documentGetElementById<HTMLDivElement>('pdf-slot');
+            pdfSlot.querySelector('.upload-slot')?.classList.add('hidden');
+            pdfSlot.querySelector('.download-slot')?.classList.remove('hidden');
+        }
+
+        updateLoadingProgress(100, 'Complete!', 'Chaya file loaded successfully');
+
+        // Notify tabs that data is ready
+        markModuleDataReady(appState.pdfDocument, appState.chayaDocument);
+        readModuleDataReady(appState.pdfDocument, appState.chayaDocument);
+
+        // Listen for rendering completion
+        this.waitForRenderingComplete();
     }
 
-    // Writes to `appState.pdfFile`, `appState.pdfDocument`, `appState.documentLoaded`, `appState.hasUnsavedChanges`.
-    // Calls `updateLoadingProgress`, `this.updateSlotUI`, `markModuleDataReady`, `readModuleDataReady`, `this.waitForRenderingComplete`.
+    // Writes to `appState.pdfFile`.
+    // Calls `updateLoadingProgress`, `this.postLoading`
     private async loadPdfFile(pdfFile: File): Promise<void> {
         if (!pdfFile) return;
         appState.pdfFile = pdfFile;
@@ -110,27 +161,7 @@ class ChayaApp {
 
             // Load PDF
             const pdfArrayBuffer = await readFileAsArrayBuffer(pdfFile);
-            updateLoadingProgress(10, 'Processing PDF...', 'Initializing PDF.js and document...');
-
-            const pdfjs = await waitForPdfjs();
-            const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
-            appState.pdfDocument = await loadingTask.promise;
-
-            updateLoadingProgress(30, 'Rendering pages...', 'Processing PDF pages for display');
-
-            appState.documentLoaded = true;
-            appState.hasUnsavedChanges = false;
-
-            // Update slot UI to download mode
-            this.updateSlotUI();
-
-            // Notify tabs that data is ready and wait for rendering to complete
-            markModuleDataReady(appState.pdfDocument, appState.chayaDocument);
-            readModuleDataReady(appState.pdfDocument, appState.chayaDocument);
-
-            // Listen for rendering completion
-            this.waitForRenderingComplete();
-
+            this.postLoading(pdfArrayBuffer);
         } catch (error) {
             console.error('Error loading files:', error);
             updateLoadingProgress(0, 'Error loading files', `Failed: ${error}`);
@@ -198,31 +229,8 @@ class ChayaApp {
             appState.chayaDocument = ChayaDocument.fromRegions(regions);
             appState.loadedChayaFileName = file.name;
 
-            // Load PDF document
-            const pdfjs = await waitForPdfjs();
-            const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
-            appState.pdfDocument = await loadingTask.promise;
-
-            updateLoadingProgress(30, 'Finalizing...', 'Preparing user interface...');
-
-            // Mark as loaded
-            appState.documentLoaded = true;
-            appState.hasUnsavedChanges = false;
-
-            // Update slot UI to download mode
-            this.updateSlotUI();
-
-            updateLoadingProgress(100, 'Complete!', 'Chaya file loaded successfully');
-
-            // Notify tabs that data is ready
-            markModuleDataReady(appState.pdfDocument, appState.chayaDocument);
-            readModuleDataReady(appState.pdfDocument, appState.chayaDocument);
-
-            // Listen for rendering completion
-            this.waitForRenderingComplete();
-
-            console.log('Successfully loaded .chaya file:', file.name);
-
+            this.postLoading(pdfArrayBuffer);
+            console.log('Successfully loaded .chaya file');
         } catch (error) {
             console.error('Error loading .chaya file:', error);
             updateLoadingProgress(0, 'Error loading .chaya file', `Failed: ${error}`);
@@ -351,66 +359,6 @@ class ChayaApp {
         URL.revokeObjectURL(url);
     }
 
-    // === UI MANAGEMENT ===
-    private updateSlotUI(): void {
-        console.assert(appState.documentLoaded);
-
-        const chayaSlot = documentGetElementById<HTMLDivElement>('chaya-slot');
-        const pdfSlot = documentGetElementById<HTMLDivElement>('pdf-slot');
-        const documentFilename = documentGetElementById<HTMLDivElement>('document-filename');
-
-        // Download mode
-        const filename = appState.pdfFile?.name || 'document';
-        documentFilename.textContent = `Document: ${filename}`;
-        documentFilename.classList.remove('hidden');
-
-        // Update .chaya slot - preserve file input
-        const chayaInput = documentGetElementById<HTMLInputElement>('chaya-upload');
-        chayaSlot.innerHTML = `
-                <div class="download-slot border-2 border-blue-500 bg-blue-50 rounded-lg p-8 text-center hover:bg-blue-100 transition-colors cursor-pointer">
-                    <div class="text-4xl mb-3">📦</div>
-                    <div class="text-sm font-medium text-blue-700 mb-1">Download .chaya</div>
-                    <div class="text-xs text-blue-600">Complete package</div>
-                </div>
-            `;
-        chayaSlot.appendChild(chayaInput);
-
-        // Update .pdf slot - preserve file input
-        const pdfInput = documentGetElementById<HTMLInputElement>('pdf-upload');
-        pdfSlot.innerHTML = `
-                <div class="download-slot border-2 border-gray-500 bg-gray-50 rounded-lg p-8 text-center hover:bg-gray-100 transition-colors cursor-pointer">
-                    <div class="text-4xl mb-3">📄</div>
-                    <div class="text-sm font-medium text-gray-700 mb-1">Download .pdf</div>
-                    <div class="text-xs text-gray-600">Original document</div>
-                </div>
-            `;
-        pdfSlot.appendChild(pdfInput);
-
-        // Re-attach event listeners after updating innerHTML
-        this.attachSlotEventListeners();
-    }
-
-    private attachSlotEventListeners(): void {
-        // Either upload or download
-        documentGetElementById<HTMLDivElement>('chaya-slot').onclick = () => {
-            if (!appState.documentLoaded) {
-                const chayaUpload = documentGetElementById<HTMLInputElement>('chaya-upload');
-                chayaUpload.click();
-            } else {
-                this.downloadChayaFile();
-            }
-        };
-
-        documentGetElementById<HTMLDivElement>('pdf-slot').onclick = () => {
-            if (!appState.documentLoaded) {
-                const pdfUpload = documentGetElementById<HTMLInputElement>('pdf-upload');
-                pdfUpload.click();
-            } else {
-                this.downloadPdfFile();
-            }
-        };
-    }
-
     // === UTILITIES ===
     private waitForRenderingComplete(): void {
         // Listen for rendering completion from the active tab
@@ -434,25 +382,7 @@ class ChayaApp {
             // Remove the event listener
             document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
         };
-
         document.addEventListener('tabRenderingComplete', handleRenderingComplete);
-
-        // Add a timeout in case rendering gets stuck
-        const timeoutId = setTimeout(() => {
-            console.warn('Rendering timeout - hiding progress bar anyway');
-            documentGetElementById<HTMLDivElement>('app-loading').classList.add('hidden');
-            document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
-        }, 300000); // 5 minutes timeout
-
-        // Store timeout ID to cancel it when rendering completes normally
-        const originalHandler = handleRenderingComplete;
-        const wrappedHandler = (event: Event) => {
-            clearTimeout(timeoutId);
-            originalHandler(event);
-        };
-
-        document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
-        document.addEventListener('tabRenderingComplete', wrappedHandler);
     }
 }
 
