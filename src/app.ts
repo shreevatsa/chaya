@@ -153,13 +153,9 @@ class ChayaApp {
     // Writes to `appState.pdfFile`.
     // Calls `updateLoadingProgress`, `this.postLoading`
     private async loadPdfFile(pdfFile: File): Promise<void> {
-        if (!pdfFile) return;
         appState.pdfFile = pdfFile;
-
         try {
             updateLoadingProgress(0, 'Loading PDF...', 'Reading PDF file...');
-
-            // Load PDF
             const pdfArrayBuffer = await readFileAsArrayBuffer(pdfFile);
             this.postLoading(pdfArrayBuffer);
         } catch (error) {
