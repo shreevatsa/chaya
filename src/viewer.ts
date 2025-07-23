@@ -3,6 +3,7 @@
 import { ChayaDocument, MarkedRegion } from './models.js';
 
 let loadedAnnotations: MarkedRegion[] = [];
+export let readModuleDataReady: Function;
 
 export function initializeViewer(): void {
     console.log('Initializing Read tab (viewer)');
@@ -17,13 +18,6 @@ export function initializeViewer(): void {
         console.error('Required DOM elements not found for Read tab');
         return;
     }
-
-    // Listen for read tab specific data ready event
-    document.addEventListener('readTabDataReady', (event: Event) => {
-        const customEvent = event as CustomEvent;
-        const { pdfDocument, chayaDocument } = customEvent.detail;
-        handleDataReady(pdfDocument, chayaDocument);
-    });
 
     function handleDataReady(pdfDocument: any, chayaDocument: ChayaDocument): void {
         console.log('Read tab: Data ready', { pdfDocument, chayaDocument });
@@ -53,6 +47,8 @@ export function initializeViewer(): void {
         // Update annotation list
         updateAnnotationList();
     }
+
+    readModuleDataReady = handleDataReady;
 
     async function displayAnnotatedRegions(pdfDocument: any, chayaDocument: ChayaDocument): Promise<void> {
         loadingMessage.textContent = 'Extracting annotated regions...';

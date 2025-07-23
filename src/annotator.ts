@@ -9,7 +9,6 @@ let isDrawing = false;
 let startX = 0;
 let startY = 0;
 let currentAnnotation: HTMLDivElement | null = null;
-let hasUnsavedChanges = false;
 
 // Resize/drag state
 let isResizing = false;
@@ -19,6 +18,8 @@ let dragStartX = 0;
 let dragStartY = 0;
 let selectedAnnotation: HTMLDivElement | null = null;
 let selectedAnnotationData: MarkedRegion | null = null;
+
+export let markModuleDataReady: Function;
 
 export function initializeAnnotator(): void {
     console.log('Initializing Mark tab (annotator)');
@@ -33,25 +34,12 @@ export function initializeAnnotator(): void {
         return;
     }
 
-    // Listen for mark tab specific data ready event
-    document.addEventListener('markTabDataReady', (event: Event) => {
-        const customEvent = event as CustomEvent;
-        const { pdfDocument, chayaDocument } = customEvent.detail;
-        handleDataReady(pdfDocument, chayaDocument);
-    });
-
-    // Listen for document saved event to reset unsaved changes flag
-    document.addEventListener('documentSaved', () => {
-        hasUnsavedChanges = false;
-        console.log('Mark tab: Document saved, unsaved changes flag reset');
-    });
-
     function handleDataReady(pdfDocument: any, chayaDocument: ChayaDocument): void {
         console.log('Mark tab: Data ready', { pdfDocument, chayaDocument });
 
         // Update global state
         localAnnotations = chayaDocument.markedRegions || [];
-        hasUnsavedChanges = false;
+        appState.hasUnsavedChanges = false;
 
         // Clear container and render PDF
         const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
@@ -63,6 +51,7 @@ export function initializeAnnotator(): void {
         // Update annotation list
         updateAnnotationList();
     }
+    markModuleDataReady = handleDataReady;
 
     async function renderPdfPages(pdfDocument: any, container: HTMLDivElement): Promise<void> {
         const containerWidth = container.offsetWidth;
@@ -130,9 +119,6 @@ export function initializeAnnotator(): void {
     // Helper functions for annotation management
     function syncWithAppState(): void {
         appState.chayaDocument = ChayaDocument.fromRegions(localAnnotations);
-        if (hasUnsavedChanges) {
-            appState.hasUnsavedChanges = true;
-        }
     }
 
     async function renderPage(pdf: any, pageNumber: number, containerWidth: number) {
@@ -197,7 +183,7 @@ export function initializeAnnotator(): void {
             if (newAnnotations) {
                 // Add the new annotations to the main list
                 localAnnotations.push(...newAnnotations);
-                hasUnsavedChanges = true;
+                appState.hasUnsavedChanges = true;
 
                 // Render the new annotation boxes on their respective pages
                 for (const annotation of newAnnotations) {
@@ -394,7 +380,7 @@ export function initializeAnnotator(): void {
                 };
 
                 localAnnotations.push(annotation);
-                hasUnsavedChanges = true;
+                appState.hasUnsavedChanges = true;
 
                 // Remove the temporary annotation
                 overlay.removeChild(currentAnnotation);
@@ -540,7 +526,7 @@ export function initializeAnnotator(): void {
                 if (newLabel !== null && newLabel.trim() !== '') {
                     annotation.label = newLabel.trim();
                     annotationBox.title = newLabel.trim();
-                    hasUnsavedChanges = true;
+                    appState.hasUnsavedChanges = true;
                     updateAnnotationList();
                     syncWithAppState();
                 }
@@ -674,7 +660,7 @@ export function initializeAnnotator(): void {
             annotation.y = newTop / pageHeight;
             annotation.width = newWidth / pageWidth;
             annotation.height = newHeight / pageHeight;
-            hasUnsavedChanges = true;
+            appState.hasUnsavedChanges = true;
             syncWithAppState();
         };
 
@@ -722,7 +708,7 @@ export function initializeAnnotator(): void {
             // Update annotation data with fractional coordinates
             annotation.x = clampedLeft / pageWidth;
             annotation.y = clampedTop / pageHeight;
-            hasUnsavedChanges = true;
+            appState.hasUnsavedChanges = true;
             syncWithAppState();
         };
 
@@ -787,7 +773,7 @@ export function initializeAnnotator(): void {
         if (index === -1) return;
 
         localAnnotations.splice(index, 1);
-        hasUnsavedChanges = true;
+        appState.hasUnsavedChanges = true;
 
         const annotationBoxes = document.querySelectorAll(`.annotation-box[data-annotation-id="${annotationId}"]`);
         annotationBoxes.forEach(box => {
@@ -841,7 +827,7 @@ export function initializeAnnotator(): void {
 
     // Warn user about unsaved changes when leaving the page
     window.addEventListener('beforeunload', (e) => {
-        if (hasUnsavedChanges && localAnnotations.length > 0) {
+        if (appState.hasUnsavedChanges && localAnnotations.length > 0) {
             const message = 'You have unsaved annotations. Are you sure you want to leave?';
             e.preventDefault();
             e.returnValue = message;

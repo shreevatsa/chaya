@@ -1,6 +1,6 @@
 import { MarkedRegion, appState, ChayaDocument } from './models.js';
-import { initializeAnnotator } from './annotator.js';
-import { initializeViewer } from './viewer.js';
+import { initializeAnnotator, markModuleDataReady } from './annotator.js';
+import { initializeViewer, readModuleDataReady } from './viewer.js';
 import { documentGetElementById, updateLoadingProgress } from './actions.js';
 
 // JSZip is loaded globally via script tag in the HTML
@@ -46,11 +46,6 @@ class ChayaApp {
         this.switchToTab('mark');
     }
 
-    // Update annotations without marking as unsaved (for sync operations)
-    public syncAnnotations(regions: MarkedRegion[]): void {
-        appState.chayaDocument = ChayaDocument.fromRegions(regions);
-    }
-
     // === TAB MANAGEMENT ===
     // Clicking on Mark/Edit/Read should call `switchToTab('mark')` etc.
     private setupTabSwitchingEventListeners(): void {
@@ -82,23 +77,6 @@ class ChayaApp {
         const targetBtn = documentGetElementById(`${tab}-tab-btn`);
         targetBtn.classList.add('active', 'bg-blue-100', 'text-blue-700');
         targetBtn.classList.remove('text-gray-600', 'hover:text-gray-800');
-
-        // If we have loaded data, notify the newly active tab
-        if (appState.documentLoaded && appState.pdfDocument) {
-            console.log(`Notifying newly active ${tab} tab with existing data`);
-            const tabDataEvent = new CustomEvent(`${tab}TabDataReady`, {
-                detail: {
-                    pdfDocument: appState.pdfDocument,
-                    chayaDocument: appState.chayaDocument,
-                    annotationsFileName: appState.loadedChayaFileName,
-                    pdfFileName: appState.pdfFile?.name
-                }
-            });
-            // Use setTimeout to ensure the tab switch visual update happens first
-            setTimeout(() => {
-                document.dispatchEvent(tabDataEvent);
-            }, 100);
-        }
 
         console.log(`Switched to ${tab} tab`);
     }
@@ -324,9 +302,6 @@ class ChayaApp {
             // Mark as saved since we just exported everything
             appState.hasUnsavedChanges = false;
 
-            // Also notify the annotator that changes have been saved
-            this.notifyTabsSaved();
-
             console.log('Successfully created .chaya file:', fileName);
 
         } catch (error) {
@@ -517,28 +492,9 @@ class ChayaApp {
     }
 
     private notifyTabsDataReady(): void {
-        // Only notify the currently active tab to avoid conflicts
-        const activeTabEvent = new CustomEvent(`${appState.currentTab}TabDataReady`, {
-            detail: {
-                pdfDocument: appState.pdfDocument,
-                chayaDocument: appState.chayaDocument,
-                annotationsFileName: appState.loadedChayaFileName,
-                pdfFileName: appState.pdfFile?.name
-            }
-        });
-        document.dispatchEvent(activeTabEvent);
-
-        console.log(`Notified ${appState.currentTab} tab that data is ready`);
+        markModuleDataReady(appState.pdfDocument, appState.chayaDocument);
+        readModuleDataReady(appState.pdfDocument, appState.chayaDocument);
     }
-
-
-    private notifyTabsSaved(): void {
-        // Dispatch event to notify tabs that data has been saved
-        const savedEvent = new CustomEvent('documentSaved');
-        document.dispatchEvent(savedEvent);
-    }
-
-
 }
 
 // Initialize the app when DOM is ready
