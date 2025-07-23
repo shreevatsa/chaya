@@ -90,7 +90,7 @@ class ChayaApp {
                 detail: {
                     pdfDocument: appState.pdfDocument,
                     annotations: appState.loadedAnnotations,
-                    annotationsFileName: appState.loadedAnnotationsFileName,
+                    annotationsFileName: appState.loadedChayaFileName,
                     pdfFileName: appState.pdfFile?.name
                 }
             });
@@ -229,7 +229,7 @@ class ChayaApp {
             // Update state
             appState.pdfFile = pdfFile;
             appState.loadedAnnotations = annotations;
-            appState.loadedAnnotationsFileName = file.name;
+            appState.loadedChayaFileName = file.name;
 
             // Load PDF document
             const pdfjs = await waitForPdfjs();
@@ -521,7 +521,7 @@ class ChayaApp {
             detail: {
                 pdfDocument: appState.pdfDocument,
                 annotations: appState.loadedAnnotations,
-                annotationsFileName: appState.loadedAnnotationsFileName,
+                annotationsFileName: appState.loadedChayaFileName,
                 pdfFileName: appState.pdfFile?.name
             }
         });

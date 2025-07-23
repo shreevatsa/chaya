@@ -54,13 +54,17 @@ export namespace MarkedRegion {
     }
 }
 
+export class Document {
+    private markedRegions: MarkedRegion[] = [];
+}
+
 // Application state.
 interface AppState {
     currentTab: 'mark' | 'edit' | 'read';  // Which tab of the app is active
     documentLoaded: boolean;  // Whether the document (PDF or Chaya) has been loaded yet
     pdfFile: File | null;
     loadedAnnotations: MarkedRegion[];
-    loadedAnnotationsFileName: string | null;
+    loadedChayaFileName: string | null;
     pdfDocument: any | null;
     hasUnsavedChanges: boolean;
 }
@@ -70,7 +74,7 @@ export const appState: AppState = {
     documentLoaded: false,
     pdfFile: null,
     loadedAnnotations: [],
-    loadedAnnotationsFileName: null,
+    loadedChayaFileName: null,
     pdfDocument: null,
     hasUnsavedChanges: false
 };
