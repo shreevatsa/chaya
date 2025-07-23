@@ -1,4 +1,4 @@
-import { MarkedRegion, appState } from './models.js';
+import { MarkedRegion, appState, ChayaDocument } from './models.js';
 import { initializeAnnotator } from './annotator.js';
 import { initializeViewer } from './viewer.js';
 import { documentGetElementById, updateLoadingProgress } from './actions.js';
@@ -47,8 +47,8 @@ class ChayaApp {
     }
 
     // Update annotations without marking as unsaved (for sync operations)
-    public syncAnnotations(annotations: MarkedRegion[]): void {
-        appState.loadedAnnotations = annotations;
+    public syncAnnotations(regions: MarkedRegion[]): void {
+        appState.document = ChayaDocument.fromRegions(regions);
     }
 
     // === TAB MANAGEMENT ===
@@ -89,7 +89,7 @@ class ChayaApp {
             const tabDataEvent = new CustomEvent(`${tab}TabDataReady`, {
                 detail: {
                     pdfDocument: appState.pdfDocument,
-                    annotations: appState.loadedAnnotations,
+                    annotations: appState.document,
                     annotationsFileName: appState.loadedChayaFileName,
                     pdfFileName: appState.pdfFile?.name
                 }
@@ -107,6 +107,7 @@ class ChayaApp {
         documentGetElementById<HTMLInputElement>('chaya-upload').addEventListener('change', async (event) => {
             const target = event.target as HTMLInputElement;
             const file = target.files?.[0];
+            console.log('Going to upload chaya file');
             if (file) {
                 await this.loadChayaFile(file);
             }
@@ -222,13 +223,13 @@ class ChayaApp {
             // Extract annotations
             const annotationsText = await zipContent.file('annotations.json')!.async('string');
             const annotationsData = JSON.parse(annotationsText);
-            const annotations = MarkedRegion.parseFromJson(annotationsData);
+            const regions = MarkedRegion.parseFromJson(annotationsData);
 
             updateLoadingProgress(25, 'Initializing document...', 'Setting up PDF viewer...');
 
             // Update state
             appState.pdfFile = pdfFile;
-            appState.loadedAnnotations = annotations;
+            appState.document = ChayaDocument.fromRegions(regions);
             appState.loadedChayaFileName = file.name;
 
             // Load PDF document
@@ -283,7 +284,7 @@ class ChayaApp {
                 originalFilename: appState.pdfFile.name,
                 chayaFormatVersion: "1.0",
                 application: {
-                    name: "Bookchop",
+                    name: "Chaya",
                     version: "1.0.0"
                 }
             };
@@ -353,7 +354,7 @@ class ChayaApp {
         };
 
         // Group annotations by page
-        appState.loadedAnnotations.forEach(annotation => {
+        appState.document.markedRegions.forEach(annotation => {
             const pageKey = annotation.pageNumber.toString();
             if (!annotationsData.annotationsByPage[pageKey]) {
                 annotationsData.annotationsByPage[pageKey] = [];
@@ -520,7 +521,7 @@ class ChayaApp {
         const activeTabEvent = new CustomEvent(`${appState.currentTab}TabDataReady`, {
             detail: {
                 pdfDocument: appState.pdfDocument,
-                annotations: appState.loadedAnnotations,
+                chayaDocument: appState.document,
                 annotationsFileName: appState.loadedChayaFileName,
                 pdfFileName: appState.pdfFile?.name
             }

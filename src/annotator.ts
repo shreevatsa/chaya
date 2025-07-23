@@ -1,10 +1,10 @@
 // Mark tab functionality - region annotation on PDF
 
-import { MarkedRegion, appState } from './models.js';
+import { MarkedRegion, appState, ChayaDocument } from './models.js';
 import { runAIAssistedAnnotation } from './ai-orchestrator.js';
 import { updateLoadingProgress } from './actions.js';
 
-let annotations: MarkedRegion[] = [];
+let localAnnotations: MarkedRegion[] = [];
 let isDrawing = false;
 let startX = 0;
 let startY = 0;
@@ -36,8 +36,8 @@ export function initializeAnnotator(): void {
     // Listen for mark tab specific data ready event
     document.addEventListener('markTabDataReady', (event: Event) => {
         const customEvent = event as CustomEvent;
-        const { pdfDocument, annotations: loadedAnnotations } = customEvent.detail;
-        handleDataReady(pdfDocument, loadedAnnotations);
+        const { pdfDocument, document } = customEvent.detail;
+        handleDataReady(pdfDocument, document);
     });
 
     // Listen for document saved event to reset unsaved changes flag
@@ -50,7 +50,7 @@ export function initializeAnnotator(): void {
         console.log('Mark tab: Data ready', { pdfDocument, loadedAnnotations });
 
         // Update global state
-        annotations = loadedAnnotations || [];
+        localAnnotations = loadedAnnotations || [];
         hasUnsavedChanges = false;
 
         // Clear container and render PDF
@@ -88,9 +88,9 @@ export function initializeAnnotator(): void {
             console.log(`All ${totalPages} pages rendered successfully`);
 
             // Render loaded annotations if any
-            if (annotations.length > 0) {
+            if (localAnnotations.length > 0) {
                 console.log('Rendering loaded annotations...');
-                annotations.forEach(annotation => {
+                localAnnotations.forEach(annotation => {
                     const pageDiv = pdfContainer.querySelector(`[data-page-number="${annotation.pageNumber}"]`) as HTMLDivElement;
                     if (pageDiv) {
                         const annotationLayer = pageDiv.querySelector('.annotation-layer') as HTMLDivElement;
@@ -129,7 +129,7 @@ export function initializeAnnotator(): void {
 
     // Helper functions for annotation management
     function syncWithAppState(): void {
-        appState.loadedAnnotations = annotations;
+        appState.document = ChayaDocument.fromRegions(localAnnotations);
         if (hasUnsavedChanges) {
             appState.hasUnsavedChanges = true;
         }
@@ -193,10 +193,10 @@ export function initializeAnnotator(): void {
         aiButton.title = 'Use AI to automatically annotate this page';
 
         aiButton.addEventListener('click', async () => {
-            const newAnnotations = await runAIAssistedAnnotation(pageDiv, pageNumber, annotations, getCanvasForPage);
+            const newAnnotations = await runAIAssistedAnnotation(pageDiv, pageNumber, localAnnotations, getCanvasForPage);
             if (newAnnotations) {
                 // Add the new annotations to the main list
-                annotations.push(...newAnnotations);
+                localAnnotations.push(...newAnnotations);
                 hasUnsavedChanges = true;
 
                 // Render the new annotation boxes on their respective pages
@@ -238,7 +238,7 @@ export function initializeAnnotator(): void {
 
     function updateAnnotationList(): void {
         // Update count
-        const count = annotations.length;
+        const count = localAnnotations.length;
         annotationCount.textContent = count === 0 ? 'No annotations' :
             count === 1 ? '1 annotation' : `${count} annotations`;
 
@@ -247,7 +247,7 @@ export function initializeAnnotator(): void {
 
         // Group annotations by page
         const annotationsByPage: { [key: number]: MarkedRegion[] } = {};
-        annotations.forEach(annotation => {
+        localAnnotations.forEach(annotation => {
             if (!annotationsByPage[annotation.pageNumber]) {
                 annotationsByPage[annotation.pageNumber] = [];
             }
@@ -393,7 +393,7 @@ export function initializeAnnotator(): void {
                     pageNumber: pageNumber
                 };
 
-                annotations.push(annotation);
+                localAnnotations.push(annotation);
                 hasUnsavedChanges = true;
 
                 // Remove the temporary annotation
@@ -738,7 +738,7 @@ export function initializeAnnotator(): void {
     }
 
     function selectAnnotationById(annotationId: string): void {
-        const annotation = annotations.find(a => a.id === annotationId);
+        const annotation = localAnnotations.find(a => a.id === annotationId);
         if (!annotation) return;
 
         const annotationBox = document.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`) as HTMLDivElement;
@@ -783,10 +783,10 @@ export function initializeAnnotator(): void {
     }
 
     function deleteAnnotationById(annotationId: string): void {
-        const index = annotations.findIndex(a => a.id === annotationId);
+        const index = localAnnotations.findIndex(a => a.id === annotationId);
         if (index === -1) return;
 
-        annotations.splice(index, 1);
+        localAnnotations.splice(index, 1);
         hasUnsavedChanges = true;
 
         const annotationBoxes = document.querySelectorAll(`.annotation-box[data-annotation-id="${annotationId}"]`);
@@ -841,7 +841,7 @@ export function initializeAnnotator(): void {
 
     // Warn user about unsaved changes when leaving the page
     window.addEventListener('beforeunload', (e) => {
-        if (hasUnsavedChanges && annotations.length > 0) {
+        if (hasUnsavedChanges && localAnnotations.length > 0) {
             const message = 'You have unsaved annotations. Are you sure you want to leave?';
             e.preventDefault();
             e.returnValue = message;
