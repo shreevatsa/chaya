@@ -1,8 +1,8 @@
 // Read tab functionality - presentation view of annotated documents
 
-import { Annotation } from './models.js';
+import { MarkedRegion } from './models.js';
 
-let loadedAnnotations: Annotation[] = [];
+let loadedAnnotations: MarkedRegion[] = [];
 
 export function initializeViewer(): void {
     console.log('Initializing Read tab (viewer)');
@@ -25,7 +25,7 @@ export function initializeViewer(): void {
         handleDataReady(pdfDocument, annotations, annotationsFileName, pdfFileName);
     });
 
-    function handleDataReady(pdfDocument: any, annotations: Annotation[], annotationsFileName: string | null, pdfFileName: string | null): void {
+    function handleDataReady(pdfDocument: any, annotations: MarkedRegion[], annotationsFileName: string | null, pdfFileName: string | null): void {
         console.log('Read tab: Data ready', { pdfDocument, annotations, annotationsFileName, pdfFileName });
 
         // Update local state
@@ -54,7 +54,7 @@ export function initializeViewer(): void {
         updateAnnotationList();
     }
 
-    async function displayAnnotatedRegions(pdfDocument: any, annotations: Annotation[]): Promise<void> {
+    async function displayAnnotatedRegions(pdfDocument: any, annotations: MarkedRegion[]): Promise<void> {
         loadingMessage.textContent = 'Extracting annotated regions...';
 
         for (let i = 0; i < annotations.length; i++) {
@@ -79,7 +79,7 @@ export function initializeViewer(): void {
     }
 
     // Extract a cropped region from a page canvas for a specific annotation
-    async function extractAnnotationRegion(pdf: any, annotation: Annotation): Promise<HTMLDivElement> {
+    async function extractAnnotationRegion(pdf: any, annotation: MarkedRegion): Promise<HTMLDivElement> {
         const page = await pdf.getPage(annotation.pageNumber);
 
         // Calculate scale to limit maximum width while maintaining aspect ratio
@@ -196,7 +196,7 @@ export function initializeViewer(): void {
     }
 
     // Scroll to and highlight an annotation region
-    function scrollToAnnotationRegion(annotation: Annotation): void {
+    function scrollToAnnotationRegion(annotation: MarkedRegion): void {
         const regionDivs = pdfContainer.querySelectorAll('.annotation-region');
 
         // Find the region div for this annotation by matching the label
@@ -216,7 +216,7 @@ export function initializeViewer(): void {
     }
 
     // Highlight annotation region with a visual effect
-    function highlightAnnotationRegion(annotation: Annotation, highlight: boolean): void {
+    function highlightAnnotationRegion(annotation: MarkedRegion, highlight: boolean): void {
         const regionDivs = pdfContainer.querySelectorAll('.annotation-region');
 
         // Find the region div for this annotation by matching the label

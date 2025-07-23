@@ -5,7 +5,7 @@
 // It handles DOM interactions, user prompts, and orchestrates the AI workflow.
 
 import { annotateWithGemini, AIAnnotationRequest } from './ai-engine.js';
-import { Annotation } from './models.js';
+import { MarkedRegion } from './models.js';
 
 /**
  * This is the main entry point called by the UI (annotator.ts).
@@ -15,9 +15,9 @@ import { Annotation } from './models.js';
 export async function runAIAssistedAnnotation(
     pageDiv: HTMLDivElement,
     pageNumber: number,
-    allAnnotations: Annotation[],
+    allAnnotations: MarkedRegion[],
     getCanvasForPage: (pageNumber: number) => HTMLCanvasElement | null
-): Promise<Annotation[] | null> {
+): Promise<MarkedRegion[] | null> {
 
     // 1. Get user input from the dialog.
     const userPrompt = `Break these document pages into "regions" (paragraphs etc), and for each region, provide a descriptive label and bounding box. The box_2d should be [ymin, xmin, ymax, xmax] normalized to 0-1000. Don't make bounding boxes too tight - leave 5-10 pixels of empty space on all sides.`;
@@ -186,7 +186,7 @@ async function getWordLevelOCR(canvas: HTMLCanvasElement, apiKey: string): Promi
 async function prepareMultiPageAnnotationRequest(
     pageNumbers: number[],
     prompt: string,
-    allAnnotations: Annotation[],
+    allAnnotations: MarkedRegion[],
     getCanvasForPage: (pageNumber: number) => HTMLCanvasElement | null,
     pageVisionData: { [pageNum: number]: VisionData }
 ): Promise<AIAnnotationRequest | null> {
@@ -304,8 +304,8 @@ function convertMultiPageResponseToAnnotations(
     pageNumbers: number[],
     pageVisionData: { [pageNum: number]: VisionData },
     getCanvasForPage: (pageNumber: number) => HTMLCanvasElement | null
-): Annotation[] {
-    const allAnnotations: Annotation[] = [];
+): MarkedRegion[] {
+    const allAnnotations: MarkedRegion[] = [];
 
     for (const region of parsedAnnotations) {
         const pageNumber = region.pageNumber;
@@ -336,7 +336,7 @@ function convertMultiPageResponseToAnnotations(
 /**
  * Converts a single region from AI response to Annotation format
  */
-function convertSingleRegionToAnnotation(region: any, pageNumber: number, visionData: VisionData, canvas: HTMLCanvasElement): Annotation | null {
+function convertSingleRegionToAnnotation(region: any, pageNumber: number, visionData: VisionData, canvas: HTMLCanvasElement): MarkedRegion | null {
     // Method 1: Use word indices to calculate precise bounding box
     if (region.wordIndices && Array.isArray(region.wordIndices) && region.wordIndices.length > 0) {
         const regionWords = region.wordIndices
@@ -357,7 +357,7 @@ function convertSingleRegionToAnnotation(region: any, pageNumber: number, vision
             const height = Math.max(0.01, (ymax - ymin) / canvas.height);
 
             return {
-                id: Annotation.generateRandomId(),
+                id: MarkedRegion.generateRandomId(),
                 x, y, width, height,
                 label: region.label || 'AI Annotation',
                 semanticType: region.semanticType,
@@ -379,7 +379,7 @@ function convertSingleRegionToAnnotation(region: any, pageNumber: number, vision
         const height = Math.max(0.01, Math.min(1 - y, region.height || 0.1));
 
         return {
-            id: Annotation.generateRandomId(),
+            id: MarkedRegion.generateRandomId(),
             x, y, width, height,
             label: region.label || 'AI Annotation',
             pageNumber: pageNumber
@@ -399,7 +399,7 @@ function convertSingleRegionToAnnotation(region: any, pageNumber: number, vision
     const height = Math.max(0.01, ymax - ymin);
 
     return {
-        id: Annotation.generateRandomId(),
+        id: MarkedRegion.generateRandomId(),
         x, y, width, height,
         label: region.label || 'AI Annotation',
         semanticType: region.semanticType,
@@ -446,7 +446,7 @@ function getGoogleVisionApiKey(): string | null {
  */
 function getExamplesFromRecentPages(
     currentPageNumber: number,
-    allAnnotations: Annotation[],
+    allAnnotations: MarkedRegion[],
     getCanvasForPage: (pageNumber: number) => HTMLCanvasElement | null
 ): { base64Image: string; annotations: any[]; }[] {
     const examples: { base64Image: string; annotations: any[]; }[] = [];

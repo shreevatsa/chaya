@@ -1,10 +1,10 @@
 // Mark tab functionality - region annotation on PDF
 
-import { Annotation, appState } from './models.js';
+import { MarkedRegion, appState } from './models.js';
 import { runAIAssistedAnnotation } from './ai-orchestrator.js';
 import { updateLoadingProgress } from './actions.js';
 
-let annotations: Annotation[] = [];
+let annotations: MarkedRegion[] = [];
 let isDrawing = false;
 let startX = 0;
 let startY = 0;
@@ -18,7 +18,7 @@ let resizeHandle: string | null = null;
 let dragStartX = 0;
 let dragStartY = 0;
 let selectedAnnotation: HTMLDivElement | null = null;
-let selectedAnnotationData: Annotation | null = null;
+let selectedAnnotationData: MarkedRegion | null = null;
 
 export function initializeAnnotator(): void {
     console.log('Initializing Mark tab (annotator)');
@@ -46,7 +46,7 @@ export function initializeAnnotator(): void {
         console.log('Mark tab: Document saved, unsaved changes flag reset');
     });
 
-    function handleDataReady(pdfDocument: any, loadedAnnotations: Annotation[]): void {
+    function handleDataReady(pdfDocument: any, loadedAnnotations: MarkedRegion[]): void {
         console.log('Mark tab: Data ready', { pdfDocument, loadedAnnotations });
 
         // Update global state
@@ -246,7 +246,7 @@ export function initializeAnnotator(): void {
         annotationList.innerHTML = '';
 
         // Group annotations by page
-        const annotationsByPage: { [key: number]: Annotation[] } = {};
+        const annotationsByPage: { [key: number]: MarkedRegion[] } = {};
         annotations.forEach(annotation => {
             if (!annotationsByPage[annotation.pageNumber]) {
                 annotationsByPage[annotation.pageNumber] = [];
@@ -383,8 +383,8 @@ export function initializeAnnotator(): void {
                 const pageWidth = pageDiv.offsetWidth;
                 const pageHeight = pageDiv.offsetHeight;
 
-                const annotation: Annotation = {
-                    id: Annotation.generateRandomId(),
+                const annotation: MarkedRegion = {
+                    id: MarkedRegion.generateRandomId(),
                     x: left / pageWidth,
                     y: top / pageHeight,
                     width: width / pageWidth,
@@ -422,7 +422,7 @@ export function initializeAnnotator(): void {
         });
     }
 
-    function createAnnotationBox(overlay: HTMLDivElement, pageDiv: HTMLDivElement, annotation: Annotation): void {
+    function createAnnotationBox(overlay: HTMLDivElement, pageDiv: HTMLDivElement, annotation: MarkedRegion): void {
         // Check if annotation box already exists to prevent duplicates
         const existingBox = overlay.querySelector(`[data-annotation-id="${annotation.id}"]`);
         if (existingBox) {
@@ -458,7 +458,7 @@ export function initializeAnnotator(): void {
         overlay.appendChild(annotationBox);
     }
 
-    function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: Annotation, pageDiv: HTMLDivElement): void {
+    function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: MarkedRegion, pageDiv: HTMLDivElement): void {
         // Add resize handles
         const handles = ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'];
         handles.forEach(handle => {
@@ -568,7 +568,7 @@ export function initializeAnnotator(): void {
         });
     }
 
-    function selectAnnotation(annotationBox: HTMLDivElement, annotation: Annotation): void {
+    function selectAnnotation(annotationBox: HTMLDivElement, annotation: MarkedRegion): void {
         // Hide handles from previously selected annotation
         if (selectedAnnotation && selectedAnnotation !== annotationBox) {
             hideResizeHandles(selectedAnnotation);
@@ -596,7 +596,7 @@ export function initializeAnnotator(): void {
         });
     }
 
-    function startResize(e: MouseEvent, handle: string, annotationBox: HTMLDivElement, annotation: Annotation, pageDiv: HTMLDivElement): void {
+    function startResize(e: MouseEvent, handle: string, annotationBox: HTMLDivElement, annotation: MarkedRegion, pageDiv: HTMLDivElement): void {
         isResizing = true;
         resizeHandle = handle;
         startX = e.clientX;
@@ -690,7 +690,7 @@ export function initializeAnnotator(): void {
         e.preventDefault();
     }
 
-    function startDrag(e: MouseEvent, annotationBox: HTMLDivElement, annotation: Annotation, pageDiv: HTMLDivElement): void {
+    function startDrag(e: MouseEvent, annotationBox: HTMLDivElement, annotation: MarkedRegion, pageDiv: HTMLDivElement): void {
         isDragging = true;
         dragStartX = e.clientX;
         dragStartY = e.clientY;

@@ -1,5 +1,4 @@
-// TODO: Rename `Annotation` to `MarkedRegion`
-export interface Annotation {
+export interface MarkedRegion {
     id: string;
     pageNumber: number;
     x: number;
@@ -13,9 +12,9 @@ export interface Annotation {
     ocrText?: string;
 }
 
-export namespace Annotation {
+export namespace MarkedRegion {
     // Load and parse annotations from JSON data as saved to .chaya file.
-    export function parseFromJson(jsonData: any): Annotation[] {
+    export function parseFromJson(jsonData: any): MarkedRegion[] {
         // Validate the JSON structure
         if (!jsonData.metadata || !jsonData.annotationsByPage) {
             throw new Error('Invalid annotations JSON format');
@@ -23,7 +22,7 @@ export namespace Annotation {
 
         console.log('Loading annotations from JSON:', jsonData);
 
-        const annotations: Annotation[] = [];
+        const annotations: MarkedRegion[] = [];
 
         // Convert loaded annotations to our internal format
         Object.keys(jsonData.annotationsByPage).forEach(pageKey => {
@@ -31,7 +30,7 @@ export namespace Annotation {
             const pageAnnotations = jsonData.annotationsByPage[pageKey];
 
             pageAnnotations.forEach((ann: any) => {
-                const annotation: Annotation = {
+                const annotation: MarkedRegion = {
                     id: ann.id || generateRandomId(),
                     pageNumber: pageNumber,
                     x: ann.x,
@@ -55,13 +54,12 @@ export namespace Annotation {
     }
 }
 
-
 // Application state.
 interface AppState {
     currentTab: 'mark' | 'edit' | 'read';  // Which tab of the app is active
     documentLoaded: boolean;  // Whether the document (PDF or Chaya) has been loaded yet
     pdfFile: File | null;
-    loadedAnnotations: Annotation[];
+    loadedAnnotations: MarkedRegion[];
     loadedAnnotationsFileName: string | null;
     pdfDocument: any | null;
     hasUnsavedChanges: boolean;

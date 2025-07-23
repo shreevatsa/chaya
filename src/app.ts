@@ -1,4 +1,4 @@
-import { Annotation, appState } from './models.js';
+import { MarkedRegion, appState } from './models.js';
 import { initializeAnnotator } from './annotator.js';
 import { initializeViewer } from './viewer.js';
 import { documentGetElementById, updateLoadingProgress } from './actions.js';
@@ -47,7 +47,7 @@ class ChayaApp {
     }
 
     // Update annotations without marking as unsaved (for sync operations)
-    public syncAnnotations(annotations: Annotation[]): void {
+    public syncAnnotations(annotations: MarkedRegion[]): void {
         appState.loadedAnnotations = annotations;
     }
 
@@ -222,7 +222,7 @@ class ChayaApp {
             // Extract annotations
             const annotationsText = await zipContent.file('annotations.json')!.async('string');
             const annotationsData = JSON.parse(annotationsText);
-            const annotations = Annotation.parseFromJson(annotationsData);
+            const annotations = MarkedRegion.parseFromJson(annotationsData);
 
             updateLoadingProgress(25, 'Initializing document...', 'Setting up PDF viewer...');
 
