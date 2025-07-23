@@ -7,6 +7,9 @@ export function documentGetElementById<T extends HTMLElement>(id: string): T {
 }
 
 export function updateLoadingProgress(percent: number, text: string, details: string): void {
+    const loadingDiv = documentGetElementById<HTMLDivElement>('app-loading');
+    loadingDiv.classList.remove('hidden');
+
     const clampedPercent = Math.max(0, Math.min(100, percent));
 
     documentGetElementById<HTMLSpanElement>('app-loading-text').textContent = text;
