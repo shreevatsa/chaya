@@ -69,7 +69,7 @@ interface AppState {
     currentTab: 'mark' | 'edit' | 'read';  // Which tab of the app is active
     documentLoaded: boolean;  // Whether the document (PDF or Chaya) has been loaded yet
     pdfFile: File | null;
-    document: ChayaDocument,
+    chayaDocument: ChayaDocument,
     loadedChayaFileName: string | null;
     pdfDocument: any | null;
     hasUnsavedChanges: boolean;
@@ -79,7 +79,7 @@ export const appState: AppState = {
     currentTab: 'mark',
     documentLoaded: false,
     pdfFile: null,
-    document: new ChayaDocument(),
+    chayaDocument: new ChayaDocument(),
     loadedChayaFileName: null,
     pdfDocument: null,
     hasUnsavedChanges: false

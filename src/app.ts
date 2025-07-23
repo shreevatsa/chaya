@@ -48,7 +48,7 @@ class ChayaApp {
 
     // Update annotations without marking as unsaved (for sync operations)
     public syncAnnotations(regions: MarkedRegion[]): void {
-        appState.document = ChayaDocument.fromRegions(regions);
+        appState.chayaDocument = ChayaDocument.fromRegions(regions);
     }
 
     // === TAB MANAGEMENT ===
@@ -89,7 +89,7 @@ class ChayaApp {
             const tabDataEvent = new CustomEvent(`${tab}TabDataReady`, {
                 detail: {
                     pdfDocument: appState.pdfDocument,
-                    annotations: appState.document,
+                    chayaDocument: appState.chayaDocument,
                     annotationsFileName: appState.loadedChayaFileName,
                     pdfFileName: appState.pdfFile?.name
                 }
@@ -229,7 +229,7 @@ class ChayaApp {
 
             // Update state
             appState.pdfFile = pdfFile;
-            appState.document = ChayaDocument.fromRegions(regions);
+            appState.chayaDocument = ChayaDocument.fromRegions(regions);
             appState.loadedChayaFileName = file.name;
 
             // Load PDF document
@@ -354,7 +354,7 @@ class ChayaApp {
         };
 
         // Group annotations by page
-        appState.document.markedRegions.forEach(annotation => {
+        appState.chayaDocument.markedRegions.forEach(annotation => {
             const pageKey = annotation.pageNumber.toString();
             if (!annotationsData.annotationsByPage[pageKey]) {
                 annotationsData.annotationsByPage[pageKey] = [];
@@ -521,7 +521,7 @@ class ChayaApp {
         const activeTabEvent = new CustomEvent(`${appState.currentTab}TabDataReady`, {
             detail: {
                 pdfDocument: appState.pdfDocument,
-                chayaDocument: appState.document,
+                chayaDocument: appState.chayaDocument,
                 annotationsFileName: appState.loadedChayaFileName,
                 pdfFileName: appState.pdfFile?.name
             }
@@ -540,6 +540,11 @@ class ChayaApp {
 
 
 }
+
+// Initialize the app when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    new ChayaApp();
+});
 
 // CSS for tab styling
 const style = document.createElement('style');

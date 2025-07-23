@@ -36,8 +36,8 @@ export function initializeAnnotator(): void {
     // Listen for mark tab specific data ready event
     document.addEventListener('markTabDataReady', (event: Event) => {
         const customEvent = event as CustomEvent;
-        const { pdfDocument, document } = customEvent.detail;
-        handleDataReady(pdfDocument, document);
+        const { pdfDocument, chayaDocument } = customEvent.detail;
+        handleDataReady(pdfDocument, chayaDocument);
     });
 
     // Listen for document saved event to reset unsaved changes flag
@@ -46,11 +46,11 @@ export function initializeAnnotator(): void {
         console.log('Mark tab: Document saved, unsaved changes flag reset');
     });
 
-    function handleDataReady(pdfDocument: any, loadedAnnotations: MarkedRegion[]): void {
-        console.log('Mark tab: Data ready', { pdfDocument, loadedAnnotations });
+    function handleDataReady(pdfDocument: any, chayaDocument: ChayaDocument): void {
+        console.log('Mark tab: Data ready', { pdfDocument, chayaDocument });
 
         // Update global state
-        localAnnotations = loadedAnnotations || [];
+        localAnnotations = chayaDocument.markedRegions || [];
         hasUnsavedChanges = false;
 
         // Clear container and render PDF
@@ -129,7 +129,7 @@ export function initializeAnnotator(): void {
 
     // Helper functions for annotation management
     function syncWithAppState(): void {
-        appState.document = ChayaDocument.fromRegions(localAnnotations);
+        appState.chayaDocument = ChayaDocument.fromRegions(localAnnotations);
         if (hasUnsavedChanges) {
             appState.hasUnsavedChanges = true;
         }

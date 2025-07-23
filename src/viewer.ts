@@ -1,6 +1,6 @@
 // Read tab functionality - presentation view of annotated documents
 
-import { MarkedRegion } from './models.js';
+import { ChayaDocument, MarkedRegion } from './models.js';
 
 let loadedAnnotations: MarkedRegion[] = [];
 
@@ -21,21 +21,21 @@ export function initializeViewer(): void {
     // Listen for read tab specific data ready event
     document.addEventListener('readTabDataReady', (event: Event) => {
         const customEvent = event as CustomEvent;
-        const { pdfDocument, annotations, annotationsFileName, pdfFileName } = customEvent.detail;
-        handleDataReady(pdfDocument, annotations, annotationsFileName, pdfFileName);
+        const { pdfDocument, chayaDocument } = customEvent.detail;
+        handleDataReady(pdfDocument, chayaDocument);
     });
 
-    function handleDataReady(pdfDocument: any, annotations: MarkedRegion[], annotationsFileName: string | null, pdfFileName: string | null): void {
-        console.log('Read tab: Data ready', { pdfDocument, annotations, annotationsFileName, pdfFileName });
+    function handleDataReady(pdfDocument: any, chayaDocument: ChayaDocument): void {
+        console.log('Read tab: Data ready', { pdfDocument, chayaDocument });
 
         // Update local state
-        loadedAnnotations = annotations || [];
+        loadedAnnotations = chayaDocument.markedRegions || [];
 
         // Clear container
         pdfContainer.innerHTML = '';
 
         // Check if we have both PDF and annotations
-        if (!pdfDocument || !annotations || annotations.length === 0) {
+        if (!pdfDocument || !chayaDocument || chayaDocument.markedRegions.length === 0) {
             pdfContainer.innerHTML = `
                 <div class="p-8 text-center text-gray-500">
                     <div class="text-4xl mb-4">📖</div>
@@ -48,14 +48,16 @@ export function initializeViewer(): void {
         }
 
         // Display the annotated regions
-        displayAnnotatedRegions(pdfDocument, annotations);
+        displayAnnotatedRegions(pdfDocument, chayaDocument);
 
         // Update annotation list
         updateAnnotationList();
     }
 
-    async function displayAnnotatedRegions(pdfDocument: any, annotations: MarkedRegion[]): Promise<void> {
+    async function displayAnnotatedRegions(pdfDocument: any, chayaDocument: ChayaDocument): Promise<void> {
         loadingMessage.textContent = 'Extracting annotated regions...';
+
+        let annotations = chayaDocument.markedRegions;
 
         for (let i = 0; i < annotations.length; i++) {
             const annotation = annotations[i];
