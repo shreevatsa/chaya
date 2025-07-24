@@ -1,6 +1,6 @@
 import { MarkedRegion, appState, ChayaDocument } from './models.js';
-import { MarkController, initializeMarkTab } from './annotator.js';
-import { ViewerController, initializeViewer } from './viewer.js';
+import { MarkController, initializeMarkTab } from './mark-controller.js';
+import { ViewerController, initializeViewer } from './read-controller.js';
 import { documentGetElementById, updateLoadingProgress } from './actions.js';
 
 // JSZip is loaded globally via script tag in the HTML
