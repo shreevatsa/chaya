@@ -301,42 +301,27 @@ class ChayaApp {
         }
     }
 
+    // Creates annotations JSON structure for saving to the file.
     private createAnnotationsJSON(): any {
-        // Create annotations JSON structure for saving to the file.
-        const annotationsData = {
+        const annotationsByPage: Record<string, any[]> = {};
+        // Convert the Map to the plain object required by JSON.stringify
+        appState.chayaDocument.markedRegions.forEach((regions, pageNumber) => {
+            annotationsByPage[String(pageNumber)] = regions.map(ann => ({
+                id: ann.id,
+                x: ann.x, y: ann.y,
+                width: ann.width, height: ann.height,
+                label: ann.label
+            }));
+        });
+
+        return {
             metadata: {
                 sourcePdf: appState.pdfFile?.name || 'unknown.pdf',
                 annotationVersion: "1.1",
                 annotatedAt: new Date().toISOString()
             },
-            annotationsByPage: {} as Record<string, Array<{
-                id: string;
-                x: number;
-                y: number;
-                width: number;
-                height: number;
-                label: string;
-            }>>
+            annotationsByPage
         };
-
-        // Group annotations by page
-        appState.chayaDocument.markedRegions.forEach(annotation => {
-            const pageKey = annotation.pageNumber.toString();
-            if (!annotationsData.annotationsByPage[pageKey]) {
-                annotationsData.annotationsByPage[pageKey] = [];
-            }
-
-            annotationsData.annotationsByPage[pageKey].push({
-                id: annotation.id,
-                x: annotation.x,
-                y: annotation.y,
-                width: annotation.width,
-                height: annotation.height,
-                label: annotation.label
-            });
-        });
-
-        return annotationsData;
     }
 
     private async downloadPdfFile(): Promise<void> {

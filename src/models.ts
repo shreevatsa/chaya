@@ -14,38 +14,28 @@ export interface MarkedRegion {
 
 export namespace MarkedRegion {
     // Load and parse annotations from JSON data as saved to .chaya file.
-    export function parseFromJson(jsonData: any): MarkedRegion[] {
-        // Validate the JSON structure
+    export function parseFromJson(jsonData: any): Map<number, MarkedRegion[]> {
         if (!jsonData.metadata || !jsonData.annotationsByPage) {
             throw new Error('Invalid annotations JSON format');
         }
 
         console.log('Loading annotations from JSON:', jsonData);
 
-        const annotations: MarkedRegion[] = [];
+        const annotationsMap = new Map<number, MarkedRegion[]>();
 
-        // Convert loaded annotations to our internal format
         Object.keys(jsonData.annotationsByPage).forEach(pageKey => {
             const pageNumber = parseInt(pageKey);
-            const pageAnnotations = jsonData.annotationsByPage[pageKey];
-
-            pageAnnotations.forEach((ann: any) => {
-                const annotation: MarkedRegion = {
-                    id: ann.id || generateRandomId(),
-                    pageNumber: pageNumber,
-                    x: ann.x,
-                    y: ann.y,
-                    width: ann.width,
-                    height: ann.height,
-                    label: ann.label,
-                    ocrText: ann.ocrText,
-                };
-                annotations.push(annotation);
-            });
+            const pageAnnotations = jsonData.annotationsByPage[pageKey].map((ann: any) => ({
+                id: ann.id || generateRandomId(),
+                pageNumber: pageNumber,
+                x: ann.x, y: ann.y, width: ann.width, height: ann.height,
+                label: ann.label,
+                ocrText: ann.ocrText,
+            }));
+            annotationsMap.set(pageNumber, pageAnnotations);
         });
 
-        console.log('Loaded annotations:', annotations);
-        return annotations;
+        return annotationsMap;
     }
 
     // A string like `annotation_1753194399461_735zr5zix` (via 0.19688771398906768 = 0.735zr5zix73)
@@ -55,9 +45,9 @@ export namespace MarkedRegion {
 }
 
 export class ChayaDocument {
-    public markedRegions: MarkedRegion[] = [];
+    public markedRegions: Map<number, MarkedRegion[]> = new Map();
 
-    public static fromRegions(regions: MarkedRegion[]) {
+    public static fromRegions(regions: Map<number, MarkedRegion[]>) {
         const doc = new ChayaDocument();
         doc.markedRegions = regions;
         return doc;

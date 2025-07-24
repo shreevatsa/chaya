@@ -14,14 +14,14 @@ test.describe('Chaya Functionality Tests', () => {
       const fileChooserPromise = page.waitForEvent('filechooser');
       await page.click('#pdf-slot');
       const fileChooser = await fileChooserPromise;
-      
+
       // Use the test PDF file
       const testPdfPath = path.join(__dirname, '..', 'test.pdf');
       await fileChooser.setFiles(testPdfPath);
 
       // Wait for PDF to load
       await page.waitForSelector('#pdf-container canvas', { timeout: 10000 });
-      
+
       // Wait for loading to complete (loading div becomes hidden)
       await page.waitForFunction(() => {
         const loadingDiv = document.querySelector('#app-loading');
@@ -50,7 +50,7 @@ test.describe('Chaya Functionality Tests', () => {
       // Draw a rectangle annotation on the annotation layer
       const annotationLayer = page.locator('.annotation-layer').first();
       await annotationLayer.hover();
-      
+
       // Use page.mouse with the annotation layer's bounding box
       const layerBox = await annotationLayer.boundingBox();
       await page.mouse.move(layerBox!.x + 100, layerBox!.y + 100);
@@ -76,7 +76,7 @@ test.describe('Chaya Functionality Tests', () => {
 
       // Verify download
       expect(download.suggestedFilename()).toMatch(/\.chaya$/);
-      
+
       // Save the file for next test
       const downloadPath = path.join(__dirname, 'test-output.chaya');
       await download.saveAs(downloadPath);
@@ -88,16 +88,16 @@ test.describe('Chaya Functionality Tests', () => {
     test('can upload a .chaya file and MarkedRegions render correctly in Mark tab', async ({ page }) => {
       // For this test, just verify the Mark tab basic functionality with a PDF upload
       // (Creating and loading .chaya files in tests is complex due to file dependencies)
-      
+
       const fileChooserPromise = page.waitForEvent('filechooser');
       await page.click('#pdf-slot');
       const fileChooser = await fileChooserPromise;
-      
+
       const testPdfPath = path.join(__dirname, '..', 'test.pdf');
       await fileChooser.setFiles(testPdfPath);
-      
+
       await page.waitForSelector('#pdf-container canvas', { timeout: 10000 });
-      
+
       // Wait for loading to complete
       await page.waitForFunction(() => {
         const loadingDiv = document.querySelector('#app-loading');
@@ -113,7 +113,7 @@ test.describe('Chaya Functionality Tests', () => {
 
       const annotationList = page.locator('#annotation-list');
       expect(await annotationList.isVisible()).toBe(true);
-      
+
       // Verify annotation layer exists for drawing
       const annotationLayer = page.locator('.annotation-layer').first();
       expect(await annotationLayer.count()).toBeGreaterThan(0);
@@ -125,12 +125,12 @@ test.describe('Chaya Functionality Tests', () => {
         const fileChooserPromise = page.waitForEvent('filechooser');
         await page.click('#pdf-slot');
         const fileChooser = await fileChooserPromise;
-        
+
         const testPdfPath = path.join(__dirname, '..', 'test.pdf');
         await fileChooser.setFiles(testPdfPath);
-        
+
         await page.waitForSelector('#pdf-container canvas', { timeout: 10000 });
-        
+
         // Wait for loading to complete
         await page.waitForFunction(() => {
           const loadingDiv = document.querySelector('#app-loading');
@@ -155,7 +155,7 @@ test.describe('Chaya Functionality Tests', () => {
         const annotationLayer = page.locator('.annotation-layer').first();
         await annotationLayer.hover();
         const layerBox = await annotationLayer.boundingBox();
-        
+
         // First annotation
         await page.mouse.move(layerBox!.x + 100, layerBox!.y + 100);
         await page.mouse.down();
@@ -176,7 +176,7 @@ test.describe('Chaya Functionality Tests', () => {
         const downloadPromise = page.waitForEvent('download');
         await page.click('#chaya-slot');
         const download = await downloadPromise;
-        
+
         const downloadPath = path.join(__dirname, 'read-tab-test.chaya');
         await download.saveAs(downloadPath);
       });
@@ -189,13 +189,13 @@ test.describe('Chaya Functionality Tests', () => {
       const fileChooserPromise = page.waitForEvent('filechooser');
       await page.click('#chaya-slot');
       const fileChooser = await fileChooserPromise;
-      
+
       const chayaPath = path.join(__dirname, 'read-tab-test.chaya');
       await fileChooser.setFiles(chayaPath);
 
       // Wait for .chaya file to load
       await page.waitForSelector('#pdf-container canvas', { timeout: 10000 });
-      
+
       // Wait for loading to complete
       await page.waitForFunction(() => {
         const loadingDiv = document.querySelector('#app-loading');
@@ -232,43 +232,41 @@ test.describe('Chaya Functionality Tests', () => {
       const fileChooserPromise = page.waitForEvent('filechooser');
       await page.click('#pdf-slot');
       const fileChooser = await fileChooserPromise;
-      
+
       const testPdfPath = path.join(__dirname, '..', 'test.pdf');
       await fileChooser.setFiles(testPdfPath);
-      
+
       await page.waitForSelector('#pdf-container canvas', { timeout: 10000 });
-      
+
       // Wait for loading to complete
       await page.waitForFunction(() => {
         const loadingDiv = document.querySelector('#app-loading');
         return loadingDiv && loadingDiv.classList.contains('hidden');
       }, { timeout: 15000 });
 
-      // Set up dialog handler for persistent annotation test
-      let dialogHandled = false;
-      const dialogHandler = async (dialog) => {
-        if (dialog.type() === 'prompt' && !dialogHandled) {
-          dialogHandled = true;
-          await dialog.accept('Persistent Annotation');
-        }
-      };
-      page.on('dialog', dialogHandler);
+      // Set up a one-time handler for the dialog BEFORE the action that triggers it.
+      // This is more robust than a persistent listener with a flag.
+      page.once('dialog', async dialog => {
+        expect(dialog.message()).toContain('Enter label for this region');
+        await dialog.accept('Persistent Annotation');
+      });
+
 
       // Create annotation in Mark tab
+      // This is the recommended, more reliable way to simulate drawing.
       const annotationLayer = page.locator('.annotation-layer').first();
-      await annotationLayer.hover();
-      
-      const layerBox = await annotationLayer.boundingBox();
-      await page.mouse.move(layerBox!.x + 100, layerBox!.y + 100);
-      await page.mouse.down();
-      await page.mouse.move(layerBox!.x + 200, layerBox!.y + 150);
-      await page.mouse.up();
-
-      await page.waitForSelector('.annotation-box', { timeout: 5000 });
+      await annotationLayer.dragTo(annotationLayer, {
+        // Start drawing at position (100, 100) within the layer
+        sourcePosition: { x: 100, y: 100 },
+        // End drawing at position (200, 150) within the layer
+        targetPosition: { x: 200, y: 150 },
+      });
 
       // Verify annotation in Mark tab
-      expect(await page.locator('.annotation-box').count()).toBe(1);
-      expect(await page.locator('#annotation-count').textContent()).toContain('1 annotation');
+      const annotationBox = page.locator('.annotation-box');
+      await expect(annotationBox).toBeVisible();
+      await expect(annotationBox).toHaveCount(1);
+      await expect(page.locator('#annotation-count')).toContainText('1 marked region');
 
       // Switch to Read tab
       await page.click('#read-tab-btn');
@@ -277,19 +275,21 @@ test.describe('Chaya Functionality Tests', () => {
       // Verify we're on Read tab and basic structure exists
       expect(await page.locator('#read-tab').isVisible()).toBe(true);
       expect(await page.locator('#mark-tab').isVisible()).toBe(false);
-      
+
       const readAnnotationCount = page.locator('#read-annotation-count');
       expect(await readAnnotationCount.isVisible()).toBe(true);
 
       // Switch back to Mark tab
       await page.click('#mark-tab-btn');
-      await page.waitForSelector('#mark-tab:not(.hidden)', { timeout: 5000 });
+      await expect(page.locator('#mark-tab')).toBeVisible();
 
       // Verify we're back on Mark tab and annotation still exists
       expect(await page.locator('#mark-tab').isVisible()).toBe(true);
       expect(await page.locator('#read-tab').isVisible()).toBe(false);
+      await expect(annotationBox).toBeVisible();
       expect(await page.locator('.annotation-box').count()).toBe(1);
-      expect(await page.locator('#annotation-count').textContent()).toContain('1 annotation');
+      await expect(page.locator('#annotation-count')).toContainText('1 marked region');
+      await expect(annotationBox).toBeVisible();
     });
   });
 
@@ -300,7 +300,7 @@ test.describe('Chaya Functionality Tests', () => {
       'mark-tab-test.chaya',
       'read-tab-test.chaya'
     ];
-    
+
     for (const file of testFiles) {
       const filePath = path.join(__dirname, file);
       if (fs.existsSync(filePath)) {

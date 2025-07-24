@@ -9,7 +9,7 @@ export class MarkController {
     private annotationCount: HTMLDivElement;
 
     // State
-    private localAnnotations: MarkedRegion[] = [];
+    private localAnnotations: Map<number, MarkedRegion[]> = new Map();
     private selectedAnnotationId: string | null = null;
 
     // Interaction State (for drawing, resizing, dragging)
@@ -46,7 +46,7 @@ export class MarkController {
     public loadData(pdfDocument: any, chayaDocument: ChayaDocument): void {
         console.log('Mark tab: Data ready', { pdfDocument, chayaDocument });
 
-        this.localAnnotations = chayaDocument.markedRegions || [];
+        this.localAnnotations = chayaDocument.markedRegions || new Map();
         appState.hasUnsavedChanges = false;
         this.pdfContainer.innerHTML = ''; // Clear previous content
 
@@ -121,55 +121,57 @@ export class MarkController {
         annotationLayer.style.height = '100%';
         annotationLayer.style.pointerEvents = 'auto';
         annotationLayer.style.cursor = 'crosshair';
+        annotationLayer.addEventListener('mousedown', (e) => this._onDrawStart(e, pageDiv, pageNumber));
+        annotationLayer.addEventListener('mousemove', (e) => this._onDrawMove(e));
+        annotationLayer.addEventListener('mouseup', (e) => this._onDrawEnd(e, pageDiv, pageNumber));
+        annotationLayer.addEventListener('mouseleave', (e) => this._onDrawEnd(e, pageDiv, pageNumber));
 
         const aiButton = this._createAiButton(pageDiv, pageNumber);
 
         pageDiv.append(canvas, annotationLayer, aiButton);
         await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise;
         this.pdfContainer.appendChild(pageDiv);
-
-        annotationLayer.addEventListener('mousedown', (e) => this._onDrawStart(e, pageDiv, pageNumber));
     }
 
     private _renderExistingAnnotations(): void {
-        if (this.localAnnotations.length === 0) return;
-
+        if (this.localAnnotations.size === 0) return;
         console.log('Rendering loaded annotations...');
-        this.localAnnotations.forEach(annotation => {
-            const pageDiv = this.pdfContainer.querySelector<HTMLDivElement>(`[data-page-number="${annotation.pageNumber}"]`);
+        this.localAnnotations.forEach((regions, pageNumber) => {
+            const pageDiv = this.pdfContainer.querySelector<HTMLDivElement>(`[data-page-number="${pageNumber}"]`);
             if (pageDiv) {
                 const annotationLayer = pageDiv.querySelector<HTMLDivElement>('.annotation-layer');
                 if (annotationLayer) {
-                    this._createAnnotationBox(annotationLayer, pageDiv, annotation);
+                    regions.forEach(annotation => {
+                        this._createAnnotationBox(annotationLayer, pageDiv, annotation);
+                    });
                 }
             }
         });
     }
 
     private _updateAnnotationList(): void {
-        const count = this.localAnnotations.length;
-        this.annotationCount.textContent = count === 0 ? 'No marked regions' : `${count} annotation${count > 1 ? 's' : ''}`;
+        let count = 0;
+        this.localAnnotations.forEach(pageRegions => count += pageRegions.length);
+
+        this.annotationCount.textContent = count === 0 ? 'No marked regions' : `${count} marked regions${count > 1 ? 's' : ''}`;
         this.annotationList.innerHTML = '';
 
-        const annotationsByPage: Record<number, MarkedRegion[]> = {};
-        this.localAnnotations.forEach(annotation => {
-            annotationsByPage[annotation.pageNumber] = annotationsByPage[annotation.pageNumber] || [];
-            annotationsByPage[annotation.pageNumber].push(annotation);
-        });
+        // Sort page numbers numerically before rendering.
+        const sortedPageKeys = Array.from(this.localAnnotations.keys()).sort((a, b) => a - b);
 
-        Object.keys(annotationsByPage).sort((a, b) => Number(a) - Number(b)).forEach(pageKey => {
-            const pageNumber = Number(pageKey);
+        for (const pageNumber of sortedPageKeys) {
+            const pageRegions = this.localAnnotations.get(pageNumber)!;
 
             const pageHeader = document.createElement('div');
             pageHeader.className = 'text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 mt-2 first:mt-0';
             pageHeader.textContent = `Page ${pageNumber}`;
             this.annotationList.appendChild(pageHeader);
 
-            annotationsByPage[pageNumber].forEach(annotation => {
+            pageRegions.forEach(annotation => {
                 const listItem = this._createAnnotationListItem(annotation);
                 this.annotationList.appendChild(listItem);
             });
-        });
+        }
     }
 
     // --- Private Methods (Annotation Box & List Item Creation) ---
@@ -253,10 +255,18 @@ export class MarkController {
         button.title = 'Use AI to automatically mark regions on this and subsequent pages';
 
         button.addEventListener('click', async () => {
-            const newAnnotations = await runAIAssistedAnnotation(pageDiv, pageNumber, this.localAnnotations, this._getCanvasForPage.bind(this));
+            // Flatten the map values into a list for the AI orchestrator.
+            const allCurrentAnnotations = Array.from(this.localAnnotations.values()).flat();
+            const newAnnotations = await runAIAssistedAnnotation(pageDiv, pageNumber, allCurrentAnnotations, this._getCanvasForPage.bind(this));
 
             if (newAnnotations && newAnnotations.length > 0) {
-                this.localAnnotations.push(...newAnnotations);
+                newAnnotations.forEach(annotation => {
+                    const pageNum = annotation.pageNumber;
+                    if (!this.localAnnotations.has(pageNum)) {
+                        this.localAnnotations.set(pageNum, []);
+                    }
+                    this.localAnnotations.get(pageNum)!.push(annotation);
+                });
                 appState.hasUnsavedChanges = true;
 
                 newAnnotations.forEach(annotation => {
@@ -280,7 +290,7 @@ export class MarkController {
     // --- Private Methods (Event Handlers) ---
 
     private _onDrawStart(e: MouseEvent, pageDiv: HTMLDivElement, pageNumber: number): void {
-        // Only start drawing on left mouse button (button 0)
+        // Only start drawing on left mouse button (button 0). Prevent drawing when clicking on an existing box.
         if (e.button !== 0 || (e.target as HTMLElement).closest('.annotation-box')) return;
         e.preventDefault();
 
@@ -301,16 +311,6 @@ export class MarkController {
 
         this.interactionState.currentBox = tempBox;
         (e.currentTarget as HTMLElement).appendChild(tempBox);
-
-        const onDrawMove = (ev: MouseEvent) => this._onDrawMove(ev);
-        const onDrawEnd = (ev: MouseEvent) => {
-            document.removeEventListener('mousemove', onDrawMove);
-            document.removeEventListener('mouseup', onDrawEnd);
-            this._onDrawEnd(ev, pageDiv, pageNumber);
-        };
-
-        document.addEventListener('mousemove', onDrawMove);
-        document.addEventListener('mouseup', onDrawEnd);
     }
 
     private _onDrawMove(e: MouseEvent): void {
@@ -361,7 +361,10 @@ export class MarkController {
             pageNumber,
         };
 
-        this.localAnnotations.push(newAnnotation);
+        if (!this.localAnnotations.has(pageNumber)) {
+            this.localAnnotations.set(pageNumber, []);
+        }
+        this.localAnnotations.get(pageNumber)!.push(newAnnotation);
         appState.hasUnsavedChanges = true;
 
         this._createAnnotationBox(pageDiv.querySelector('.annotation-layer')!, pageDiv, newAnnotation);
@@ -500,17 +503,24 @@ export class MarkController {
     }
 
     private _deleteAnnotation(annotationId: string): void {
-        this.localAnnotations = this.localAnnotations.filter(a => a.id !== annotationId);
-        appState.hasUnsavedChanges = true;
-
-        this.pdfContainer.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`)?.remove();
-
-        if (this.selectedAnnotationId === annotationId) {
-            this.selectedAnnotationId = null;
+        let found = false;
+        for (const [pageNumber, regions] of this.localAnnotations.entries()) {
+            const index = regions.findIndex(a => a.id === annotationId);
+            if (index !== -1) {
+                regions.splice(index, 1);
+                found = true;
+                break;
+            }
         }
-
-        this._updateAnnotationList();
-        this._syncWithAppState();
+        if (found) {
+            appState.hasUnsavedChanges = true;
+            this.pdfContainer.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`)?.remove();
+            if (this.selectedAnnotationId === annotationId) {
+                this.selectedAnnotationId = null;
+            }
+            this._updateAnnotationList();
+            this._syncWithAppState();
+        }
     }
 
     private _highlightAnnotationBox(id: string, highlight: boolean): void {
@@ -535,7 +545,7 @@ export class MarkController {
         });
 
         window.addEventListener('beforeunload', (e) => {
-            if (appState.hasUnsavedChanges && this.localAnnotations.length > 0) {
+            if (appState.hasUnsavedChanges) {
                 e.preventDefault();
                 e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
                 return e.returnValue;
