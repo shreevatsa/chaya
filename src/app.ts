@@ -1,5 +1,5 @@
 import { MarkedRegion, appState, ChayaDocument } from './models.js';
-import { initializeAnnotator, markModuleDataReady } from './annotator.js';
+import { initializeMarkTab, markModuleDataReady } from './annotator.js';
 import { initializeViewer, readModuleDataReady } from './viewer.js';
 import { documentGetElementById, updateLoadingProgress } from './actions.js';
 
@@ -78,7 +78,7 @@ class ChayaApp {
             documentGetElementById<HTMLButtonElement>('edit-tab-btn').addEventListener('click', () => this.switchToTab('edit'));
             documentGetElementById<HTMLButtonElement>('read-tab-btn').addEventListener('click', () => this.switchToTab('read'));
         }
-        initializeAnnotator();
+        initializeMarkTab();
         initializeViewer();
 
         // Start with Mark tab

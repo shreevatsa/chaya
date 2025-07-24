@@ -1,152 +1,117 @@
-// Mark tab functionality - region annotation on PDF
-
 import { MarkedRegion, appState, ChayaDocument } from './models.js';
 import { runAIAssistedAnnotation } from './ai-orchestrator.js';
 import { updateLoadingProgress } from './actions.js';
 
-let localAnnotations: MarkedRegion[] = [];
-let isDrawing = false;
-let startX = 0;
-let startY = 0;
-let currentAnnotation: HTMLDivElement | null = null;
+class MarkController {
+    // DOM Element References
+    private pdfContainer: HTMLDivElement;
+    private annotationList: HTMLDivElement;
+    private annotationCount: HTMLDivElement;
 
-// Resize/drag state
-let isResizing = false;
-let isDragging = false;
-let resizeHandle: string | null = null;
-let dragStartX = 0;
-let dragStartY = 0;
-let selectedAnnotation: HTMLDivElement | null = null;
-let selectedAnnotationData: MarkedRegion | null = null;
+    // State
+    private localAnnotations: MarkedRegion[] = [];
+    private selectedAnnotationId: string | null = null;
 
-export let markModuleDataReady: Function;
+    // Interaction State (for drawing, resizing, dragging)
+    private isDrawing = false;
+    private isResizing = false;
+    private isDragging = false;
+    private interactionState: {
+        startX: number;
+        startY: number;
+        startWidth?: number;
+        startHeight?: number;
+        startLeft?: number;
+        startTop?: number;
+        resizeHandle?: string;
+        currentBox?: HTMLDivElement;
+    } = { startX: 0, startY: 0 };
 
-export function initializeAnnotator(): void {
-    console.log('Initializing Mark tab (annotator)');
+    constructor(
+        pdfContainer: HTMLDivElement,
+        annotationList: HTMLDivElement,
+        annotationCount: HTMLDivElement
+    ) {
+        this.pdfContainer = pdfContainer;
+        this.annotationList = annotationList;
+        this.annotationCount = annotationCount;
 
-    // Get DOM elements
-    const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
-    const annotationList = document.getElementById('annotation-list') as HTMLDivElement;
-    const annotationCount = document.getElementById('annotation-count') as HTMLDivElement;
-
-    if (!pdfContainer || !annotationList || !annotationCount) {
-        console.error('Required DOM elements not found for Mark tab');
-        return;
+        this._setupGlobalListeners();
     }
 
-    function handleDataReady(pdfDocument: any, chayaDocument: ChayaDocument): void {
+    /**
+     * Public method to load PDF and annotation data into the component.
+     * This is the main entry point for rendering content.
+     */
+    public loadData(pdfDocument: any, chayaDocument: ChayaDocument): void {
         console.log('Mark tab: Data ready', { pdfDocument, chayaDocument });
 
-        // Update global state
-        localAnnotations = chayaDocument.markedRegions || [];
+        this.localAnnotations = chayaDocument.markedRegions || [];
         appState.hasUnsavedChanges = false;
+        this.pdfContainer.innerHTML = ''; // Clear previous content
 
-        // Clear container and render PDF
-        const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
-        pdfContainer.innerHTML = '';
-
-        // Render PDF pages
-        renderPdfPages(pdfDocument, pdfContainer);
-
-        // Update annotation list
-        updateAnnotationList();
+        this._renderPdfPages(pdfDocument);
+        this._updateAnnotationList();
     }
-    markModuleDataReady = handleDataReady;
 
-    async function renderPdfPages(pdfDocument: any, container: HTMLDivElement): Promise<void> {
-        const containerWidth = container.offsetWidth;
+    // --- Private Methods (Rendering) ---
+
+    private async _renderPdfPages(pdfDocument: any): Promise<void> {
         const totalPages = pdfDocument.numPages;
-
         console.log(`Starting to render ${totalPages} pages...`);
 
         try {
             for (let i = 1; i <= totalPages; i++) {
-                // Update progress during rendering (30% to 100% = 70% of the progress bar)
                 const progress = 30 + (70 * i / totalPages);
-                const isLastPage = i === totalPages;
+                const isLastPage = i == totalPages;
                 const statusText = isLastPage ? 'Complete!' : `Rendering page ${i} of ${totalPages}...`;
-                const detailText = isLastPage ? 'PDF ready for annotation' : `Processing page ${i}`;
-
-                console.log(`Rendering page ${i}/${totalPages}, progress: ${progress.toFixed(1)}%`);
+                const detailText = isLastPage ? 'PDF ready for marking' : `Processing page ${i}`;
                 updateLoadingProgress(progress, statusText, detailText);
 
-                await renderPage(pdfDocument, i, containerWidth);
-                console.log(`Page ${i} rendered successfully`);
+                await this._renderPage(pdfDocument, i);
             }
 
             console.log(`All ${totalPages} pages rendered successfully`);
-
-            // Render loaded annotations if any
-            if (localAnnotations.length > 0) {
-                console.log('Rendering loaded annotations...');
-                localAnnotations.forEach(annotation => {
-                    const pageDiv = pdfContainer.querySelector(`[data-page-number="${annotation.pageNumber}"]`) as HTMLDivElement;
-                    if (pageDiv) {
-                        const annotationLayer = pageDiv.querySelector('.annotation-layer') as HTMLDivElement;
-                        if (annotationLayer) {
-                            createAnnotationBox(annotationLayer, pageDiv, annotation);
-                        }
-                    }
-                });
-            }
+            this._renderExistingAnnotations();
 
             // Notify app that rendering is complete
-            console.log('Dispatching rendering complete event');
-            const renderingCompleteEvent = new CustomEvent('tabRenderingComplete', {
-                detail: {
-                    tabName: 'mark',
-                    totalPages: totalPages
-                }
-            });
-            document.dispatchEvent(renderingCompleteEvent);
-
+            document.dispatchEvent(new CustomEvent('tabRenderingComplete', {
+                detail: { tabName: 'mark', totalPages }
+            }));
         } catch (error) {
             console.error('Error during PDF page rendering:', error);
             updateLoadingProgress(0, 'Error rendering pages', `Failed at page: ${error}`);
-
-            // Still notify completion even on error
-            const errorEvent = new CustomEvent('tabRenderingComplete', {
-                detail: {
-                    tabName: 'mark',
-                    totalPages: totalPages,
-                    error: error
-                }
-            });
-            document.dispatchEvent(errorEvent);
+            document.dispatchEvent(new CustomEvent('tabRenderingComplete', {
+                detail: { tabName: 'mark', totalPages, error }
+            }));
         }
     }
 
-    // Helper functions for annotation management
-    function syncWithAppState(): void {
-        appState.chayaDocument = ChayaDocument.fromRegions(localAnnotations);
-    }
-
-    async function renderPage(pdf: any, pageNumber: number, containerWidth: number) {
+    private async _renderPage(pdf: any, pageNumber: number): Promise<void> {
         const page = await pdf.getPage(pageNumber);
 
-        // Calculate scale to fit the container width, up to a maximum.
+        // Scale to fit the container width, up to a maximum.
         const baseViewport = page.getViewport({ scale: 1.0 });
-        const maxWidth = 1200; // Maximum width in pixels
-        const targetWidth = Math.min(containerWidth, maxWidth);
+        const maxWidth = 1200;
+        const targetWidth = Math.min(this.pdfContainer.offsetWidth, maxWidth);
         const scale = targetWidth / baseViewport.width;
-
         const viewport = page.getViewport({ scale });
 
-        // Create a div to hold the canvas and the annotation layer
+        // A div to hold the canvas and the layer for marked regions.
         const pageDiv = document.createElement('div');
         pageDiv.className = 'page';
         pageDiv.style.position = 'relative';
         pageDiv.style.marginBottom = '1rem';
-        pageDiv.dataset.pageNumber = pageNumber.toString();
+        pageDiv.dataset.pageNumber = String(pageNumber);
+        pageDiv.style.width = `${viewport.width}px`;
+        pageDiv.style.height = `${viewport.height}px`;
 
         const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.height = viewport.height;
         canvas.width = viewport.width;
-        canvas.style.border = '1px solid black';
-        canvas.style.display = 'block';
+        canvas.height = viewport.height;
+        canvas.style.border = '1px solid #ccc';
 
-        // Create annotation overlay
+        // Overlay for marked regions.
         const annotationLayer = document.createElement('div');
         annotationLayer.className = 'annotation-layer';
         annotationLayer.style.position = 'absolute';
@@ -157,681 +122,460 @@ export function initializeAnnotator(): void {
         annotationLayer.style.pointerEvents = 'auto';
         annotationLayer.style.cursor = 'crosshair';
 
-        pageDiv.style.width = `${viewport.width}px`;
-        pageDiv.style.height = `${viewport.height}px`;
+        const aiButton = this._createAiButton(pageDiv, pageNumber);
 
-        // Create AI annotate button
-        const aiButton = document.createElement('button');
-        aiButton.className = 'ai-annotate-btn';
-        aiButton.style.position = 'absolute';
-        aiButton.style.top = '8px';
-        aiButton.style.right = '8px';
-        aiButton.style.backgroundColor = '#3b82f6';
-        aiButton.style.color = 'white';
-        aiButton.style.border = 'none';
-        aiButton.style.borderRadius = '6px';
-        aiButton.style.padding = '6px 12px';
-        aiButton.style.fontSize = '12px';
-        aiButton.style.cursor = 'pointer';
-        aiButton.style.zIndex = '1000';
-        aiButton.style.fontFamily = 'sans-serif';
-        aiButton.textContent = '🤖 AI Annotate';
-        aiButton.title = 'Use AI to automatically annotate this page';
+        pageDiv.append(canvas, annotationLayer, aiButton);
+        await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise;
+        this.pdfContainer.appendChild(pageDiv);
 
-        aiButton.addEventListener('click', async () => {
-            const newAnnotations = await runAIAssistedAnnotation(pageDiv, pageNumber, localAnnotations, getCanvasForPage);
-            if (newAnnotations) {
-                // Add the new annotations to the main list
-                localAnnotations.push(...newAnnotations);
-                appState.hasUnsavedChanges = true;
-
-                // Render the new annotation boxes on their respective pages
-                for (const annotation of newAnnotations) {
-                    const targetPageDiv = pdfContainer.querySelector(`[data-page-number="${annotation.pageNumber}"]`) as HTMLDivElement;
-                    if (targetPageDiv) {
-                        const targetAnnotationLayer = targetPageDiv.querySelector('.annotation-layer') as HTMLDivElement;
-                        if (targetAnnotationLayer) {
-                            createAnnotationBox(targetAnnotationLayer, targetPageDiv, annotation);
-                        }
-                    } else {
-                        console.warn(`Could not find page div for annotation on page ${annotation.pageNumber}`);
-                    }
-                }
-
-                // Update the sidebar and sync with app state
-                updateAnnotationList();
-                syncWithAppState();
-                console.log(`Added ${newAnnotations.length} AI-generated annotations.`);
-            }
-        });
-
-        pageDiv.appendChild(canvas);
-        pageDiv.appendChild(annotationLayer);
-        pageDiv.appendChild(aiButton);
-
-        // Only append to container after the page is fully rendered
-        const renderContext = {
-            canvasContext: context!,
-            viewport: viewport
-        };
-        await page.render(renderContext).promise;
-        pdfContainer.appendChild(pageDiv);
-
-        // Add mouse event listeners for annotation drawing
-        setupAnnotationDrawing(annotationLayer, pageDiv, pageNumber);
+        annotationLayer.addEventListener('mousedown', (e) => this._onDrawStart(e, pageDiv, pageNumber));
     }
 
+    private _renderExistingAnnotations(): void {
+        if (this.localAnnotations.length === 0) return;
 
-    function updateAnnotationList(): void {
-        // Update count
-        const count = localAnnotations.length;
-        annotationCount.textContent = count === 0 ? 'No annotations' :
-            count === 1 ? '1 annotation' : `${count} annotations`;
-
-        // Clear existing list
-        annotationList.innerHTML = '';
-
-        // Group annotations by page
-        const annotationsByPage: { [key: number]: MarkedRegion[] } = {};
-        localAnnotations.forEach(annotation => {
-            if (!annotationsByPage[annotation.pageNumber]) {
-                annotationsByPage[annotation.pageNumber] = [];
+        console.log('Rendering loaded annotations...');
+        this.localAnnotations.forEach(annotation => {
+            const pageDiv = this.pdfContainer.querySelector<HTMLDivElement>(`[data-page-number="${annotation.pageNumber}"]`);
+            if (pageDiv) {
+                const annotationLayer = pageDiv.querySelector<HTMLDivElement>('.annotation-layer');
+                if (annotationLayer) {
+                    this._createAnnotationBox(annotationLayer, pageDiv, annotation);
+                }
             }
+        });
+    }
+
+    private _updateAnnotationList(): void {
+        const count = this.localAnnotations.length;
+        this.annotationCount.textContent = count === 0 ? 'No marked regions' : `${count} annotation${count > 1 ? 's' : ''}`;
+        this.annotationList.innerHTML = '';
+
+        const annotationsByPage: Record<number, MarkedRegion[]> = {};
+        this.localAnnotations.forEach(annotation => {
+            annotationsByPage[annotation.pageNumber] = annotationsByPage[annotation.pageNumber] || [];
             annotationsByPage[annotation.pageNumber].push(annotation);
         });
 
-        // Create list items grouped by page
-        Object.keys(annotationsByPage).sort((a, b) => parseInt(a) - parseInt(b)).forEach(pageKey => {
-            const pageNumber = parseInt(pageKey);
-            const pageAnnotations = annotationsByPage[pageNumber];
+        Object.keys(annotationsByPage).sort((a, b) => Number(a) - Number(b)).forEach(pageKey => {
+            const pageNumber = Number(pageKey);
 
-            // Page header
             const pageHeader = document.createElement('div');
-            pageHeader.className = 'text-xs font-medium text-gray-500 uppercase tracking-wide mb-1';
+            pageHeader.className = 'text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 mt-2 first:mt-0';
             pageHeader.textContent = `Page ${pageNumber}`;
-            annotationList.appendChild(pageHeader);
+            this.annotationList.appendChild(pageHeader);
 
-            // Annotations for this page
-            pageAnnotations.forEach(annotation => {
-                const listItem = document.createElement('div');
-                listItem.className = 'bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 cursor-pointer transition-colors';
-                listItem.dataset.annotationId = annotation.id;
-
-                listItem.innerHTML = `
-                    <div class="flex items-start justify-between">
-                        <div class="flex-1 min-w-0">
-                            <div class="text-sm font-medium text-gray-900 truncate">
-                                ${annotation.label}
-                            </div>
-                        </div>
-                        <div class="ml-2 flex-shrink-0">
-                            <button class="delete-annotation-btn text-red-500 hover:text-red-700 p-1" 
-                                    data-annotation-id="${annotation.id}" 
-                                    title="Delete annotation">
-                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                `;
-
-                // Add click handler to select annotation
-                listItem.addEventListener('click', (e) => {
-                    if (!(e.target as Element).closest('.delete-annotation-btn')) {
-                        selectAnnotationById(annotation.id);
-                    }
-                });
-
-                // Add hover effect for annotation highlighting
-                listItem.addEventListener('mouseenter', () => {
-                    highlightAnnotationById(annotation.id, true);
-                });
-
-                listItem.addEventListener('mouseleave', () => {
-                    highlightAnnotationById(annotation.id, false);
-                });
-
-                annotationList.appendChild(listItem);
+            annotationsByPage[pageNumber].forEach(annotation => {
+                const listItem = this._createAnnotationListItem(annotation);
+                this.annotationList.appendChild(listItem);
             });
-
-            // Add some space between pages
-            if (Object.keys(annotationsByPage).length > 1) {
-                const spacer = document.createElement('div');
-                spacer.className = 'h-2';
-                annotationList.appendChild(spacer);
-            }
         });
     }
 
-    // Helper functions for annotation management
-    function setupAnnotationDrawing(overlay: HTMLDivElement, pageDiv: HTMLDivElement, pageNumber: number) {
-        overlay.addEventListener('mousedown', (e) => {
-            // Only start drawing on left mouse button (button 0)
-            if (e.button !== 0) return;
+    // --- Private Methods (Annotation Box & List Item Creation) ---
 
-            isDrawing = true;
-            const rect = overlay.getBoundingClientRect();
-            startX = e.clientX - rect.left;
-            startY = e.clientY - rect.top;
+    private _createAnnotationBox(overlay: HTMLDivElement, pageDiv: HTMLDivElement, annotation: MarkedRegion): HTMLDivElement {
+        const pageWidth = pageDiv.offsetWidth;
+        const pageHeight = pageDiv.offsetHeight;
 
-            // Create a new temporary annotation box
-            currentAnnotation = document.createElement('div');
-            currentAnnotation.className = 'annotation-box-tmp';
-            currentAnnotation.style.position = 'absolute';
-            currentAnnotation.style.border = '2px solid #ff0000';
-            currentAnnotation.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
-            currentAnnotation.style.left = `${startX}px`;
-            currentAnnotation.style.top = `${startY}px`;
-            currentAnnotation.style.width = '0px';
-            currentAnnotation.style.height = '0px';
-            currentAnnotation.style.pointerEvents = 'none';
+        const box = document.createElement('div');
+        box.className = 'annotation-box';
+        box.dataset.annotationId = annotation.id;
+        box.style.position = 'absolute';
+        box.style.border = '2px solid #ff0000';
+        box.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+        box.style.left = `${annotation.x * pageWidth}px`;
+        box.style.top = `${annotation.y * pageHeight}px`;
+        box.style.width = `${annotation.width * pageWidth}px`;
+        box.style.height = `${annotation.height * pageHeight}px`;
+        box.style.cursor = 'move';
+        box.title = annotation.label;
 
-            overlay.appendChild(currentAnnotation);
-            e.preventDefault();
+        // Add resize handles
+        ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'].forEach(handleType => {
+            box.appendChild(this._createResizeHandle(handleType));
         });
 
-        overlay.addEventListener('mousemove', (e) => {
-            if (!isDrawing || !currentAnnotation) return;
+        box.addEventListener('mousedown', e => this._onBoxMouseDown(e, box, annotation, pageDiv));
+        box.addEventListener('dblclick', e => this._onBoxDoubleClick(e, box, annotation));
+        box.addEventListener('mouseenter', () => this._highlightSidebarItem(annotation.id, true));
+        box.addEventListener('mouseleave', () => this._highlightSidebarItem(annotation.id, false));
 
-            const rect = overlay.getBoundingClientRect();
-            const currentX = e.clientX - rect.left;
-            const currentY = e.clientY - rect.top;
+        overlay.appendChild(box);
+        return box;
+    }
 
-            const width = Math.abs(currentX - startX);
-            const height = Math.abs(currentY - startY);
-            const left = Math.min(startX, currentX);
-            const top = Math.min(startY, currentY);
+    private _createAnnotationListItem(annotation: MarkedRegion): HTMLDivElement {
+        const item = document.createElement('div');
+        item.className = 'bg-gray-50 border border-gray-200 rounded-lg p-3 my-1 hover:bg-gray-100 cursor-pointer transition-colors';
+        item.dataset.annotationId = annotation.id;
+        item.innerHTML = `
+            <div class="flex items-start justify-between">
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium text-gray-900 truncate">${annotation.label}</div>
+                </div>
+                <div class="ml-2 flex-shrink-0">
+                    <button class="delete-annotation-btn text-red-500 hover:text-red-700 p-1" title="Delete region">
+                        <svg class="w-4 h-4 pointer-events-none" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                    </button>
+                </div>
+            </div>`;
 
-            currentAnnotation.style.left = `${left}px`;
-            currentAnnotation.style.top = `${top}px`;
-            currentAnnotation.style.width = `${width}px`;
-            currentAnnotation.style.height = `${height}px`;
-        });
-
-        overlay.addEventListener('mouseup', (e) => {
-            if (!isDrawing || !currentAnnotation) return;
-
-            isDrawing = false;
-            const rect = overlay.getBoundingClientRect();
-            const endX = e.clientX - rect.left;
-            const endY = e.clientY - rect.top;
-
-            const width = Math.abs(endX - startX);
-            const height = Math.abs(endY - startY);
-
-            // Only create annotation if it has meaningful size
-            if (width > 5 && height > 5) {
-                const left = Math.min(startX, endX);
-                const top = Math.min(startY, endY);
-
-                // Convert to fractional coordinates
-                const pageWidth = pageDiv.offsetWidth;
-                const pageHeight = pageDiv.offsetHeight;
-
-                const annotation: MarkedRegion = {
-                    id: MarkedRegion.generateRandomId(),
-                    x: left / pageWidth,
-                    y: top / pageHeight,
-                    width: width / pageWidth,
-                    height: height / pageHeight,
-                    label: prompt('Enter label for this annotation:') || 'Unlabeled',
-                    pageNumber: pageNumber
-                };
-
-                localAnnotations.push(annotation);
-                appState.hasUnsavedChanges = true;
-
-                // Remove the temporary annotation
-                overlay.removeChild(currentAnnotation);
-
-                // Create proper annotation box using the same path as loaded annotations
-                createAnnotationBox(overlay, pageDiv, annotation);
-
-                // Auto-select the newly created annotation so user can resize it immediately
-                const newAnnotationBox = overlay.querySelector(`[data-annotation-id="${annotation.id}"]`) as HTMLDivElement;
-                if (newAnnotationBox) {
-                    selectAnnotation(newAnnotationBox, annotation);
-                }
-
-                // Update the annotation list and sync with app state
-                updateAnnotationList();
-                syncWithAppState();
-
-                console.log('Created annotation:', annotation);
+        item.addEventListener('click', e => {
+            if ((e.target as HTMLElement).classList.contains('delete-annotation-btn')) {
+                this._deleteAnnotation(annotation.id);
             } else {
-                // Remove the annotation if it's too small
-                overlay.removeChild(currentAnnotation);
+                this._selectAnnotation(annotation.id, true);
             }
-
-            currentAnnotation = null;
         });
+        item.addEventListener('mouseenter', () => this._highlightAnnotationBox(annotation.id, true));
+        item.addEventListener('mouseleave', () => this._highlightAnnotationBox(annotation.id, false));
+        return item;
     }
 
-    function createAnnotationBox(overlay: HTMLDivElement, pageDiv: HTMLDivElement, annotation: MarkedRegion): void {
-        // Check if annotation box already exists to prevent duplicates
-        const existingBox = overlay.querySelector(`[data-annotation-id="${annotation.id}"]`);
-        if (existingBox) {
-            console.log(`Annotation box with ID ${annotation.id} already exists, skipping creation`);
-            return;
-        }
+    private _createResizeHandle(type: string): HTMLDivElement {
+        const handle = document.createElement('div');
+        handle.className = `resize-handle resize-${type}`;
+        handle.dataset.handle = type;
+        return handle;
+    }
+
+    private _createAiButton(pageDiv: HTMLDivElement, pageNumber: number): HTMLButtonElement {
+        const button = document.createElement('button');
+        button.className = 'ai-annotate-btn';
+        button.textContent = '🤖 AI Mark Regions';
+        button.title = 'Use AI to automatically mark regions on this and subsequent pages';
+        button.addEventListener('click', async () => {
+            const newAnnotations = await runAIAssistedAnnotation(pageDiv, pageNumber, this.localAnnotations, this._getCanvasForPage.bind(this));
+            if (newAnnotations) {
+                this.localAnnotations.push(...newAnnotations);
+                appState.hasUnsavedChanges = true;
+                this._renderExistingAnnotations();
+                this._updateAnnotationList();
+                this._syncWithAppState();
+                console.log(`Added ${newAnnotations.length} AI-generated marked regions.`);
+            }
+        });
+        return button;
+    }
+
+    // --- Private Methods (Event Handlers) ---
+
+    private _onDrawStart(e: MouseEvent, pageDiv: HTMLDivElement, pageNumber: number): void {
+        // Only start drawing on left mouse button (button 0)
+        if (e.button !== 0 || (e.target as HTMLElement).closest('.annotation-box')) return;
+        e.preventDefault();
+
+        this.isDrawing = true;
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        this.interactionState = {
+            startX: e.clientX - rect.left,
+            startY: e.clientY - rect.top,
+        };
+
+        const tempBox = document.createElement('div');
+        tempBox.className = 'annotation-box-tmp';
+
+        tempBox.style.left = `${this.interactionState.startX}px`;
+        tempBox.style.top = `${this.interactionState.startY}px`;
+        tempBox.style.width = '0px';
+        tempBox.style.height = '0px';
+
+        this.interactionState.currentBox = tempBox;
+        (e.currentTarget as HTMLElement).appendChild(tempBox);
+
+        const onDrawMove = (ev: MouseEvent) => this._onDrawMove(ev);
+        const onDrawEnd = (ev: MouseEvent) => {
+            document.removeEventListener('mousemove', onDrawMove);
+            document.removeEventListener('mouseup', onDrawEnd);
+            this._onDrawEnd(ev, pageDiv, pageNumber);
+        };
+
+        document.addEventListener('mousemove', onDrawMove);
+        document.addEventListener('mouseup', onDrawEnd);
+    }
+
+    private _onDrawMove(e: MouseEvent): void {
+        if (!this.isDrawing || !this.interactionState.currentBox) return;
+
+        const box = this.interactionState.currentBox;
+        const rect = box.parentElement!.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+
+        const left = Math.min(this.interactionState.startX, currentX);
+        const top = Math.min(this.interactionState.startY, currentY);
+        const width = Math.abs(currentX - this.interactionState.startX);
+        const height = Math.abs(currentY - this.interactionState.startY);
+
+        box.style.left = `${left}px`;
+        box.style.top = `${top}px`;
+        box.style.width = `${width}px`;
+        box.style.height = `${height}px`;
+    }
+
+    private _onDrawEnd(e: MouseEvent, pageDiv: HTMLDivElement, pageNumber: number): void {
+        if (!this.isDrawing || !this.interactionState.currentBox) return;
+        this.isDrawing = false;
+
+        const box = this.interactionState.currentBox;
+        const width = parseFloat(box.style.width);
+        const height = parseFloat(box.style.height);
+
+        box.remove();
+        this.interactionState.currentBox = undefined;
+
+        if (width < 5 || height < 5) return;
+
+        const label = prompt('Enter label for this region:', 'Unlabeled');
+        if (!label) return;
 
         const pageWidth = pageDiv.offsetWidth;
         const pageHeight = pageDiv.offsetHeight;
 
-        // Convert fractional coordinates back to pixels
-        const left = annotation.x * pageWidth;
-        const top = annotation.y * pageHeight;
-        const width = annotation.width * pageWidth;
-        const height = annotation.height * pageHeight;
-
-        const annotationBox = document.createElement('div');
-        annotationBox.className = 'annotation-box';
-        annotationBox.style.position = 'absolute';
-        annotationBox.style.border = '2px solid #ff0000';
-        annotationBox.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
-        annotationBox.style.left = `${left}px`;
-        annotationBox.style.top = `${top}px`;
-        annotationBox.style.width = `${width}px`;
-        annotationBox.style.height = `${height}px`;
-        annotationBox.style.cursor = 'move';
-        annotationBox.title = annotation.label;
-        annotationBox.dataset.annotationId = annotation.id;
-
-        // Make annotation interactive
-        makeAnnotationInteractive(annotationBox, annotation, pageDiv);
-
-        overlay.appendChild(annotationBox);
-    }
-
-    function makeAnnotationInteractive(annotationBox: HTMLDivElement, annotation: MarkedRegion, pageDiv: HTMLDivElement): void {
-        // Add resize handles
-        const handles = ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'];
-        handles.forEach(handle => {
-            const handleElement = document.createElement('div');
-            handleElement.className = `resize-handle resize-${handle}`;
-            handleElement.style.position = 'absolute';
-            handleElement.style.backgroundColor = '#fff';
-            handleElement.style.border = '1px solid #000';
-            handleElement.style.width = '8px';
-            handleElement.style.height = '8px';
-            handleElement.style.zIndex = '1000';
-
-            // Position handles
-            switch (handle) {
-                case 'nw':
-                    handleElement.style.top = '-4px';
-                    handleElement.style.left = '-4px';
-                    handleElement.style.cursor = 'nw-resize';
-                    break;
-                case 'ne':
-                    handleElement.style.top = '-4px';
-                    handleElement.style.right = '-4px';
-                    handleElement.style.cursor = 'ne-resize';
-                    break;
-                case 'sw':
-                    handleElement.style.bottom = '-4px';
-                    handleElement.style.left = '-4px';
-                    handleElement.style.cursor = 'sw-resize';
-                    break;
-                case 'se':
-                    handleElement.style.bottom = '-4px';
-                    handleElement.style.right = '-4px';
-                    handleElement.style.cursor = 'se-resize';
-                    break;
-                case 'n':
-                    handleElement.style.top = '-4px';
-                    handleElement.style.left = '50%';
-                    handleElement.style.transform = 'translateX(-50%)';
-                    handleElement.style.cursor = 'n-resize';
-                    break;
-                case 's':
-                    handleElement.style.bottom = '-4px';
-                    handleElement.style.left = '50%';
-                    handleElement.style.transform = 'translateX(-50%)';
-                    handleElement.style.cursor = 's-resize';
-                    break;
-                case 'e':
-                    handleElement.style.right = '-4px';
-                    handleElement.style.top = '50%';
-                    handleElement.style.transform = 'translateY(-50%)';
-                    handleElement.style.cursor = 'e-resize';
-                    break;
-                case 'w':
-                    handleElement.style.left = '-4px';
-                    handleElement.style.top = '50%';
-                    handleElement.style.transform = 'translateY(-50%)';
-                    handleElement.style.cursor = 'w-resize';
-                    break;
-            }
-
-            // Initially hide handles
-            handleElement.style.display = 'none';
-
-            // Add resize functionality
-            handleElement.addEventListener('mousedown', (e) => {
-                e.stopPropagation();
-                startResize(e, handle, annotationBox, annotation, pageDiv);
-            });
-
-            annotationBox.appendChild(handleElement);
-        });
-
-        // Add selection and drag functionality
-        annotationBox.addEventListener('mousedown', (e) => {
-            e.stopPropagation();
-            selectAnnotation(annotationBox, annotation);
-            if (e.detail === 2) { // Double click to edit label
-                const newLabel = window.prompt('Edit label:', annotation.label);
-                if (newLabel !== null && newLabel.trim() !== '') {
-                    annotation.label = newLabel.trim();
-                    annotationBox.title = newLabel.trim();
-                    appState.hasUnsavedChanges = true;
-                    updateAnnotationList();
-                    syncWithAppState();
-                }
-            } else {
-                startDrag(e, annotationBox, annotation, pageDiv);
-            }
-        });
-
-        // Add click handler to scroll to annotation in sidebar
-        annotationBox.addEventListener('click', (e) => {
-            e.stopPropagation();
-            scrollToSidebarAnnotation(annotation.id);
-        });
-
-        // Show/hide handles on hover + highlight sidebar annotation
-        annotationBox.addEventListener('mouseenter', () => {
-            if (selectedAnnotation === annotationBox) {
-                showResizeHandles(annotationBox);
-            }
-            highlightSidebarAnnotation(annotation.id, true);
-        });
-
-        annotationBox.addEventListener('mouseleave', () => {
-            highlightSidebarAnnotation(annotation.id, false);
-        });
-    }
-
-    function selectAnnotation(annotationBox: HTMLDivElement, annotation: MarkedRegion): void {
-        // Hide handles from previously selected annotation
-        if (selectedAnnotation && selectedAnnotation !== annotationBox) {
-            hideResizeHandles(selectedAnnotation);
-            selectedAnnotation.style.border = '2px solid #ff0000';
-        }
-
-        // Select new annotation
-        selectedAnnotation = annotationBox;
-        selectedAnnotationData = annotation;
-        annotationBox.style.border = '2px solid #0066ff';
-        showResizeHandles(annotationBox);
-    }
-
-    function showResizeHandles(annotationBox: HTMLDivElement): void {
-        const handles = annotationBox.querySelectorAll('.resize-handle');
-        handles.forEach(handle => {
-            (handle as HTMLElement).style.display = 'block';
-        });
-    }
-
-    function hideResizeHandles(annotationBox: HTMLDivElement): void {
-        const handles = annotationBox.querySelectorAll('.resize-handle');
-        handles.forEach(handle => {
-            (handle as HTMLElement).style.display = 'none';
-        });
-    }
-
-    function startResize(e: MouseEvent, handle: string, annotationBox: HTMLDivElement, annotation: MarkedRegion, pageDiv: HTMLDivElement): void {
-        isResizing = true;
-        resizeHandle = handle;
-        startX = e.clientX;
-        startY = e.clientY;
-
-        const rect = annotationBox.getBoundingClientRect();
-        const startWidth = rect.width;
-        const startHeight = rect.height;
-        const startLeft = parseFloat(annotationBox.style.left);
-        const startTop = parseFloat(annotationBox.style.top);
-
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!isResizing) return;
-
-            const deltaX = e.clientX - startX;
-            const deltaY = e.clientY - startY;
-
-            let newLeft = startLeft;
-            let newTop = startTop;
-            let newWidth = startWidth;
-            let newHeight = startHeight;
-
-            switch (resizeHandle) {
-                case 'nw':
-                    newLeft = startLeft + deltaX;
-                    newTop = startTop + deltaY;
-                    newWidth = startWidth - deltaX;
-                    newHeight = startHeight - deltaY;
-                    break;
-                case 'ne':
-                    newTop = startTop + deltaY;
-                    newWidth = startWidth + deltaX;
-                    newHeight = startHeight - deltaY;
-                    break;
-                case 'sw':
-                    newLeft = startLeft + deltaX;
-                    newWidth = startWidth - deltaX;
-                    newHeight = startHeight + deltaY;
-                    break;
-                case 'se':
-                    newWidth = startWidth + deltaX;
-                    newHeight = startHeight + deltaY;
-                    break;
-                case 'n':
-                    newTop = startTop + deltaY;
-                    newHeight = startHeight - deltaY;
-                    break;
-                case 's':
-                    newHeight = startHeight + deltaY;
-                    break;
-                case 'e':
-                    newWidth = startWidth + deltaX;
-                    break;
-                case 'w':
-                    newLeft = startLeft + deltaX;
-                    newWidth = startWidth - deltaX;
-                    break;
-            }
-
-            // Ensure minimum size
-            if (newWidth < 10) newWidth = 10;
-            if (newHeight < 10) newHeight = 10;
-
-            // Apply changes
-            annotationBox.style.left = `${newLeft}px`;
-            annotationBox.style.top = `${newTop}px`;
-            annotationBox.style.width = `${newWidth}px`;
-            annotationBox.style.height = `${newHeight}px`;
-
-            // Update annotation data with fractional coordinates
-            const pageWidth = pageDiv.offsetWidth;
-            const pageHeight = pageDiv.offsetHeight;
-
-            annotation.x = newLeft / pageWidth;
-            annotation.y = newTop / pageHeight;
-            annotation.width = newWidth / pageWidth;
-            annotation.height = newHeight / pageHeight;
-            appState.hasUnsavedChanges = true;
-            syncWithAppState();
+        const newAnnotation: MarkedRegion = {
+            id: MarkedRegion.generateRandomId(),
+            x: parseFloat(box.style.left) / pageWidth,
+            y: parseFloat(box.style.top) / pageHeight,
+            width: width / pageWidth,
+            height: height / pageHeight,
+            label,
+            pageNumber,
         };
 
-        const handleMouseUp = () => {
-            isResizing = false;
-            resizeHandle = null;
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-        };
-
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-        e.preventDefault();
-    }
-
-    function startDrag(e: MouseEvent, annotationBox: HTMLDivElement, annotation: MarkedRegion, pageDiv: HTMLDivElement): void {
-        isDragging = true;
-        dragStartX = e.clientX;
-        dragStartY = e.clientY;
-
-        const startLeft = parseFloat(annotationBox.style.left);
-        const startTop = parseFloat(annotationBox.style.top);
-
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!isDragging) return;
-
-            const deltaX = e.clientX - dragStartX;
-            const deltaY = e.clientY - dragStartY;
-
-            const newLeft = startLeft + deltaX;
-            const newTop = startTop + deltaY;
-
-            // Keep annotation within page bounds
-            const pageWidth = pageDiv.offsetWidth;
-            const pageHeight = pageDiv.offsetHeight;
-            const boxWidth = parseFloat(annotationBox.style.width);
-            const boxHeight = parseFloat(annotationBox.style.height);
-
-            const clampedLeft = Math.max(0, Math.min(newLeft, pageWidth - boxWidth));
-            const clampedTop = Math.max(0, Math.min(newTop, pageHeight - boxHeight));
-
-            annotationBox.style.left = `${clampedLeft}px`;
-            annotationBox.style.top = `${clampedTop}px`;
-
-            // Update annotation data with fractional coordinates
-            annotation.x = clampedLeft / pageWidth;
-            annotation.y = clampedTop / pageHeight;
-            appState.hasUnsavedChanges = true;
-            syncWithAppState();
-        };
-
-        const handleMouseUp = () => {
-            isDragging = false;
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-        };
-
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-        e.preventDefault();
-    }
-
-    function selectAnnotationById(annotationId: string): void {
-        const annotation = localAnnotations.find(a => a.id === annotationId);
-        if (!annotation) return;
-
-        const annotationBox = document.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`) as HTMLDivElement;
-        if (annotationBox) {
-            selectAnnotation(annotationBox, annotation);
-            annotationBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    }
-
-    function highlightAnnotationById(annotationId: string, highlight: boolean): void {
-        const annotationBox = document.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`) as HTMLDivElement;
-        if (annotationBox) {
-            if (highlight) {
-                annotationBox.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.5)';
-            } else {
-                annotationBox.style.boxShadow = '';
-            }
-        }
-    }
-
-    function highlightSidebarAnnotation(annotationId: string, highlight: boolean): void {
-        const sidebarItem = document.querySelector(`#annotation-list [data-annotation-id="${annotationId}"]`) as HTMLDivElement;
-        if (sidebarItem) {
-            if (highlight) {
-                sidebarItem.style.backgroundColor = '#dbeafe';
-                sidebarItem.style.transform = 'scale(1.02)';
-                sidebarItem.style.transition = 'all 0.2s ease';
-            } else {
-                sidebarItem.style.backgroundColor = '';
-                sidebarItem.style.transform = '';
-            }
-        }
-    }
-
-    function scrollToSidebarAnnotation(annotationId: string): void {
-        const sidebarItem = document.querySelector(`#annotation-list [data-annotation-id="${annotationId}"]`) as HTMLDivElement;
-        if (sidebarItem) {
-            sidebarItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            highlightSidebarAnnotation(annotationId, true);
-            setTimeout(() => highlightSidebarAnnotation(annotationId, false), 2000);
-        }
-    }
-
-    function deleteAnnotationById(annotationId: string): void {
-        const index = localAnnotations.findIndex(a => a.id === annotationId);
-        if (index === -1) return;
-
-        localAnnotations.splice(index, 1);
+        this.localAnnotations.push(newAnnotation);
         appState.hasUnsavedChanges = true;
 
-        const annotationBoxes = document.querySelectorAll(`.annotation-box[data-annotation-id="${annotationId}"]`);
-        annotationBoxes.forEach(box => {
-            box.remove();
-        });
+        this._createAnnotationBox(pageDiv.querySelector('.annotation-layer')!, pageDiv, newAnnotation);
+        this._updateAnnotationList();
+        this._syncWithAppState();
+        this._selectAnnotation(newAnnotation.id);
+    }
 
-        updateAnnotationList();
-        syncWithAppState();
+    private _onBoxMouseDown(e: MouseEvent, box: HTMLDivElement, annotation: MarkedRegion, pageDiv: HTMLDivElement): void {
+        e.stopPropagation();
+        this._selectAnnotation(annotation.id);
 
-        if (selectedAnnotationData && selectedAnnotationData.id === annotationId) {
-            selectedAnnotation = null;
-            selectedAnnotationData = null;
+        const handle = (e.target as HTMLElement).dataset.handle;
+        if (handle) {
+            this.isResizing = true;
+            this.interactionState = {
+                startX: e.clientX,
+                startY: e.clientY,
+                startLeft: parseFloat(box.style.left),
+                startTop: parseFloat(box.style.top),
+                startWidth: parseFloat(box.style.width),
+                startHeight: parseFloat(box.style.height),
+                resizeHandle: handle,
+            };
+        } else {
+            this.isDragging = true;
+            this.interactionState = {
+                startX: e.clientX,
+                startY: e.clientY,
+                startLeft: parseFloat(box.style.left),
+                startTop: parseFloat(box.style.top),
+            };
+        }
+
+        const onInteractionMove = (ev: MouseEvent) => {
+            if (this.isResizing) this._onResize(ev, box, annotation, pageDiv);
+            if (this.isDragging) this._onDrag(ev, box, annotation, pageDiv);
+        };
+
+        const onInteractionEnd = () => {
+            this.isResizing = false;
+            this.isDragging = false;
+            document.removeEventListener('mousemove', onInteractionMove);
+            document.removeEventListener('mouseup', onInteractionEnd);
+        };
+
+        document.addEventListener('mousemove', onInteractionMove);
+        document.addEventListener('mouseup', onInteractionEnd);
+    }
+
+    private _onResize(e: MouseEvent, box: HTMLDivElement, annotation: MarkedRegion, pageDiv: HTMLDivElement): void {
+        const { startX, startY, startLeft, startTop, startWidth, startHeight, resizeHandle } = this.interactionState;
+        const deltaX = e.clientX - startX!;
+        const deltaY = e.clientY - startY!;
+
+        let newLeft = startLeft!, newTop = startTop!, newWidth = startWidth!, newHeight = startHeight!;
+
+        if (resizeHandle!.includes('w')) { newWidth -= deltaX; newLeft += deltaX; }
+        if (resizeHandle!.includes('e')) { newWidth += deltaX; }
+        if (resizeHandle!.includes('n')) { newHeight -= deltaY; newTop += deltaY; }
+        if (resizeHandle!.includes('s')) { newHeight += deltaY; }
+
+        if (newWidth < 10) newWidth = 10;
+        if (newHeight < 10) newHeight = 10;
+
+        box.style.left = `${newLeft}px`;
+        box.style.top = `${newTop}px`;
+        box.style.width = `${newWidth}px`;
+        box.style.height = `${newHeight}px`;
+
+        annotation.x = newLeft / pageDiv.offsetWidth;
+        annotation.y = newTop / pageDiv.offsetHeight;
+        annotation.width = newWidth / pageDiv.offsetWidth;
+        annotation.height = newHeight / pageDiv.offsetHeight;
+
+        appState.hasUnsavedChanges = true;
+        this._syncWithAppState();
+    }
+
+    private _onDrag(e: MouseEvent, box: HTMLDivElement, annotation: MarkedRegion, pageDiv: HTMLDivElement): void {
+        const { startX, startY, startLeft, startTop } = this.interactionState;
+        const newLeft = startLeft! + e.clientX - startX!;
+        const newTop = startTop! + e.clientY - startY!;
+
+        const clampedLeft = Math.max(0, Math.min(newLeft, pageDiv.offsetWidth - box.offsetWidth));
+        const clampedTop = Math.max(0, Math.min(newTop, pageDiv.offsetHeight - box.offsetHeight));
+
+        box.style.left = `${clampedLeft}px`;
+        box.style.top = `${clampedTop}px`;
+
+        annotation.x = clampedLeft / pageDiv.offsetWidth;
+        annotation.y = clampedTop / pageDiv.offsetHeight;
+
+        appState.hasUnsavedChanges = true;
+        this._syncWithAppState();
+    }
+
+    private _onBoxDoubleClick(e: MouseEvent, box: HTMLDivElement, annotation: MarkedRegion) {
+        e.preventDefault();
+        const newLabel = prompt('Edit label:', annotation.label);
+        if (newLabel !== null && newLabel.trim()) {
+            annotation.label = newLabel.trim();
+            box.title = newLabel.trim();
+            appState.hasUnsavedChanges = true;
+            this._updateAnnotationList();
+            this._syncWithAppState();
         }
     }
 
-    function getCanvasForPage(pageNumber: number): HTMLCanvasElement | null {
-        const pageDiv = pdfContainer.querySelector(`[data-page-number="${pageNumber}"]`) as HTMLDivElement;
-        if (pageDiv) {
-            return pageDiv.querySelector('canvas');
-        }
-        return null;
+    // --- Private Methods (State & UI Sync) ---
+
+    private _syncWithAppState(): void {
+        appState.chayaDocument = ChayaDocument.fromRegions(this.localAnnotations);
     }
 
-    // Clean up temporary annotations on any click and handle deselection
-    document.addEventListener('click', (e) => {
-        const tempAnnotations = document.querySelectorAll('.annotation-box-tmp');
-        tempAnnotations.forEach(temp => temp.remove());
-
-        isDrawing = false;
-        currentAnnotation = null;
-
-        if (selectedAnnotation && !selectedAnnotation.contains(e.target as Node)) {
-            hideResizeHandles(selectedAnnotation);
-            selectedAnnotation.style.border = '2px solid #ff0000';
-            selectedAnnotation = null;
-            selectedAnnotationData = null;
+    private _selectAnnotation(annotationId: string, scrollIntoView = false): void {
+        if (this.selectedAnnotationId) {
+            this.pdfContainer.querySelector(`.annotation-box[data-annotation-id="${this.selectedAnnotationId}"]`)?.classList.remove('selected');
         }
-    });
 
-    // Event listener for delete annotation buttons
-    document.addEventListener('click', (e) => {
-        const deleteBtn = (e.target as Element).closest('.delete-annotation-btn') as HTMLElement;
-        if (deleteBtn) {
-            e.stopPropagation();
-            const annotationId = deleteBtn.dataset.annotationId;
-            if (annotationId) {
-                deleteAnnotationById(annotationId);
+        this.selectedAnnotationId = annotationId;
+        const box = this.pdfContainer.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`);
+        if (box) {
+            box.classList.add('selected');
+            if (scrollIntoView) {
+                box.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
-    });
+    }
 
-    // Warn user about unsaved changes when leaving the page
-    window.addEventListener('beforeunload', (e) => {
-        if (appState.hasUnsavedChanges && localAnnotations.length > 0) {
-            const message = 'You have unsaved annotations. Are you sure you want to leave?';
-            e.preventDefault();
-            e.returnValue = message;
-            return message;
+    private _deselectAll(): void {
+        if (this.selectedAnnotationId) {
+            this.pdfContainer.querySelector(`.annotation-box[data-annotation-id="${this.selectedAnnotationId}"]`)?.classList.remove('selected');
+            this.selectedAnnotationId = null;
         }
-    });
+    }
+
+    private _deleteAnnotation(annotationId: string): void {
+        this.localAnnotations = this.localAnnotations.filter(a => a.id !== annotationId);
+        appState.hasUnsavedChanges = true;
+
+        this.pdfContainer.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`)?.remove();
+
+        if (this.selectedAnnotationId === annotationId) {
+            this.selectedAnnotationId = null;
+        }
+
+        this._updateAnnotationList();
+        this._syncWithAppState();
+    }
+
+    private _highlightAnnotationBox(id: string, highlight: boolean): void {
+        const box = this.pdfContainer.querySelector(`.annotation-box[data-annotation-id="${id}"]`);
+        if (box) box.classList.toggle('highlighted', highlight);
+    }
+
+    private _highlightSidebarItem(id: string, highlight: boolean): void {
+        const item = this.annotationList.querySelector(`[data-annotation-id="${id}"]`);
+        if (item) item.classList.toggle('highlighted', highlight);
+    }
+
+    private _getCanvasForPage(pageNumber: number): HTMLCanvasElement | null {
+        return this.pdfContainer.querySelector(`[data-page-number="${pageNumber}"] canvas`);
+    }
+
+    private _setupGlobalListeners(): void {
+        this.pdfContainer.addEventListener('mousedown', (e) => {
+            if (!(e.target as HTMLElement).closest('.annotation-box')) {
+                this._deselectAll();
+            }
+        });
+
+        window.addEventListener('beforeunload', (e) => {
+            if (appState.hasUnsavedChanges && this.localAnnotations.length > 0) {
+                e.preventDefault();
+                e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        });
+    }
+}
+
+
+// --- Module's Public Interface ---
+
+let markControllerInstance: MarkController | null = null;
+
+export function initializeMarkTab(): void {
+    console.log('Initializing Mark tab');
+    const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
+    const annotationList = document.getElementById('annotation-list') as HTMLDivElement;
+    const annotationCount = document.getElementById('annotation-count') as HTMLDivElement;
+
+    if (!pdfContainer || !annotationList || !annotationCount) {
+        console.error('Required DOM elements not found for Mark tab');
+        return;
+    }
+
+    markControllerInstance = new MarkController(pdfContainer, annotationList, annotationCount);
+
+    const style = document.createElement('style');
+    style.textContent = `
+        .annotation-box.selected { border-color: #0066ff; background-color: rgba(0, 102, 255, 0.15); }
+        .annotation-box.selected .resize-handle { display: block; }
+        .annotation-box.highlighted { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); }
+        #annotation-list .highlighted { background-color: #dbeafe !important; }
+        .resize-handle { 
+            position: absolute; display: none; background-color: #fff; border: 1px solid #000;
+            width: 8px; height: 8px; z-index: 1000;
+        }
+        .ai-annotate-btn {
+            position: absolute; top: 8px; right: 8px; background-color: #3b82f6; color: white;
+            border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; z-index: 1000;
+        }
+        .ai-annotate-btn:hover { background-color: #2563eb; }
+        .resize-nw { top: -4px; left: -4px; cursor: nwse-resize; }
+        .resize-ne { top: -4px; right: -4px; cursor: nesw-resize; }
+        .resize-sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
+        .resize-se { bottom: -4px; right: -4px; cursor: nwse-resize; }
+        .resize-n { top: -4px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+        .resize-s { bottom: -4px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+        .resize-e { top: 50%; right: -4px; transform: translateY(-50%); cursor: ew-resize; }
+        .resize-w { top: 50%; left: -4px; transform: translateY(-50%); cursor: ew-resize; }
+        .annotation-box-tmp { position: absolute; border: 2px dashed #ff0000; background-color: rgba(255, 0, 0, 0.05); pointer-events: none; }
+    `;
+    document.head.appendChild(style);
+}
+
+export function markModuleDataReady(pdfDocument: any, chayaDocument: ChayaDocument): void {
+    if (markControllerInstance) {
+        markControllerInstance.loadData(pdfDocument, chayaDocument);
+    } else {
+        console.error("Mark tab controller not initialized before data was ready.");
+    }
 }
