@@ -1,6 +1,6 @@
 import { MarkedRegion, appState, ChayaDocument } from './models.js';
 import { MarkController, initializeMarkTab } from './annotator.js';
-import { initializeViewer, readModuleDataReady } from './viewer.js';
+import { ViewerController, initializeViewer } from './viewer.js';
 import { documentGetElementById, updateLoadingProgress } from './actions.js';
 
 // JSZip is loaded globally via script tag in the HTML
@@ -35,6 +35,7 @@ function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
 
 class ChayaApp {
     private markController: MarkController;
+    private viewerController: ViewerController;
 
     constructor() {
         // Set up file input listeners
@@ -81,7 +82,7 @@ class ChayaApp {
             documentGetElementById<HTMLButtonElement>('read-tab-btn').addEventListener('click', () => this.switchToTab('read'));
         }
         this.markController = initializeMarkTab();
-        initializeViewer();
+        this.viewerController = initializeViewer();
 
         // Start with Mark tab
         this.switchToTab('mark');
@@ -137,7 +138,7 @@ class ChayaApp {
 
         // Notify tabs that data is ready
         this.markController.loadData(appState.pdfDocument, appState.chayaDocument);
-        readModuleDataReady(appState.pdfDocument, appState.chayaDocument);
+        this.viewerController.loadData(appState.pdfDocument);
 
         // TODO: This should not be needed.
         // Listen for rendering completion
