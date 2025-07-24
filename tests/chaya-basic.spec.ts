@@ -18,7 +18,10 @@ test.describe('Chaya Basic Functionality', () => {
     await page.waitForSelector('#pdf-container canvas', { timeout: 15000 });
     
     // Wait a bit more for the loading to complete
-    await page.waitForTimeout(2000);
+    await page.waitForFunction(() => {
+      const loading = document.querySelector('#app-loading');
+      return loading && loading.classList.contains('hidden');
+    });
 
     // Verify PDF loaded successfully
     const canvases = page.locator('#pdf-container canvas');
@@ -131,7 +134,10 @@ test.describe('Chaya Basic Functionality', () => {
     await fileInput.setInputFiles(testPdfPath);
 
     await page.waitForSelector('#pdf-container canvas', { timeout: 15000 });
-    await page.waitForTimeout(2000);
+    await page.waitForFunction(() => {
+      const loading = document.querySelector('#app-loading');
+      return loading && loading.classList.contains('hidden');
+    });
 
     // Programmatically add an annotation to the app state
     await page.evaluate(() => {
@@ -174,7 +180,10 @@ test.describe('Chaya Basic Functionality', () => {
     await fileInput.setInputFiles(testPdfPath);
 
     await page.waitForSelector('#pdf-container canvas', { timeout: 15000 });
-    await page.waitForTimeout(2000);
+    await page.waitForFunction(() => {
+      const loading = document.querySelector('#app-loading');
+      return loading && loading.classList.contains('hidden');
+    });
 
     // Switch to Read tab
     await page.click('#read-tab-btn');
