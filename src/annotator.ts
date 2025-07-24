@@ -174,7 +174,13 @@ class MarkController {
 
     // --- Private Methods (Annotation Box & List Item Creation) ---
 
-    private _createAnnotationBox(overlay: HTMLDivElement, pageDiv: HTMLDivElement, annotation: MarkedRegion): HTMLDivElement {
+    private _createAnnotationBox(overlay: HTMLDivElement, pageDiv: HTMLDivElement, annotation: MarkedRegion): HTMLDivElement | null {
+        const existingBox = overlay.querySelector(`[data-annotation-id="${annotation.id}"]`);
+        if (existingBox) {
+            console.warn(`Annotation box with ID ${annotation.id} already exists. Skipping creation.`);
+            return null;
+        }
+
         const pageWidth = pageDiv.offsetWidth;
         const pageHeight = pageDiv.offsetHeight;
 
@@ -245,12 +251,24 @@ class MarkController {
         button.className = 'ai-annotate-btn';
         button.textContent = '🤖 AI Mark Regions';
         button.title = 'Use AI to automatically mark regions on this and subsequent pages';
+
         button.addEventListener('click', async () => {
             const newAnnotations = await runAIAssistedAnnotation(pageDiv, pageNumber, this.localAnnotations, this._getCanvasForPage.bind(this));
-            if (newAnnotations) {
+
+            if (newAnnotations && newAnnotations.length > 0) {
                 this.localAnnotations.push(...newAnnotations);
                 appState.hasUnsavedChanges = true;
-                this._renderExistingAnnotations();
+
+                newAnnotations.forEach(annotation => {
+                    const targetPageDiv = this.pdfContainer.querySelector<HTMLDivElement>(`[data-page-number="${annotation.pageNumber}"]`);
+                    if (targetPageDiv) {
+                        const layer = targetPageDiv.querySelector<HTMLDivElement>('.annotation-layer');
+                        if (layer) {
+                            this._createAnnotationBox(layer, targetPageDiv, annotation);
+                        }
+                    }
+                });
+
                 this._updateAnnotationList();
                 this._syncWithAppState();
                 console.log(`Added ${newAnnotations.length} AI-generated marked regions.`);
