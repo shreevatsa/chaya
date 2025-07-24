@@ -131,14 +131,32 @@ class ChayaApp {
             pdfSlot.querySelector('.download-slot')?.classList.remove('hidden');
         }
 
-        updateLoadingProgress(100, 'Complete!', 'Chaya file loaded successfully');
+        updateLoadingProgress(100, 'Complete!', 'File loaded successfully');
 
         // Notify tabs that data is ready
         markModuleDataReady(appState.pdfDocument, appState.chayaDocument);
         readModuleDataReady(appState.pdfDocument, appState.chayaDocument);
 
+        // TODO: This should not be needed.
         // Listen for rendering completion
-        this.waitForRenderingComplete();
+        const handleRenderingComplete = (event: Event) => {
+            const customEvent = event as CustomEvent;
+            const { tabName, totalPages, error } = customEvent.detail;
+            if (error) {
+                console.error(`Rendering failed for ${tabName} tab: ${error}`);
+            } else {
+                console.log(`Rendering complete for ${tabName} tab: ${totalPages} pages`);
+            }
+            // Hide loading after a short delay (progress should already be at 100% with "Complete!" text)
+            const loadingDiv = documentGetElementById<HTMLDivElement>('app-loading');
+            setTimeout(() => {
+                console.log('Hiding loading progress bar');
+                loadingDiv.classList.add('hidden');
+            }, 1000);
+            // Remove the event listener
+            document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
+        };
+        document.addEventListener('tabRenderingComplete', handleRenderingComplete);
     }
 
     // Writes to `appState.pdfFile`.
@@ -155,30 +173,18 @@ class ChayaApp {
         }
     }
 
-    // .chaya file handling methods
-    /**
-     * Load a `.chaya` package. A .chaya file is a ZIP archive containing
-     * the original PDF, annotations and a manifest. This method extracts
-     * those components and then follows the same initialization steps as
-     * `loadPdfFile()`.
-     */
     private async loadChayaFile(file: File): Promise<void> {
         const loadingDiv = documentGetElementById<HTMLDivElement>('app-loading');
 
         try {
             console.log('Loading .chaya file:', file.name);
-
-            // Show loading progress
-            loadingDiv.classList.remove('hidden');
             updateLoadingProgress(0, 'Loading .chaya file...', 'Reading ZIP file...');
 
-            // Read ZIP file
             const zip = new JSZip();
             const zipContent = await zip.loadAsync(file);
 
             updateLoadingProgress(5, 'Extracting files...', 'Validating .chaya format...');
 
-            // Validate required files
             const requiredFiles = ['manifest.json', 'document.pdf', 'annotations.json'];
             for (const requiredFile of requiredFiles) {
                 if (!zipContent.file(requiredFile)) {
@@ -236,7 +242,6 @@ class ChayaApp {
         try {
             console.log('Creating .chaya file...');
 
-            // Create ZIP file
             const zip = new JSZip();
 
             // Add manifest.json
@@ -344,32 +349,6 @@ class ChayaApp {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }
-
-    // === UTILITIES ===
-    private waitForRenderingComplete(): void {
-        // Listen for rendering completion from the active tab
-        const handleRenderingComplete = (event: Event) => {
-            const customEvent = event as CustomEvent;
-            const { tabName, totalPages, error } = customEvent.detail;
-
-            if (error) {
-                console.error(`Rendering failed for ${tabName} tab: ${error}`);
-            } else {
-                console.log(`Rendering complete for ${tabName} tab: ${totalPages} pages`);
-            }
-
-            // Hide loading after a short delay (progress should already be at 100% with "Complete!" text)
-            const loadingDiv = documentGetElementById<HTMLDivElement>('app-loading');
-            setTimeout(() => {
-                console.log('Hiding loading progress bar');
-                loadingDiv.classList.add('hidden');
-            }, 1000);
-
-            // Remove the event listener
-            document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
-        };
-        document.addEventListener('tabRenderingComplete', handleRenderingComplete);
     }
 }
 
