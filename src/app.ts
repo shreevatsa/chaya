@@ -1,5 +1,5 @@
 import { MarkedRegion, appState, ChayaDocument } from './models.js';
-import { initializeMarkTab, markModuleDataReady } from './annotator.js';
+import { MarkController, initializeMarkTab } from './annotator.js';
 import { initializeViewer, readModuleDataReady } from './viewer.js';
 import { documentGetElementById, updateLoadingProgress } from './actions.js';
 
@@ -34,6 +34,8 @@ function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
 }
 
 class ChayaApp {
+    private markController: MarkController;
+
     constructor() {
         // Set up file input listeners
         {
@@ -78,7 +80,7 @@ class ChayaApp {
             documentGetElementById<HTMLButtonElement>('edit-tab-btn').addEventListener('click', () => this.switchToTab('edit'));
             documentGetElementById<HTMLButtonElement>('read-tab-btn').addEventListener('click', () => this.switchToTab('read'));
         }
-        initializeMarkTab();
+        this.markController = initializeMarkTab();
         initializeViewer();
 
         // Start with Mark tab
@@ -134,7 +136,7 @@ class ChayaApp {
         updateLoadingProgress(100, 'Complete!', 'File loaded successfully');
 
         // Notify tabs that data is ready
-        markModuleDataReady(appState.pdfDocument, appState.chayaDocument);
+        this.markController.loadData(appState.pdfDocument, appState.chayaDocument);
         readModuleDataReady(appState.pdfDocument, appState.chayaDocument);
 
         // TODO: This should not be needed.

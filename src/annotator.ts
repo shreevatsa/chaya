@@ -2,7 +2,7 @@ import { MarkedRegion, appState, ChayaDocument } from './models.js';
 import { runAIAssistedAnnotation } from './ai-orchestrator.js';
 import { updateLoadingProgress } from './actions.js';
 
-class MarkController {
+export class MarkController {
     // DOM Element References
     private pdfContainer: HTMLDivElement;
     private annotationList: HTMLDivElement;
@@ -547,20 +547,17 @@ class MarkController {
 
 // --- Module's Public Interface ---
 
-let markControllerInstance: MarkController | null = null;
-
-export function initializeMarkTab(): void {
+export function initializeMarkTab(): MarkController {
     console.log('Initializing Mark tab');
     const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
     const annotationList = document.getElementById('annotation-list') as HTMLDivElement;
     const annotationCount = document.getElementById('annotation-count') as HTMLDivElement;
 
     if (!pdfContainer || !annotationList || !annotationCount) {
-        console.error('Required DOM elements not found for Mark tab');
-        return;
+        throw new Error("Required DOM elements not found for Mark tab");
     }
 
-    markControllerInstance = new MarkController(pdfContainer, annotationList, annotationCount);
+    const controller = new MarkController(pdfContainer, annotationList, annotationCount);
 
     const style = document.createElement('style');
     style.textContent = `
@@ -588,12 +585,5 @@ export function initializeMarkTab(): void {
         .annotation-box-tmp { position: absolute; border: 2px dashed #ff0000; background-color: rgba(255, 0, 0, 0.05); pointer-events: none; }
     `;
     document.head.appendChild(style);
-}
-
-export function markModuleDataReady(pdfDocument: any, chayaDocument: ChayaDocument): void {
-    if (markControllerInstance) {
-        markControllerInstance.loadData(pdfDocument, chayaDocument);
-    } else {
-        console.error("Mark tab controller not initialized before data was ready.");
-    }
+    return controller;
 }
