@@ -170,7 +170,9 @@ test.describe('Chaya Functionality Tests', () => {
         await page.mouse.move(layerBox!.x + 400, layerBox!.y + 250);
         await page.mouse.up();
 
-        await page.waitForTimeout(1000); // Wait for second annotation to be created
+        await page.waitForFunction(() =>
+          document.querySelectorAll('.annotation-box').length >= 2
+        );
 
         // Save .chaya file
         const downloadPromise = page.waitForEvent('download');
