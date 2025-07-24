@@ -9,7 +9,6 @@ export class MarkController {
     private annotationCount: HTMLDivElement;
 
     // State
-    private localAnnotations: Map<number, MarkedRegion[]> = new Map();
     private selectedAnnotationId: string | null = null;
 
     // Interaction State (for drawing, resizing, dragging)
@@ -46,7 +45,6 @@ export class MarkController {
     public loadData(pdfDocument: any, chayaDocument: ChayaDocument): void {
         console.log('Mark tab: Data ready', { pdfDocument, chayaDocument });
 
-        this.localAnnotations = chayaDocument.markedRegions || new Map();
         appState.hasUnsavedChanges = false;
         this.pdfContainer.innerHTML = ''; // Clear previous content
 
@@ -134,9 +132,10 @@ export class MarkController {
     }
 
     private _renderExistingAnnotations(): void {
-        if (this.localAnnotations.size === 0) return;
+        const annotationsMap = appState.chayaDocument.markedRegions;
+        if (annotationsMap.size === 0) return;
         console.log('Rendering loaded annotations...');
-        this.localAnnotations.forEach((regions, pageNumber) => {
+        annotationsMap.forEach((regions, pageNumber) => {
             const pageDiv = this.pdfContainer.querySelector<HTMLDivElement>(`[data-page-number="${pageNumber}"]`);
             if (pageDiv) {
                 const annotationLayer = pageDiv.querySelector<HTMLDivElement>('.annotation-layer');
@@ -151,16 +150,18 @@ export class MarkController {
 
     private _updateAnnotationList(): void {
         let count = 0;
-        this.localAnnotations.forEach(pageRegions => count += pageRegions.length);
+        const annotationsMap = appState.chayaDocument.markedRegions;
+        annotationsMap.forEach(pageRegions => count += pageRegions.length);
 
         this.annotationCount.textContent = count === 0 ? 'No marked regions' : `${count} marked regions${count > 1 ? 's' : ''}`;
         this.annotationList.innerHTML = '';
 
         // Sort page numbers numerically before rendering.
-        const sortedPageKeys = Array.from(this.localAnnotations.keys()).sort((a, b) => a - b);
+        const sortedPageKeys = Array.from(annotationsMap.keys()).sort((a, b) => a - b);
+
 
         for (const pageNumber of sortedPageKeys) {
-            const pageRegions = this.localAnnotations.get(pageNumber)!;
+            const pageRegions = annotationsMap.get(pageNumber)!;
 
             const pageHeader = document.createElement('div');
             pageHeader.className = 'text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 mt-2 first:mt-0';
@@ -256,16 +257,16 @@ export class MarkController {
 
         button.addEventListener('click', async () => {
             // Flatten the map values into a list for the AI orchestrator.
-            const allCurrentAnnotations = Array.from(this.localAnnotations.values()).flat();
+            const allCurrentAnnotations = Array.from(appState.chayaDocument.markedRegions.values()).flat();
             const newAnnotations = await runAIAssistedAnnotation(pageDiv, pageNumber, allCurrentAnnotations, this._getCanvasForPage.bind(this));
 
             if (newAnnotations && newAnnotations.length > 0) {
                 newAnnotations.forEach(annotation => {
                     const pageNum = annotation.pageNumber;
-                    if (!this.localAnnotations.has(pageNum)) {
-                        this.localAnnotations.set(pageNum, []);
+                    if (!appState.chayaDocument.markedRegions.has(pageNumber)) {
+                        appState.chayaDocument.markedRegions.set(pageNumber, []);
                     }
-                    this.localAnnotations.get(pageNum)!.push(annotation);
+                    appState.chayaDocument.markedRegions.get(pageNumber)!.push(annotation);
                 });
                 appState.hasUnsavedChanges = true;
 
@@ -280,7 +281,6 @@ export class MarkController {
                 });
 
                 this._updateAnnotationList();
-                this._syncWithAppState();
                 console.log(`Added ${newAnnotations.length} AI-generated marked regions.`);
             }
         });
@@ -361,15 +361,14 @@ export class MarkController {
             pageNumber,
         };
 
-        if (!this.localAnnotations.has(pageNumber)) {
-            this.localAnnotations.set(pageNumber, []);
+        if (!appState.chayaDocument.markedRegions.has(pageNumber)) {
+            appState.chayaDocument.markedRegions.set(pageNumber, []);
         }
-        this.localAnnotations.get(pageNumber)!.push(newAnnotation);
+        appState.chayaDocument.markedRegions.get(pageNumber)!.push(newAnnotation);
         appState.hasUnsavedChanges = true;
 
         this._createAnnotationBox(pageDiv.querySelector('.annotation-layer')!, pageDiv, newAnnotation);
         this._updateAnnotationList();
-        this._syncWithAppState();
         this._selectAnnotation(newAnnotation.id);
     }
 
@@ -441,7 +440,6 @@ export class MarkController {
         annotation.height = newHeight / pageDiv.offsetHeight;
 
         appState.hasUnsavedChanges = true;
-        this._syncWithAppState();
     }
 
     private _onDrag(e: MouseEvent, box: HTMLDivElement, annotation: MarkedRegion, pageDiv: HTMLDivElement): void {
@@ -459,7 +457,6 @@ export class MarkController {
         annotation.y = clampedTop / pageDiv.offsetHeight;
 
         appState.hasUnsavedChanges = true;
-        this._syncWithAppState();
     }
 
     private _onBoxDoubleClick(e: MouseEvent, box: HTMLDivElement, annotation: MarkedRegion) {
@@ -470,16 +467,10 @@ export class MarkController {
             box.title = newLabel.trim();
             appState.hasUnsavedChanges = true;
             this._updateAnnotationList();
-            this._syncWithAppState();
         }
     }
 
     // --- Private Methods (State & UI Sync) ---
-
-    private _syncWithAppState(): void {
-        appState.chayaDocument = ChayaDocument.fromRegions(this.localAnnotations);
-    }
-
     private _selectAnnotation(annotationId: string, scrollIntoView = false): void {
         if (this.selectedAnnotationId) {
             this.pdfContainer.querySelector(`.annotation-box[data-annotation-id="${this.selectedAnnotationId}"]`)?.classList.remove('selected');
@@ -504,7 +495,8 @@ export class MarkController {
 
     private _deleteAnnotation(annotationId: string): void {
         let found = false;
-        for (const [pageNumber, regions] of this.localAnnotations.entries()) {
+        const annotationsMap = appState.chayaDocument.markedRegions;
+        for (const [pageNumber, regions] of annotationsMap.entries()) {
             const index = regions.findIndex(a => a.id === annotationId);
             if (index !== -1) {
                 regions.splice(index, 1);
@@ -519,7 +511,6 @@ export class MarkController {
                 this.selectedAnnotationId = null;
             }
             this._updateAnnotationList();
-            this._syncWithAppState();
         }
     }
 
