@@ -34,7 +34,6 @@ function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
 }
 
 class ChayaApp {
-    // === PUBLIC API (Interface for tabs to use) ===
     constructor() {
         // Set up file input listeners
         {
@@ -86,16 +85,11 @@ class ChayaApp {
         this.switchToTab('mark');
     }
 
-    // === TAB MANAGEMENT ===
     private switchToTab(tab: 'mark' | 'edit' | 'read'): void {
-        // Update state
-        appState.currentTab = tab;
-
         // Hide all tab content
         document.querySelectorAll('.tab-content').forEach(el => {
             el.classList.add('hidden');
         });
-
         // Remove active class from all buttons
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.remove('active');
@@ -105,13 +99,10 @@ class ChayaApp {
 
         // Show target tab
         documentGetElementById(`${tab}-tab`).classList.remove('hidden');
-
         // Activate target button
         const targetBtn = documentGetElementById(`${tab}-tab-btn`);
         targetBtn.classList.add('active', 'bg-blue-100', 'text-blue-700');
         targetBtn.classList.remove('text-gray-600', 'hover:text-gray-800');
-
-        console.log(`Switched to ${tab} tab`);
     }
 
     private async postLoading(pdfArrayBuffer: ArrayBuffer) {

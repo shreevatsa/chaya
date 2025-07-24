@@ -66,7 +66,6 @@ export class ChayaDocument {
 
 // Application state.
 interface AppState {
-    currentTab: 'mark' | 'edit' | 'read';  // Which tab of the app is active
     // These two bools are actually three states and could be an enum: NOT_LOADED, LOADED_NO_UNSAVED_CHANGES, LOADED_WITH_UNSAVED_CHANGES
     documentLoaded: boolean;  // Whether the document (PDF or Chaya) has been loaded yet
     hasUnsavedChanges: boolean;
@@ -77,11 +76,10 @@ interface AppState {
 }
 
 export const appState: AppState = {
-    currentTab: 'mark',
     documentLoaded: false,
+    hasUnsavedChanges: false,
     pdfFile: null,
     chayaDocument: new ChayaDocument(),
     loadedChayaFileName: null,
     pdfDocument: null,
-    hasUnsavedChanges: false
 };
