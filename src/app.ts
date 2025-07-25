@@ -83,8 +83,6 @@ class ChayaApp {
         }
         this.markController = initializeMarkTab();
         this.viewerController = initializeViewer();
-
-        // Start with Mark tab
         this.switchToTab('mark');
     }
 
@@ -114,8 +112,10 @@ class ChayaApp {
         const pdfjs = await waitForPdfjs();
         appState.pdfDocument = await pdfjs.getDocument(new Uint8Array(pdfArrayBuffer)).promise;
 
+        this.markController.prepareForDocument();
+        this.viewerController.prepareForDocument();
+
         updateLoadingProgress(30, 'Rendering pages...', 'Processing PDF pages for display');
-        await this._renderPdfToCache();
 
         // Mark as loaded
         appState.documentLoaded = true;
@@ -134,34 +134,23 @@ class ChayaApp {
             pdfSlot.querySelector('.download-slot')?.classList.remove('hidden');
         }
 
-        updateLoadingProgress(100, 'Complete!', 'File loaded successfully');
-
-        // Notify tabs that data is ready
-        this.markController.loadData();
-        this.viewerController.loadData();
-
-        updateLoadingProgress(100, 'Complete!', 'File loaded successfully');
-        setTimeout(() => {
-            documentGetElementById('app-loading').classList.add('hidden');
-        }, 500); // A shorter delay is fine.
+        this._progressivelyRenderPages();
     }
 
-    // NEW: This method populates the shared canvas cache.
-    private async _renderPdfToCache(): Promise<void> {
+    private async _progressivelyRenderPages(): Promise<void> {
         const pdf = appState.pdfDocument;
         const totalPages = pdf.numPages;
-        appState.pageCanvasCache.clear(); // Clear cache from any previous document
+        appState.pageCanvasCache.clear();
 
-        console.log(`Starting to render ${totalPages} pages to cache...`);
-
-        // Use the main container's width to determine the rendering scale.
+        console.log(`Starting progressive render of ${totalPages} pages...`);
         const containerWidth = documentGetElementById('pdf-container').offsetWidth;
 
-        for (let i = 1; i <= totalPages; i++) {
-            const progress = 30 + (70 * i / totalPages);
-            updateLoadingProgress(progress, `Rendering page ${i} of ${totalPages}...`, `Processing page ${i}`);
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+            const progress = 10 + (85 * pageNum / totalPages); // Leave final 5% for cleanup
+            updateLoadingProgress(progress, `Rendering page ${pageNum} of ${totalPages}...`, `Processing page ${pageNum}`);
 
-            const page = await pdf.getPage(i);
+            const page = await pdf.getPage(pageNum);
+            // Calculate the correct scale for this page.
             const baseViewport = page.getViewport({ scale: 1.0 });
             const maxWidth = 1200;
             const targetWidth = Math.min(containerWidth, maxWidth);
@@ -172,13 +161,21 @@ class ChayaApp {
             canvas.width = viewport.width;
             canvas.height = viewport.height;
             const context = canvas.getContext('2d')!;
-
             await page.render({ canvasContext: context, viewport }).promise;
 
-            // Store the fully rendered canvas in our global cache.
-            appState.pageCanvasCache.set(i, canvas);
+            appState.pageCanvasCache.set(pageNum, canvas);
+            canvas.style.width = `${targetWidth}px`;
+
+            // Notify controllers that a new page is ready to be displayed.
+            this.markController.renderPage(pageNum);
+            await this.viewerController.renderRegionsForPage(pageNum);
         }
-        console.log('All pages rendered to cache.');
+
+        console.log('All pages rendered.');
+        updateLoadingProgress(100, 'Complete!', 'Document ready.');
+        setTimeout(() => {
+            documentGetElementById('app-loading').classList.add('hidden');
+        }, 500);
     }
 
     // Writes to `appState.pdfFile`.

@@ -17,67 +17,43 @@ export class ViewerController {
         this.annotationList = annotationList;
     }
 
-    public loadData(): void {
-        console.log('Read tab: Displaying cached data');
+    public prepareForDocument(): void {
         this.pdfContainer.innerHTML = '';
-        const annotationsMap = appState.chayaDocument.markedRegions;
+        this.annotationList.innerHTML = '';
+    }
 
-        if (annotationsMap.size === 0) {
-            this.pdfContainer.innerHTML = `...`; // Placeholder message
-            this.annotationCount.textContent = 'No marked regions loaded';
-            this.annotationList.innerHTML = '';
+    public async renderRegionsForPage(pageNumber: number): Promise<void> {
+        const regions = appState.chayaDocument.markedRegions.get(pageNumber);
+        if (!regions || regions.length === 0) {
+            // If there are no regions on this page, there's nothing to do.
             return;
         }
 
-        this.displayAnnotatedRegions();
-        this.updateAnnotationList(annotationsMap);
-    }
-
-    private async displayAnnotatedRegions(): Promise<void> {
-        const annotationsMap = appState.chayaDocument.markedRegions;
-        // Get page numbers and sort them to ensure regions are displayed in order.
-        const sortedPages = Array.from(annotationsMap.keys()).sort((a, b) => a - b);
-
-        let totalAnnotations = 0;
-        annotationsMap.forEach(regions => totalAnnotations += regions.length);
-        let processedCount = 0;
-
-        for (const pageNumber of sortedPages) {
-            const regionsOnPage = annotationsMap.get(pageNumber)!;
-            for (const annotation of regionsOnPage) {
-                processedCount++;
-                console.log(`Extracting region ${processedCount}/${totalAnnotations}: ${annotation.label}`);
-                const regionDiv = await this.extractAnnotationRegion(annotation);
-                this.pdfContainer.appendChild(regionDiv);
-            }
+        const regionDivs: HTMLDivElement[] = [];
+        for (const annotation of regions) {
+            // Await the extraction before pushing to the array.
+            const regionDiv = await this.extractAnnotationRegion(annotation);
+            regionDivs.push(regionDiv);
         }
 
-        console.log('All annotation regions extracted successfully');
+        // Append all divs for this page to the container at once.
+        this.pdfContainer.append(...regionDivs);
+
+        this._updateAnnotationListForPage(regions);
     }
 
-    // Update the annotation list sidebar
-    private updateAnnotationList(annotationsMap: Map<number, MarkedRegion[]>): void {
-        let count = 0;
-        annotationsMap.forEach(regions => count += regions.length);
-        this.annotationCount.textContent = count === 0 ? 'No marked regions' : `${count} marked region${count > 1 ? 's' : ''}`;
-        // Clear existing list
-        this.annotationList.innerHTML = '';
+    private _updateAnnotationListForPage(regions: MarkedRegion[]): void {
+        regions.forEach(annotation => {
+            const navButton = document.createElement('button');
+            navButton.className = 'px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-full transition-colors cursor-pointer';
+            navButton.textContent = `${annotation.label} (p.${annotation.pageNumber})`;
+            navButton.title = `Jump to: ${annotation.label}`;
 
-        const sortedPages = Array.from(annotationsMap.keys()).sort((a, b) => a - b);
-        for (const pageNumber of sortedPages) {
-            const regionsOnPage = annotationsMap.get(pageNumber)!;
-            for (const annotation of regionsOnPage) {
-                const navButton = document.createElement('button');
-                navButton.className = 'px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-full transition-colors cursor-pointer';
-                navButton.textContent = `${annotation.label} (p.${annotation.pageNumber})`;
-                navButton.title = `Jump to: ${annotation.label}`;
-
-                navButton.addEventListener('click', () => this.scrollToAnnotationRegion(annotation.id));
-                navButton.addEventListener('mouseenter', () => this.highlightAnnotationRegion(annotation.id, true));
-                navButton.addEventListener('mouseleave', () => this.highlightAnnotationRegion(annotation.id, false));
-                this.annotationList.appendChild(navButton);
-            }
-        }
+            navButton.addEventListener('click', () => this.scrollToAnnotationRegion(annotation.id));
+            navButton.addEventListener('mouseenter', () => this.highlightAnnotationRegion(annotation.id, true));
+            navButton.addEventListener('mouseleave', () => this.highlightAnnotationRegion(annotation.id, false));
+            this.annotationList.appendChild(navButton);
+        });
     }
 
     // Scroll to and highlight an annotation region
