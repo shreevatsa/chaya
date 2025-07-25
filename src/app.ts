@@ -112,10 +112,10 @@ class ChayaApp {
         updateLoadingProgress(10, 'Processing PDF...', 'Initializing PDF.js and document...');
 
         const pdfjs = await waitForPdfjs();
-        const loadingTask = pdfjs.getDocument(new Uint8Array(pdfArrayBuffer));
-        appState.pdfDocument = await loadingTask.promise;
+        appState.pdfDocument = await pdfjs.getDocument(new Uint8Array(pdfArrayBuffer)).promise;
 
         updateLoadingProgress(30, 'Rendering pages...', 'Processing PDF pages for display');
+        await this._renderPdfToCache();
 
         // Mark as loaded
         appState.documentLoaded = true;
@@ -137,29 +137,48 @@ class ChayaApp {
         updateLoadingProgress(100, 'Complete!', 'File loaded successfully');
 
         // Notify tabs that data is ready
-        this.markController.loadData(appState.pdfDocument, appState.chayaDocument);
-        this.viewerController.loadData(appState.pdfDocument);
+        this.markController.loadData();
+        this.viewerController.loadData();
 
-        // TODO: This should not be needed.
-        // Listen for rendering completion
-        const handleRenderingComplete = (event: Event) => {
-            const customEvent = event as CustomEvent;
-            const { tabName, totalPages, error } = customEvent.detail;
-            if (error) {
-                console.error(`Rendering failed for ${tabName} tab: ${error}`);
-            } else {
-                console.log(`Rendering complete for ${tabName} tab: ${totalPages} pages`);
-            }
-            // Hide loading after a short delay (progress should already be at 100% with "Complete!" text)
-            const loadingDiv = documentGetElementById<HTMLDivElement>('app-loading');
-            setTimeout(() => {
-                console.log('Hiding loading progress bar');
-                loadingDiv.classList.add('hidden');
-            }, 1000);
-            // Remove the event listener
-            document.removeEventListener('tabRenderingComplete', handleRenderingComplete);
-        };
-        document.addEventListener('tabRenderingComplete', handleRenderingComplete);
+        updateLoadingProgress(100, 'Complete!', 'File loaded successfully');
+        setTimeout(() => {
+            documentGetElementById('app-loading').classList.add('hidden');
+        }, 500); // A shorter delay is fine.
+    }
+
+    // NEW: This method populates the shared canvas cache.
+    private async _renderPdfToCache(): Promise<void> {
+        const pdf = appState.pdfDocument;
+        const totalPages = pdf.numPages;
+        appState.pageCanvasCache.clear(); // Clear cache from any previous document
+
+        console.log(`Starting to render ${totalPages} pages to cache...`);
+
+        // Use the main container's width to determine the rendering scale.
+        const containerWidth = documentGetElementById('pdf-container').offsetWidth;
+
+        for (let i = 1; i <= totalPages; i++) {
+            const progress = 30 + (70 * i / totalPages);
+            updateLoadingProgress(progress, `Rendering page ${i} of ${totalPages}...`, `Processing page ${i}`);
+
+            const page = await pdf.getPage(i);
+            const baseViewport = page.getViewport({ scale: 1.0 });
+            const maxWidth = 1200;
+            const targetWidth = Math.min(containerWidth, maxWidth);
+            const scale = targetWidth / baseViewport.width;
+            const viewport = page.getViewport({ scale });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            const context = canvas.getContext('2d')!;
+
+            await page.render({ canvasContext: context, viewport }).promise;
+
+            // Store the fully rendered canvas in our global cache.
+            appState.pageCanvasCache.set(i, canvas);
+        }
+        console.log('All pages rendered to cache.');
     }
 
     // Writes to `appState.pdfFile`.

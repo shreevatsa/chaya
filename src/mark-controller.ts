@@ -42,74 +42,49 @@ export class MarkController {
      * Public method to load PDF and annotation data into the component.
      * This is the main entry point for rendering content.
      */
-    public loadData(pdfDocument: any, chayaDocument: ChayaDocument): void {
-        console.log('Mark tab: Data ready', { pdfDocument, chayaDocument });
+    public loadData(): void {
+        console.log('Mark tab: Loading data');
 
         appState.hasUnsavedChanges = false;
         this.pdfContainer.innerHTML = ''; // Clear previous content
 
-        this._renderPdfPages(pdfDocument);
+        this._renderPagesFromCache();
         this._updateAnnotationList();
     }
 
     // --- Private Methods (Rendering) ---
-
-    private async _renderPdfPages(pdfDocument: any): Promise<void> {
-        const totalPages = pdfDocument.numPages;
-        console.log(`Starting to render ${totalPages} pages...`);
-
-        try {
-            for (let i = 1; i <= totalPages; i++) {
-                const progress = 30 + (70 * i / totalPages);
-                const isLastPage = i == totalPages;
-                const statusText = isLastPage ? 'Complete!' : `Rendering page ${i} of ${totalPages}...`;
-                const detailText = isLastPage ? 'PDF ready for marking' : `Processing page ${i}`;
-                updateLoadingProgress(progress, statusText, detailText);
-
-                await this._renderPage(pdfDocument, i);
-            }
-
-            console.log(`All ${totalPages} pages rendered successfully`);
-            this._renderExistingAnnotations();
-
-            // Notify app that rendering is complete
-            document.dispatchEvent(new CustomEvent('tabRenderingComplete', {
-                detail: { tabName: 'mark', totalPages }
-            }));
-        } catch (error) {
-            console.error('Error during PDF page rendering:', error);
-            updateLoadingProgress(0, 'Error rendering pages', `Failed at page: ${error}`);
-            document.dispatchEvent(new CustomEvent('tabRenderingComplete', {
-                detail: { tabName: 'mark', totalPages, error }
-            }));
+    private _renderPagesFromCache(): void {
+        const totalPages = appState.pageCanvasCache.size;
+        for (let i = 1; i <= totalPages; i++) {
+            this._renderPage(i);
         }
+        this._renderExistingAnnotations();
     }
 
-    private async _renderPage(pdf: any, pageNumber: number): Promise<void> {
-        const page = await pdf.getPage(pageNumber);
+    private _renderPage(pageNumber: number): void {
+        const cachedCanvas = appState.pageCanvasCache.get(pageNumber);
+        if (!cachedCanvas) {
+            console.error(`Canvas for page ${pageNumber} not found in cache.`);
+            return;
+        }
 
-        // Scale to fit the container width, up to a maximum.
-        const baseViewport = page.getViewport({ scale: 1.0 });
-        const maxWidth = 1200;
-        const targetWidth = Math.min(this.pdfContainer.offsetWidth, maxWidth);
-        const scale = targetWidth / baseViewport.width;
-        const viewport = page.getViewport({ scale });
-
-        // A div to hold the canvas and the layer for marked regions.
         const pageDiv = document.createElement('div');
         pageDiv.className = 'page';
         pageDiv.style.position = 'relative';
         pageDiv.style.marginBottom = '1rem';
         pageDiv.dataset.pageNumber = String(pageNumber);
-        pageDiv.style.width = `${viewport.width}px`;
-        pageDiv.style.height = `${viewport.height}px`;
+        pageDiv.style.width = `${cachedCanvas.width}px`;
+        pageDiv.style.height = `${cachedCanvas.height}px`;
 
+        // Create a new, blank canvas for this tab.
         const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        canvas.width = cachedCanvas.width;
+        canvas.height = cachedCanvas.height;
         canvas.style.border = '1px solid #ccc';
 
-        // Overlay for marked regions.
+        const context = canvas.getContext('2d')!;
+        context.drawImage(cachedCanvas, 0, 0);
+
         const annotationLayer = document.createElement('div');
         annotationLayer.className = 'annotation-layer';
         annotationLayer.style.position = 'absolute';
@@ -117,7 +92,6 @@ export class MarkController {
         annotationLayer.style.left = '0';
         annotationLayer.style.width = '100%';
         annotationLayer.style.height = '100%';
-        annotationLayer.style.pointerEvents = 'auto';
         annotationLayer.style.cursor = 'crosshair';
         annotationLayer.addEventListener('mousedown', (e) => this._onDrawStart(e, pageDiv, pageNumber));
         annotationLayer.addEventListener('mousemove', (e) => this._onDrawMove(e));
@@ -127,7 +101,6 @@ export class MarkController {
         const aiButton = this._createAiButton(pageDiv, pageNumber);
 
         pageDiv.append(canvas, annotationLayer, aiButton);
-        await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise;
         this.pdfContainer.appendChild(pageDiv);
     }
 

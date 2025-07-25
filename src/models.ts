@@ -63,6 +63,7 @@ interface AppState {
     chayaDocument: ChayaDocument,
     loadedChayaFileName: string | null;
     pdfDocument: any | null; // Actually it is of type `PDFDocumentProxy`
+    pageCanvasCache: Map<number, HTMLCanvasElement>;
 }
 
 export const appState: AppState = {
@@ -72,4 +73,5 @@ export const appState: AppState = {
     chayaDocument: new ChayaDocument(),
     loadedChayaFileName: null,
     pdfDocument: null,
+    pageCanvasCache: new Map(),
 };

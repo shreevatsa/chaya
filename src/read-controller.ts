@@ -17,23 +17,24 @@ export class ViewerController {
         this.annotationList = annotationList;
     }
 
-    public loadData(pdfDocument: any): void {
-        console.log('Read tab: Data ready');
+    public loadData(): void {
+        console.log('Read tab: Displaying cached data');
         this.pdfContainer.innerHTML = '';
         const annotationsMap = appState.chayaDocument.markedRegions;
 
-        if (!pdfDocument || annotationsMap.size === 0) {
+        if (annotationsMap.size === 0) {
             this.pdfContainer.innerHTML = `...`; // Placeholder message
             this.annotationCount.textContent = 'No marked regions loaded';
             this.annotationList.innerHTML = '';
             return;
         }
 
-        this.displayAnnotatedRegions(pdfDocument, annotationsMap);
+        this.displayAnnotatedRegions();
         this.updateAnnotationList(annotationsMap);
     }
 
-    private async displayAnnotatedRegions(pdfDocument: any, annotationsMap: Map<number, MarkedRegion[]>): Promise<void> {
+    private async displayAnnotatedRegions(): Promise<void> {
+        const annotationsMap = appState.chayaDocument.markedRegions;
         // Get page numbers and sort them to ensure regions are displayed in order.
         const sortedPages = Array.from(annotationsMap.keys()).sort((a, b) => a - b);
 
@@ -46,20 +47,12 @@ export class ViewerController {
             for (const annotation of regionsOnPage) {
                 processedCount++;
                 console.log(`Extracting region ${processedCount}/${totalAnnotations}: ${annotation.label}`);
-                const regionDiv = await this.extractAnnotationRegion(pdfDocument, annotation);
+                const regionDiv = await this.extractAnnotationRegion(annotation);
                 this.pdfContainer.appendChild(regionDiv);
             }
         }
 
         console.log('All annotation regions extracted successfully');
-
-        const renderingCompleteEvent = new CustomEvent('tabRenderingComplete', {
-            detail: {
-                tabName: 'read',
-                totalPages: totalAnnotations
-            }
-        });
-        document.dispatchEvent(renderingCompleteEvent);
     }
 
     // Update the annotation list sidebar
@@ -113,46 +106,30 @@ export class ViewerController {
     }
 
     // Extract a cropped region from a page canvas for a specific annotation
-    private async extractAnnotationRegion(pdf: any, annotation: MarkedRegion): Promise<HTMLDivElement> {
-        const page = await pdf.getPage(annotation.pageNumber);
+    private async extractAnnotationRegion(annotation: MarkedRegion): Promise<HTMLDivElement> {
+        const sourceCanvas = appState.pageCanvasCache.get(annotation.pageNumber);
+        if (!sourceCanvas) {
+            console.error(`Canvas for page ${annotation.pageNumber} not found in cache.`);
+            const errorDiv = document.createElement('div');
+            errorDiv.textContent = `Error: Could not display region for page ${annotation.pageNumber}.`;
+            return errorDiv;
+        }
 
-        // Calculate scale to limit maximum width while maintaining aspect ratio
-        const baseViewport = page.getViewport({ scale: 1.0 });
-        const maxWidth = 1200; // Maximum width in pixels - adjust this to control PDF size
-        const scale = baseViewport.width > maxWidth ? maxWidth / baseViewport.width : 1.5;
+        const left = annotation.x * sourceCanvas.width;
+        const top = annotation.y * sourceCanvas.height;
+        const width = annotation.width * sourceCanvas.width;
+        const height = annotation.height * sourceCanvas.height;
 
-        const viewport = page.getViewport({ scale });
-
-        // Create a canvas to render the full page
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d')!;
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-
-        // Render the page
-        const renderContext = {
-            canvasContext: context,
-            viewport: viewport
-        };
-        await page.render(renderContext).promise;
-
-        // Calculate the annotation region in pixels
-        const left = annotation.x * viewport.width;
-        const top = annotation.y * viewport.height;
-        const width = annotation.width * viewport.width;
-        const height = annotation.height * viewport.height;
-
-        // Create a new canvas for the cropped region
         const croppedCanvas = document.createElement('canvas');
-        const croppedContext = croppedCanvas.getContext('2d')!;
         croppedCanvas.width = width;
         croppedCanvas.height = height;
+        const croppedContext = croppedCanvas.getContext('2d')!;
 
-        // Draw the cropped region
+        // Crop directly from the cached canvas - this is very fast.
         croppedContext.drawImage(
-            canvas,
-            left, top, width, height,  // source rectangle
-            0, 0, width, height        // destination rectangle
+            sourceCanvas,
+            left, top, width, height, // source rectangle
+            0, 0, width, height      // destination rectangle
         );
 
         // Create a container div with the cropped image and label
