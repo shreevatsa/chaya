@@ -107,7 +107,7 @@ class ChayaApp {
     }
 
     private async postLoading(pdfArrayBuffer: ArrayBuffer) {
-        updateLoadingProgress(10, 'Processing PDF...', 'Initializing PDF.js and document...');
+        updateLoadingProgress(5, 'Processing PDF...', 'Initializing PDF.js and document...');
 
         const pdfjs = await waitForPdfjs();
         appState.pdfDocument = await pdfjs.getDocument(new Uint8Array(pdfArrayBuffer)).promise;
@@ -115,7 +115,7 @@ class ChayaApp {
         this.markController.prepareForDocument();
         this.viewerController.prepareForDocument();
 
-        updateLoadingProgress(30, 'Rendering pages...', 'Processing PDF pages for display');
+        updateLoadingProgress(5, 'Rendering pages...', 'Processing PDF pages for display');
 
         // Mark as loaded
         appState.documentLoaded = true;
@@ -211,14 +211,14 @@ class ChayaApp {
                 }
             }
 
-            updateLoadingProgress(10, 'Reading manifest...', 'Validating format version...');
+            updateLoadingProgress(5, 'Reading manifest...', 'Validating format version...');
 
             // Read and validate manifest
             const manifestText = await zipContent.file('manifest.json')!.async('string');
             const manifest = JSON.parse(manifestText);
             console.log('Manifest:', manifest);
 
-            updateLoadingProgress(15, 'Extracting PDF...', 'Loading document content...');
+            updateLoadingProgress(5, 'Extracting PDF...', 'Loading document content...');
 
             // Extract PDF data
             const pdfArrayBuffer = await zipContent.file('document.pdf')!.async('arraybuffer');
@@ -227,14 +227,14 @@ class ChayaApp {
                 type: 'application/pdf'
             });
 
-            updateLoadingProgress(20, 'Loading annotations...', 'Parsing annotation data...');
+            updateLoadingProgress(5, 'Loading annotations...', 'Parsing annotation data...');
 
             // Extract annotations
             const annotationsText = await zipContent.file('annotations.json')!.async('string');
             const annotationsData = JSON.parse(annotationsText);
             const regions = MarkedRegion.parseFromJson(annotationsData);
 
-            updateLoadingProgress(25, 'Initializing document...', 'Setting up PDF viewer...');
+            updateLoadingProgress(5, 'Initializing document...', 'Setting up PDF viewer...');
 
             // Update state
             appState.pdfFile = pdfFile;
