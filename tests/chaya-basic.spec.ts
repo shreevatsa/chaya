@@ -16,7 +16,7 @@ test.describe('Chaya Basic Functionality', () => {
 
     // Wait for PDF to load - canvas should appear
     await page.waitForSelector('#pdf-container canvas', { timeout: 15000 });
-    
+
     // Wait a bit more for the loading to complete
     await page.waitForFunction(() => {
       const loading = document.querySelector('#app-loading');
@@ -30,13 +30,13 @@ test.describe('Chaya Basic Functionality', () => {
     // Step 2: Create annotation by simulating drawing
     const annotationLayer = page.locator('.annotation-layer').first();
     await annotationLayer.hover();
-    
+
     // Simulate mouse drawing - use a programmatic approach instead of relying on prompts
     await page.evaluate(() => {
       // Find the first annotation layer
       const layer = document.querySelector('.annotation-layer') as HTMLElement;
       if (!layer) return;
-      
+
       // Create a test annotation directly
       const event = new MouseEvent('mousedown', {
         clientX: layer.getBoundingClientRect().left + 100,
@@ -44,7 +44,7 @@ test.describe('Chaya Basic Functionality', () => {
         button: 0
       });
       layer.dispatchEvent(event);
-      
+
       // Move mouse
       const moveEvent = new MouseEvent('mousemove', {
         clientX: layer.getBoundingClientRect().left + 200,
@@ -52,7 +52,7 @@ test.describe('Chaya Basic Functionality', () => {
         button: 0
       });
       layer.dispatchEvent(moveEvent);
-      
+
       // Mouse up
       const upEvent = new MouseEvent('mouseup', {
         clientX: layer.getBoundingClientRect().left + 200,
@@ -73,10 +73,10 @@ test.describe('Chaya Basic Functionality', () => {
     await page.evaluate(() => {
       const layer = document.querySelector('.annotation-layer') as HTMLElement;
       if (!layer) return;
-      
+
       // Simulate complete drawing sequence
       const rect = layer.getBoundingClientRect();
-      
+
       // Mouse down
       const mouseDownEvent = new MouseEvent('mousedown', {
         bubbles: true,
@@ -86,7 +86,7 @@ test.describe('Chaya Basic Functionality', () => {
         button: 0
       });
       layer.dispatchEvent(mouseDownEvent);
-      
+
       // Mouse move
       const mouseMoveEvent = new MouseEvent('mousemove', {
         bubbles: true,
@@ -96,7 +96,7 @@ test.describe('Chaya Basic Functionality', () => {
         button: 0
       });
       layer.dispatchEvent(mouseMoveEvent);
-      
+
       // Mouse up
       const mouseUpEvent = new MouseEvent('mouseup', {
         bubbles: true,
@@ -127,7 +127,7 @@ test.describe('Chaya Basic Functionality', () => {
   test('can upload a .chaya file and render MarkedRegions in Mark tab', async ({ page }) => {
     // This test would need an existing .chaya file
     // For now, we'll create a simple test by programmatically creating annotations
-    
+
     // First upload a PDF
     const fileInput = page.locator('#pdf-upload');
     const testPdfPath = path.join(__dirname, '..', 'test.pdf');
@@ -153,9 +153,9 @@ test.describe('Chaya Basic Functionality', () => {
           label: 'Test Mark Tab Annotation',
           pageNumber: 1
         };
-        
+
         appState.chayaDocument.markedRegions = [annotation];
-        
+
         // Trigger re-rendering
         const event = new CustomEvent('annotationAdded', { detail: annotation });
         document.dispatchEvent(event);
@@ -168,9 +168,6 @@ test.describe('Chaya Basic Functionality', () => {
     // For this test, we'll verify the basic structure is present
     const annotationList = page.locator('#annotation-list');
     expect(await annotationList.isVisible()).toBe(true);
-
-    const annotationCount = page.locator('#annotation-count');
-    expect(await annotationCount.isVisible()).toBe(true);
   });
 
   test('can switch to Read tab and display annotation regions', async ({ page }) => {
@@ -178,7 +175,6 @@ test.describe('Chaya Basic Functionality', () => {
     const fileInput = page.locator('#pdf-upload');
     const testPdfPath = path.join(__dirname, '..', 'test.pdf');
     await fileInput.setInputFiles(testPdfPath);
-
     await page.waitForSelector('#pdf-container canvas', { timeout: 15000 });
     await page.waitForFunction(() => {
       const loading = document.querySelector('#app-loading');
@@ -187,26 +183,15 @@ test.describe('Chaya Basic Functionality', () => {
 
     // Switch to Read tab
     await page.click('#read-tab-btn');
-    
     // Wait for tab switch to complete
     await page.waitForSelector('#read-tab:not(.hidden)', { timeout: 5000 });
-    
     // Verify we're on Read tab
-    expect(await page.locator('#read-tab').isVisible()).toBe(true);
-    expect(await page.locator('#mark-tab').isVisible()).toBe(false);
+    await expect(page.locator('#read-tab')).toBeVisible();
+    await expect(page.locator('#mark-tab')).not.toBeVisible();
 
-    // Verify Read tab structure - wait for elements to be visible after tab switch
-    await page.waitForSelector('#read-pdf-container', { timeout: 5000 });
-    const readContainer = page.locator('#read-pdf-container');
-    expect(await readContainer.isVisible()).toBe(true);
-
-    await page.waitForSelector('#read-annotation-count', { timeout: 5000 });
-    const annotationSummary = page.locator('#read-annotation-count');
-    expect(await annotationSummary.isVisible()).toBe(true);
-
-    // Check that the navigation list element exists (might be empty/hidden if no annotations)
-    const navList = page.locator('#read-annotation-list');
-    expect(await navList.count()).toBe(1);
+    // Verify that the navigation list ELEMENT EXISTS in the DOM,
+    // even if it's not visible because it's empty.
+    await expect(page.locator('#read-annotation-list')).toHaveCount(1);
   });
 
   test('tab navigation works correctly', async ({ page }) => {
@@ -228,14 +213,14 @@ test.describe('Chaya Basic Functionality', () => {
     // Test that clicking on slots triggers file input
     const pdfSlot = page.locator('#pdf-slot');
     const chayaSlot = page.locator('#chaya-slot');
-    
+
     expect(await pdfSlot.isVisible()).toBe(true);
     expect(await chayaSlot.isVisible()).toBe(true);
 
     // Test file inputs exist
     const pdfInput = page.locator('#pdf-upload');
     const chayaInput = page.locator('#chaya-upload');
-    
+
     expect(await pdfInput.getAttribute('accept')).toBe('.pdf');
     expect(await chayaInput.getAttribute('accept')).toBe('.chaya');
   });

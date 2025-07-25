@@ -1,12 +1,10 @@
 import { MarkedRegion, appState, ChayaDocument } from './models.js';
 import { runAIAssistedAnnotation } from './ai-orchestrator.js';
-import { updateLoadingProgress } from './actions.js';
 
 export class MarkController {
     // DOM Element References
     private pdfContainer: HTMLDivElement;
     private annotationList: HTMLDivElement;
-    private annotationCount: HTMLDivElement;
 
     // State
     private selectedAnnotationId: string | null = null;
@@ -29,12 +27,9 @@ export class MarkController {
     constructor(
         pdfContainer: HTMLDivElement,
         annotationList: HTMLDivElement,
-        annotationCount: HTMLDivElement
     ) {
         this.pdfContainer = pdfContainer;
         this.annotationList = annotationList;
-        this.annotationCount = annotationCount;
-
         this._setupGlobalListeners();
     }
 
@@ -501,13 +496,12 @@ export function initializeMarkTab(): MarkController {
     console.log('Initializing Mark tab');
     const pdfContainer = document.getElementById('pdf-container') as HTMLDivElement;
     const annotationList = document.getElementById('annotation-list') as HTMLDivElement;
-    const annotationCount = document.getElementById('annotation-count') as HTMLDivElement;
 
-    if (!pdfContainer || !annotationList || !annotationCount) {
+    if (!pdfContainer || !annotationList) {
         throw new Error("Required DOM elements not found for Mark tab");
     }
 
-    const controller = new MarkController(pdfContainer, annotationList, annotationCount);
+    const controller = new MarkController(pdfContainer, annotationList);
 
     const style = document.createElement('style');
     style.textContent = `

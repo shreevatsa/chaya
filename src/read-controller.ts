@@ -4,16 +4,13 @@ import { ChayaDocument, MarkedRegion, appState } from './models.js';
 
 export class ViewerController {
     private pdfContainer: HTMLDivElement;
-    private annotationCount: HTMLDivElement;
     private annotationList: HTMLDivElement;
 
     constructor(
         pdfContainer: HTMLDivElement,
-        annotationCount: HTMLDivElement,
         annotationList: HTMLDivElement
     ) {
         this.pdfContainer = pdfContainer;
-        this.annotationCount = annotationCount;
         this.annotationList = annotationList;
     }
 
@@ -154,12 +151,11 @@ export class ViewerController {
 export function initializeViewer(): ViewerController {
     console.log('Initializing Read tab (viewer)');
     const pdfContainer = document.getElementById('read-pdf-container') as HTMLDivElement;
-    const annotationCount = document.getElementById('read-annotation-count') as HTMLDivElement;
     const annotationList = document.getElementById('read-annotation-list') as HTMLDivElement;
 
-    if (!pdfContainer || !annotationCount || !annotationList) {
+    if (!pdfContainer || !annotationList) {
         throw new Error('Required DOM elements not found for Read tab');
     }
 
-    return new ViewerController(pdfContainer, annotationCount, annotationList);
+    return new ViewerController(pdfContainer, annotationList);
 }

@@ -108,9 +108,6 @@ test.describe('Chaya Functionality Tests', () => {
       expect(await page.locator('#mark-tab').isVisible()).toBe(true);
 
       // Verify that Mark tab structure is correct for annotation functionality
-      const annotationCount = page.locator('#annotation-count');
-      expect(await annotationCount.isVisible()).toBe(true);
-
       const annotationList = page.locator('#annotation-list');
       expect(await annotationList.isVisible()).toBe(true);
 
@@ -218,9 +215,6 @@ test.describe('Chaya Functionality Tests', () => {
       const readContainer = page.locator('#read-pdf-container');
       expect(await readContainer.isVisible()).toBe(true);
 
-      const annotationCount = page.locator('#read-annotation-count');
-      expect(await annotationCount.isVisible()).toBe(true);
-
       const navButtons = page.locator('#read-annotation-list');
       expect(await navButtons.isVisible()).toBe(true);
     });
@@ -266,7 +260,6 @@ test.describe('Chaya Functionality Tests', () => {
       const annotationBox = page.locator('.annotation-box');
       await expect(annotationBox).toBeVisible();
       await expect(annotationBox).toHaveCount(1);
-      await expect(page.locator('#annotation-count')).toContainText('1 marked region');
 
       // Switch to Read tab
       await page.click('#read-tab-btn');
@@ -275,9 +268,6 @@ test.describe('Chaya Functionality Tests', () => {
       // Verify we're on Read tab and basic structure exists
       expect(await page.locator('#read-tab').isVisible()).toBe(true);
       expect(await page.locator('#mark-tab').isVisible()).toBe(false);
-
-      const readAnnotationCount = page.locator('#read-annotation-count');
-      expect(await readAnnotationCount.isVisible()).toBe(true);
 
       // Switch back to Mark tab
       await page.click('#mark-tab-btn');
@@ -288,7 +278,6 @@ test.describe('Chaya Functionality Tests', () => {
       expect(await page.locator('#read-tab').isVisible()).toBe(false);
       await expect(annotationBox).toBeVisible();
       expect(await page.locator('.annotation-box').count()).toBe(1);
-      await expect(page.locator('#annotation-count')).toContainText('1 marked region');
       await expect(annotationBox).toBeVisible();
     });
   });
