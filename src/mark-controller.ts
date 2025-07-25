@@ -113,6 +113,8 @@ export class MarkController {
 
         regions.forEach(annotation => {
             const listItem = this._createAnnotationListItem(annotation);
+            // Add a page number dataset to the list item for easier removal.
+            listItem.dataset.pageNumber = String(pageNumber);
             this.annotationList.appendChild(listItem);
         });
     }
@@ -160,6 +162,7 @@ export class MarkController {
         const item = document.createElement('div');
         item.className = 'bg-gray-50 border border-gray-200 rounded-lg p-3 my-1 hover:bg-gray-100 cursor-pointer transition-colors';
         item.dataset.annotationId = annotation.id;
+        item.dataset.pageNumber = String(annotation.pageNumber);
         item.innerHTML = `
             <div class="flex items-start justify-between">
                 <div class="flex-1 min-w-0">
@@ -436,25 +439,36 @@ export class MarkController {
     }
 
     private _deleteAnnotation(annotationId: string): void {
-        let found = false;
-        let foundPageNumber = null;
+        let foundPageNumber: number | null = null;
         const annotationsMap = appState.chayaDocument.markedRegions;
+
+        // Find and remove the region from the state
         for (const [pageNumber, regions] of annotationsMap.entries()) {
             const index = regions.findIndex(a => a.id === annotationId);
             if (index !== -1) {
                 regions.splice(index, 1);
-                found = true;
                 foundPageNumber = pageNumber;
                 break;
             }
         }
-        if (found) {
+
+        if (foundPageNumber !== null) {
             appState.hasUnsavedChanges = true;
+            // Remove the annotation box from the PDF view
             this.pdfContainer.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`)?.remove();
+            // Remove the corresponding item from the sidebar list
+            this.annotationList.querySelector(`[data-annotation-id="${annotationId}"]`)?.remove();
+            // Check if this was the last region for that page
+            const regionsLeft = annotationsMap.get(foundPageNumber);
+            if (!regionsLeft || regionsLeft.length === 0) {
+                // If so, remove the "Page X" header as well
+                this.annotationList.querySelector(`[data-page-header="${foundPageNumber}"]`)?.remove();
+                // And remove the page from the map to keep the state clean
+                annotationsMap.delete(foundPageNumber);
+            }
             if (this.selectedAnnotationId === annotationId) {
                 this.selectedAnnotationId = null;
             }
-            this._updateAnnotationListForPage(foundPageNumber!);
         }
     }
 
