@@ -99,24 +99,41 @@ export class MarkController {
     }
 
     private _updateAnnotationListForPage(pageNumber: number): void {
-        const regions = appState.chayaDocument.markedRegions.get(pageNumber);
-        if (!regions || regions.length === 0) return;
-
-        // Check if a header for this page already exists to avoid duplicates
-        if (this.annotationList.querySelector(`[data-page-header="${pageNumber}"]`)) return;
+        const regions = appState.chayaDocument.markedRegions.get(pageNumber) || [];
+        // Remove existing DOM elements for this page.
+        this.annotationList.querySelector(`[data-page-header="${pageNumber}"]`)?.remove();
+        this.annotationList.querySelectorAll(`[data-annotation-id][data-page-number="${pageNumber}"]`).forEach(el => el.remove());
+        if (regions.length === 0) return;
 
         const pageHeader = document.createElement('div');
         pageHeader.className = 'text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 mt-2 first:mt-0';
         pageHeader.textContent = `Page ${pageNumber}`;
         pageHeader.dataset.pageHeader = String(pageNumber);
-        this.annotationList.appendChild(pageHeader);
 
-        regions.forEach(annotation => {
+        // Sort the regions by their vertical position on the page for a consistent order.
+        const sortedRegions = [...regions].sort((a, b) => a.y - b.y);
+
+        const fragment = document.createDocumentFragment();
+        fragment.appendChild(pageHeader);
+        sortedRegions.forEach(annotation => { // Use the sorted array
             const listItem = this._createAnnotationListItem(annotation);
-            // Add a page number dataset to the list item for easier removal.
-            listItem.dataset.pageNumber = String(pageNumber);
-            this.annotationList.appendChild(listItem);
+            fragment.appendChild(listItem);
         });
+
+        const existingHeaders = this.annotationList.querySelectorAll<HTMLDivElement>('[data-page-header]');
+        let nextHeader: HTMLDivElement | null = null;
+        for (const header of existingHeaders) {
+            const existingPageNumber = parseInt(header.dataset.pageHeader!, 10);
+            if (existingPageNumber > pageNumber) {
+                nextHeader = header;
+                break;
+            }
+        }
+        if (nextHeader) {
+            this.annotationList.insertBefore(fragment, nextHeader);
+        } else {
+            this.annotationList.appendChild(fragment);
+        }
     }
 
     // --- Private Methods (Annotation Box & List Item Creation) ---
@@ -478,8 +495,13 @@ export class MarkController {
     }
 
     private _highlightSidebarItem(id: string, highlight: boolean): void {
-        const item = this.annotationList.querySelector(`[data-annotation-id="${id}"]`);
-        if (item) item.classList.toggle('highlighted', highlight);
+        const item = this.annotationList.querySelector<HTMLElement>(`[data-annotation-id="${id}"]`);
+        if (item) {
+            item.classList.toggle('highlighted', highlight);
+            if (highlight) {
+                item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
     }
 
     private _getCanvasForPage(pageNumber: number): HTMLCanvasElement | null {
