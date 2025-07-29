@@ -95,9 +95,10 @@ export async function runAIAssistedAnnotation(
 /**
  * Get total number of pages in the document
  */
+// TODO: This function should not be needed; we should be able to just use appState.pdfDocument.numPages
 function getTotalPages(getCanvasForPage: (pageNumber: number) => HTMLCanvasElement | null): number {
     let totalPages = 0;
-    for (let i = 1; i <= 1000; i++) { // reasonable upper bound
+    for (let i = 1; i <= 10000; i++) { // reasonable upper bound
         if (getCanvasForPage(i)) {
             totalPages = i;
         } else {
