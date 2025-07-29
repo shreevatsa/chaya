@@ -225,10 +225,10 @@ export class MarkController {
             if (newAnnotations && newAnnotations.length > 0) {
                 newAnnotations.forEach(annotation => {
                     const pageNum = annotation.pageNumber;
-                    if (!appState.chayaDocument.markedRegions.has(pageNumber)) {
-                        appState.chayaDocument.markedRegions.set(pageNumber, []);
+                    if (!appState.chayaDocument.markedRegions.has(pageNum)) {
+                        appState.chayaDocument.markedRegions.set(pageNum, []);
                     }
-                    appState.chayaDocument.markedRegions.get(pageNumber)!.push(annotation);
+                    appState.chayaDocument.markedRegions.get(pageNum)!.push(annotation);
                 });
                 appState.hasUnsavedChanges = true;
 
