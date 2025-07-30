@@ -272,9 +272,8 @@ ${pageDescriptions}
 
 For each semantic region, provide:
 1. The pageNumber indicating which page this region is on
-2. The wordIndices array containing the indices of words that belong to this region (relative to that page)
-3. The semantic type and descriptive label
-4. The bounding box that encompasses all words in the region
+2. The descriptive label
+3. The bounding box that encompasses all words in the region
 
 IMPORTANT: Don't make the bounding boxes too tight. Make sure at least 5-10 pixels of empty space is present on all sides (i.e. the text does not intersect or touch the edges of the bounding box). It's ok for the bounding boxes to overlap slightly. Err on the side of making boxes larger rather than smaller.
 
@@ -282,8 +281,6 @@ Return as JSON array with format:
 [
   {
     "pageNumber": 1,
-    "wordIndices": [0, 1, 2, 3],
-    "semanticType": "title", 
     "label": "descriptive label",
     "box_2d": [ymin, xmin, ymax, xmax]
   }
@@ -333,47 +330,14 @@ function convertMultiPageResponseToAnnotations(
  * Converts a single region from AI response to Annotation format
  */
 function convertSingleRegionToAnnotation(region: any, pageNumber: number, visionData: VisionData, canvas: HTMLCanvasElement): MarkedRegion | null {
-    // Method 1: Use word indices to calculate precise bounding box
-    if (region.wordIndices && Array.isArray(region.wordIndices) && region.wordIndices.length > 0) {
-        const regionWords = region.wordIndices
-            .map((idx: number) => visionData.words[idx])
-            .filter(Boolean);
-
-        if (regionWords.length > 0) {
-            // Calculate precise bounding box from actual words
-            const xmin = Math.min(...regionWords.map((w: VisionWord) => w.xmin));
-            const xmax = Math.max(...regionWords.map((w: VisionWord) => w.xmax));
-            const ymin = Math.min(...regionWords.map((w: VisionWord) => w.ymin));
-            const ymax = Math.max(...regionWords.map((w: VisionWord) => w.ymax));
-
-            // Convert to fractional coordinates
-            const x = xmin / canvas.width;
-            const y = ymin / canvas.height;
-            const width = Math.max(0.01, (xmax - xmin) / canvas.width);
-            const height = Math.max(0.01, (ymax - ymin) / canvas.height);
-
-            return {
-                id: MarkedRegion.generateRandomId(),
-                x, y, width, height,
-                label: region.label || 'AI Annotation',
-                semanticType: region.semanticType,
-                pageNumber: pageNumber,
-                wordIndices: region.wordIndices,
-                ocrText: regionWords.map((w: VisionWord) => w.text).join(' ')
-            };
-        }
-    }
-
-    // Method 2: Fallback to box_2d coordinates
-    const box2d = region.box_2d || region.box2d || [0, 0, 100, 100];
+    const box2d = region.box_2d || region.box2d;
 
     if (!Array.isArray(box2d) || box2d.length !== 4) {
-        console.warn('Invalid box_2d format and no valid wordIndices, using fallback:', box2d);
+        console.warn('Invalid box_2d format: ', box2d);
         const x = Math.max(0, Math.min(1, region.x || 0));
         const y = Math.max(0, Math.min(1, region.y || 0));
         const width = Math.max(0.01, Math.min(1 - x, region.width || 0.1));
         const height = Math.max(0.01, Math.min(1 - y, region.height || 0.1));
-
         return {
             id: MarkedRegion.generateRandomId(),
             x, y, width, height,
@@ -387,18 +351,11 @@ function convertSingleRegionToAnnotation(region: any, pageNumber: number, vision
     const xmin = Math.max(0, Math.min(1000, box2d[1])) / 1000;
     const ymax = Math.max(0, Math.min(1000, box2d[2])) / 1000;
     const xmax = Math.max(0, Math.min(1000, box2d[3])) / 1000;
-
     // Convert to our annotation format (x, y, width, height)
-    const x = xmin;
-    const y = ymin;
-    const width = Math.max(0.01, xmax - xmin);
-    const height = Math.max(0.01, ymax - ymin);
-
     return {
         id: MarkedRegion.generateRandomId(),
-        x, y, width, height,
+        x: xmin, y: ymin, width: Math.max(0.01, xmax - xmin), height: Math.max(0.01, ymax - ymin),
         label: region.label || 'AI Annotation',
-        semanticType: region.semanticType,
         pageNumber: pageNumber
     };
 }

@@ -6,10 +6,6 @@ export interface MarkedRegion {
     width: number;
     height: number;
     label: string;
-    // Optional fields for enhanced AI annotations
-    semanticType?: string;
-    wordIndices?: number[];
-    ocrText?: string;
 }
 
 export namespace MarkedRegion {
@@ -30,7 +26,6 @@ export namespace MarkedRegion {
                 pageNumber: pageNumber,
                 x: ann.x, y: ann.y, width: ann.width, height: ann.height,
                 label: ann.label,
-                ocrText: ann.ocrText,
             }));
             annotationsMap.set(pageNumber, pageAnnotations);
         });
