@@ -1,10 +1,4 @@
-// In src/ai-engine.ts
-
-// This file is completely headless and has no browser dependencies.
-// It can be run from a CLI or a server.
-
 // --- Data Structures ---
-
 export interface AIAnnotationRequest {
     base64Image: string;
     prompt: string;
@@ -23,30 +17,26 @@ export interface AIAnnotationResponse {
 }
 
 // --- Gemini Annotation Helper ---
-
-/**
- * Annotate a page image using the Gemini API.
- */
 export async function annotateWithGemini(
     apiKey: string,
     request: AIAnnotationRequest,
     model = 'gemini-2.5-pro'
 ): Promise<AIAnnotationResponse> {
-    console.log('Gemini Engine: Starting 1-round annotation process.');
+    console.log('Gemini Engine: Starting annotation process.');
 
-    const round1ResponseText = await runRound1(apiKey, model, request);
-    const finalAnnotations = parseAIResponse(round1ResponseText);
+    const geminiResponseText = await runGemini(apiKey, model, request);
+    const finalAnnotations = parseAIResponse(geminiResponseText);
 
     console.log(`Gemini Engine: Completed. Found ${finalAnnotations.length} annotations.`);
 
     return {
-        rawResponse: round1ResponseText,
+        rawResponse: geminiResponseText,
         parsedAnnotations: finalAnnotations,
     };
 }
 
-async function runRound1(apiKey: string, model: string, request: AIAnnotationRequest): Promise<string> {
-    console.log('Gemini Engine: Round 1 - Generating initial annotations.');
+async function runGemini(apiKey: string, model: string, request: AIAnnotationRequest): Promise<string> {
+    console.log('Gemini Engine: Generating annotations.');
     const imageParts: any[] = [{ text: request.prompt }];
 
     // Add the main image to be annotated
