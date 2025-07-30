@@ -215,18 +215,13 @@ async function prepareMultiPageAnnotationRequest(
 
     // Get examples from previously annotated pages
     const examples = getExamplesFromRecentPages(pageNumbers[0], allAnnotations, getCanvasForPage);
-
-    // Use the first page's image as the primary image for the request
-    const primaryPage = multiPageData.pages[0];
-    if (!primaryPage) {
-        console.error("No primary page available");
-        return null;
-    }
-
     return {
-        base64Image: primaryPage.base64Image,
+        targetPages: multiPageData.pages.map(p => ({
+            base64Image: p!.base64Image,
+            pageNumber: p!.pageNumber,
+        })),
         prompt: enhanceMultiPagePromptWithVisionData(prompt, multiPageData),
-        examples
+        examples,
     };
 }
 

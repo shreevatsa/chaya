@@ -1,6 +1,6 @@
 // --- Data Structures ---
 export interface AIAnnotationRequest {
-    base64Image: string;
+    targetPages: { base64Image: string; pageNumber: number; }[];
     prompt: string;
     // For few-shot examples, we include the image and the expected output.
     examples?: {
@@ -24,14 +24,31 @@ export async function annotateWithGemini(
 ): Promise<AIAnnotationResponse> {
     console.log('Gemini Engine: Starting annotation process.');
 
-    const geminiResponseText = await runGemini(apiKey, model, request);
-    const finalAnnotations = parseAIResponse(geminiResponseText);
+    const responseText = await runGemini(apiKey, model, request);
+    const parsedAnnotations = ((responseText) => {
+        try {
+            const parsed = JSON.parse(responseText);
+            if (Array.isArray(parsed)) {
+                return parsed;
+            }
+        } catch { }
+        // // Second attempt: Parse as markdown with JSON in it.
+        // const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+        // if (jsonMatch) {
+        //     try {
+        //         return JSON.parse(jsonMatch[1]);
+        //     } catch { }
+        // }
+        // Give up
+        console.error("Failed to parse response into a JSON array.", { responseText });
+        throw new Error("Could not extract a valid JSON array from the response.");
+    })(responseText);
 
-    console.log(`Gemini Engine: Completed. Found ${finalAnnotations.length} annotations.`);
+    console.log(`Gemini Engine: Completed. Found ${parsedAnnotations.length} annotations.`);
 
     return {
-        rawResponse: geminiResponseText,
-        parsedAnnotations: finalAnnotations,
+        rawResponse: responseText,
+        parsedAnnotations: parsedAnnotations,
     };
 }
 
@@ -39,8 +56,13 @@ async function runGemini(apiKey: string, model: string, request: AIAnnotationReq
     console.log('Gemini Engine: Generating annotations.');
     const imageParts: any[] = [{ text: request.prompt }];
 
-    // Add the main image to be annotated
-    imageParts.push({ inline_data: { mime_type: 'image/png', data: request.base64Image } });
+    // Add the images to be annotated
+    for (const page of request.targetPages) {
+        imageParts.push({ text: `\n\n--- Image for Page ${page.pageNumber} ---` });
+        imageParts.push({
+            inline_data: { mime_type: 'image/png', data: page.base64Image }
+        });
+    }
 
     if (request.examples && request.examples.length > 0) {
         let exampleText = `\n\nI'm providing ${request.examples.length} example(s) from OTHER pages to show the desired style. Use them as a guide for the quality and detail expected. DO NOT copy these annotations; create new ones for the image provided above.\n`;
@@ -87,26 +109,4 @@ async function callApi(apiKey: string, model: string, parts: any[]): Promise<str
         throw new Error('Invalid response from Gemini API');
     }
     return text;
-}
-
-function parseAIResponse(responseText: string): any[] {
-    try {
-        const parsed = JSON.parse(responseText);
-        if (!Array.isArray(parsed)) {
-            throw new Error('AI response is not a JSON array.');
-        }
-        return parsed;
-    } catch (error) {
-        console.error('Failed to parse AI JSON response:', error);
-        console.log('Raw AI response:', responseText);
-        const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
-        if (jsonMatch) {
-            try {
-                return JSON.parse(jsonMatch[1]);
-            } catch {
-                /* ignore */
-            }
-        }
-        throw new Error('Failed to parse AI response. See console for details.');
-    }
 }
