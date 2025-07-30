@@ -110,12 +110,9 @@ export class MarkController {
         pageHeader.textContent = `Page ${pageNumber}`;
         pageHeader.dataset.pageHeader = String(pageNumber);
 
-        // Sort the regions by their vertical position on the page for a consistent order.
-        const sortedRegions = [...regions].sort((a, b) => a.y - b.y);
-
         const fragment = document.createDocumentFragment();
         fragment.appendChild(pageHeader);
-        sortedRegions.forEach(annotation => { // Use the sorted array
+        regions.forEach(annotation => { // Use the sorted array
             const listItem = this._createAnnotationListItem(annotation);
             fragment.appendChild(listItem);
         });
