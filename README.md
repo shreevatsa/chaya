@@ -1,3 +1,4 @@
+Branch: bookchop-mark
 # Chaya
 
 **Chaya** is an application for digitizing scanned books, i.e. to “transcribe” a PDF file into paragraphs (etc.) that remain associated with regions of the original pages. I think of it as "OCR without OCR", or "OCR for people who don't trust OCR" ("verifiable OCR").
