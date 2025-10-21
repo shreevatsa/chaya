@@ -22,9 +22,9 @@ All coordinates are stored as fractions (numbers between 0.0 and 1.0) of the PDF
   - Upload a `.chaya` file, to continue or edit an existing project.
   - Upload a `.chaya` file and download the `.pdf` file from it.
 
-### Mark tab
+### Workspace
 
-- Interactively draw bounding boxes by clicking and dragging on PDF pages. 
+- Interactively draw bounding boxes by clicking and dragging on PDF pages.
   - Double click on a bounding box to give it a name (label).
   - Handles to drag (reposition) or resize these regions.
 
@@ -37,14 +37,6 @@ All coordinates are stored as fractions (numbers between 0.0 and 1.0) of the PDF
   - Optionally can use OCR+LLM (Google Cloud Vision + Gemini) to automatically draw bounding boxes on up to 5 pages at once. (The OCR is used to get precise word-level bounding boxes; seems to make a big difference in quality.)
   - Few-shot learning from previously marked pages.
   - Can also get types and OCR text here (TODO #29).
-
-### ✏️ Edit tab (coming soon)
-- Structuring and ordering these marked regions.
-- OCR and text correction.
-
-### 📖 Read tab
-- Displays only the marked regions from PDFs
-- Nice HTML document with each region toggle-able between text and source image.
 
 -------
 
@@ -107,9 +99,8 @@ All coordinates are stored as fractions (numbers between 0.0 and 1.0) of the PDF
 ### Complete Workflow
 1. Open `index.html` in your browser
 2. Upload a PDF file or .chaya package
-3. Use the Mark tab to mark regions manually or with AI assistance
-4. **Review**: Use Read tab to view extracted regions and navigate between annotations
-5. **Download**: Use the two-slot interface to download complete `.chaya` packages or original PDFs
+3. Use the workspace to mark regions manually or with AI assistance
+4. **Download**: Use the two-slot interface to download complete `.chaya` packages or original PDFs
 
 ### Annotation List Features
 - **Navigation**: Click any annotation in the list to select and scroll to it
@@ -198,15 +189,13 @@ document.chaya (ZIP file)
 ```
 chaya/
 ├── src/
-│   ├── app.ts            # Main application entry point
-│   ├── modes/
-│   │   ├── annotator.ts  # Mark tab functionality
-│   │   └── viewer.ts     # Read tab functionality
-│   ├── ai-engine.ts      # Headless AI annotation engine
+│   ├── actions.ts         # DOM helpers and progress UI utilities
+│   ├── ai-engine.ts       # Headless AI annotation engine
 │   ├── ai-orchestrator.ts # Browser-AI integration layer
-│   ├── pdf-utils.ts      # Shared PDF.js utilities
-│   ├── pdf.d.ts          # TypeScript declarations
-│   └── input.css         # Tailwind CSS input
+│   ├── app.ts             # Main application entry point
+│   ├── input.css          # Tailwind CSS input
+│   ├── mark-controller.ts # Workspace interaction logic
+│   └── models.ts          # Shared data models and state
 ├── tests/
 │   └── basic.spec.ts     # Playwright browser tests
 ├── dist/                 # Built JavaScript and CSS

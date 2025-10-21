@@ -70,3 +70,8 @@ export const appState: AppState = {
     pdfDocument: null,
     pageCanvasCache: new Map(),
 };
+
+// Expose app state for debugging and automated tests.
+if (typeof window !== 'undefined') {
+    (window as unknown as { appState?: AppState }).appState = appState;
+}
