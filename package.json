@@ -1,7 +1,7 @@
 {
   "name": "bookchop",
   "version": "1.0.0",
-  "description": "`bookchop` is a client-side web tool for annotating regions in PDF documents and viewing them.",
+  "description": "`bookchop` is a client-side web tool for marking regions in PDF documents.",
   "main": "index.js",
   "scripts": {
     "build": "tsc && ./node_modules/.bin/postcss ./src/input.css -o ./dist/output.css",
