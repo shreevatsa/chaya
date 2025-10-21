@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import fs from 'fs';
 import path from 'path';
 
 test.describe('Chaya Basic Functionality', () => {
@@ -124,89 +123,18 @@ test.describe('Chaya Basic Functionality', () => {
     expect(download.suggestedFilename()).toMatch(/\.chaya$/);
   });
 
-  test('can upload a .chaya file and render MarkedRegions in Mark tab', async ({ page }) => {
-    // This test would need an existing .chaya file
-    // For now, we'll create a simple test by programmatically creating annotations
+  test('shows a single marking workspace', async ({ page }) => {
+    const workspace = page.locator('#mark-view');
+    await expect(workspace).toBeVisible();
 
-    // First upload a PDF
-    const fileInput = page.locator('#pdf-upload');
-    const testPdfPath = path.join(__dirname, '..', 'test.pdf');
-    await fileInput.setInputFiles(testPdfPath);
+    // Legacy tab controls should not exist in the simplified UI
+    expect(await page.locator('#mark-tab-btn').count()).toBe(0);
+    expect(await page.locator('#edit-tab-btn').count()).toBe(0);
+    expect(await page.locator('#read-tab-btn').count()).toBe(0);
 
-    await page.waitForSelector('#pdf-container canvas', { timeout: 15000 });
-    await page.waitForFunction(() => {
-      const loading = document.querySelector('#app-loading');
-      return loading && loading.classList.contains('hidden');
-    });
-
-    // Programmatically add an annotation to the app state
-    await page.evaluate(() => {
-      // Access the global app state and add an annotation
-      const appState = (window as any).appState || {};
-      if (appState.chayaDocument) {
-        const annotation = {
-          id: 'test-annotation-1',
-          x: 0.1,
-          y: 0.1,
-          width: 0.2,
-          height: 0.1,
-          label: 'Test Mark Tab Annotation',
-          pageNumber: 1
-        };
-
-        appState.chayaDocument.markedRegions = [annotation];
-
-        // Trigger re-rendering
-        const event = new CustomEvent('annotationAdded', { detail: annotation });
-        document.dispatchEvent(event);
-      }
-    });
-
-    // Check if we're on the Mark tab (should be default)
-    expect(await page.locator('#mark-tab').isVisible()).toBe(true);
-
-    // For this test, we'll verify the basic structure is present
-    const annotationList = page.locator('#annotation-list');
-    expect(await annotationList.isVisible()).toBe(true);
-  });
-
-  test('can switch to Read tab and display annotation regions', async ({ page }) => {
-    // Upload PDF first
-    const fileInput = page.locator('#pdf-upload');
-    const testPdfPath = path.join(__dirname, '..', 'test.pdf');
-    await fileInput.setInputFiles(testPdfPath);
-    await page.waitForSelector('#pdf-container canvas', { timeout: 15000 });
-    await page.waitForFunction(() => {
-      const loading = document.querySelector('#app-loading');
-      return loading && loading.classList.contains('hidden');
-    });
-
-    // Switch to Read tab
-    await page.click('#read-tab-btn');
-    // Wait for tab switch to complete
-    await page.waitForSelector('#read-tab:not(.hidden)', { timeout: 5000 });
-    // Verify we're on Read tab
-    await expect(page.locator('#read-tab')).toBeVisible();
-    await expect(page.locator('#mark-tab')).not.toBeVisible();
-
-    // Verify that the navigation list ELEMENT EXISTS in the DOM,
-    // even if it's not visible because it's empty.
-    await expect(page.locator('#read-annotation-list')).toHaveCount(1);
-  });
-
-  test('tab navigation works correctly', async ({ page }) => {
-    // Test tab switching
-    await page.click('#mark-tab-btn');
-    expect(await page.locator('#mark-tab').isVisible()).toBe(true);
-    expect(await page.locator('#read-tab').isVisible()).toBe(false);
-
-    await page.click('#read-tab-btn');
-    expect(await page.locator('#read-tab').isVisible()).toBe(true);
-    expect(await page.locator('#mark-tab').isVisible()).toBe(false);
-
-    // Edit tab should be disabled
-    const editBtn = page.locator('#edit-tab-btn');
-    expect(await editBtn.getAttribute('class')).toContain('opacity-50');
+    // Core annotation elements remain available
+    await expect(page.locator('#pdf-container')).toBeVisible();
+    await expect(page.locator('#annotation-list')).toBeVisible();
   });
 
   test('file upload interface works', async ({ page }) => {
