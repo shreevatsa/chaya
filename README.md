@@ -4,7 +4,7 @@
 
 It is designed for (scanned) PDFs that are mostly lines of text (paragraphs, headings, verses, footnotes: not illustrations, math, tables, forms).
 
-The workflow is to upload a PDF, mark regions on each page (optionally assisted by AI), then name and re-order these regions, optionally running OCR on them. The result can be saved to a `.chaya` file, which can at any time be opened again in the application for reading or editing. (TODO #23: or exported to other formats)
+The workflow is to upload a PDF, mark regions on each page (optionally assisted by AI), then name and re-order these regions, optionally running OCR on them. The result can be saved to a `.chaya` file, which can at any time be opened again in the application to continue marking or export elsewhere. (TODO #23: or exported to other formats)
 
 Chaya is a client-side web application, with no backend dependencies (except the optional API providers for OCR and AI assistance).
 
@@ -22,7 +22,7 @@ All coordinates are stored as fractions (numbers between 0.0 and 1.0) of the PDF
   - Upload a `.chaya` file, to continue or edit an existing project.
   - Upload a `.chaya` file and download the `.pdf` file from it.
 
-### Mark tab
+### Mark workspace
 
 - Interactively draw bounding boxes by clicking and dragging on PDF pages. 
   - Double click on a bounding box to give it a name (label).
@@ -37,14 +37,6 @@ All coordinates are stored as fractions (numbers between 0.0 and 1.0) of the PDF
   - Optionally can use OCR+LLM (Google Cloud Vision + Gemini) to automatically draw bounding boxes on up to 5 pages at once. (The OCR is used to get precise word-level bounding boxes; seems to make a big difference in quality.)
   - Few-shot learning from previously marked pages.
   - Can also get types and OCR text here (TODO #29).
-
-### ✏️ Edit tab (coming soon)
-- Structuring and ordering these marked regions.
-- OCR and text correction.
-
-### 📖 Read tab
-- Displays only the marked regions from PDFs
-- Nice HTML document with each region toggle-able between text and source image.
 
 -------
 
@@ -107,8 +99,8 @@ All coordinates are stored as fractions (numbers between 0.0 and 1.0) of the PDF
 ### Complete Workflow
 1. Open `index.html` in your browser
 2. Upload a PDF file or .chaya package
-3. Use the Mark tab to mark regions manually or with AI assistance
-4. **Review**: Use Read tab to view extracted regions and navigate between annotations
+3. Use the marking workspace to create regions manually or with AI assistance
+4. **Review**: Adjust or remove regions directly in the workspace as you refine your document
 5. **Download**: Use the two-slot interface to download complete `.chaya` packages or original PDFs
 
 ### Annotation List Features
@@ -138,7 +130,7 @@ All coordinates are stored as fractions (numbers between 0.0 and 1.0) of the PDF
 - **Google Vision API**: Precise OCR and word-level text detection
 
 **Key Features**:
-- **Event-Driven Architecture**: Custom events coordinate between tabs
+- **Event-Driven Workspace**: Custom events synchronize annotation interactions between the page and sidebar
 - **Centralized State Management**: `ChayaApp` class manages application state
 - **Progressive Loading**: Detailed progress indicators with status updates
 - **Error Recovery**: Comprehensive error handling throughout the application
@@ -198,15 +190,13 @@ document.chaya (ZIP file)
 ```
 chaya/
 ├── src/
-│   ├── app.ts            # Main application entry point
-│   ├── modes/
-│   │   ├── annotator.ts  # Mark tab functionality
-│   │   └── viewer.ts     # Read tab functionality
-│   ├── ai-engine.ts      # Headless AI annotation engine
+│   ├── actions.ts         # Shared DOM utilities and progress UI helpers
+│   ├── ai-engine.ts       # Headless AI annotation engine
 │   ├── ai-orchestrator.ts # Browser-AI integration layer
-│   ├── pdf-utils.ts      # Shared PDF.js utilities
-│   ├── pdf.d.ts          # TypeScript declarations
-│   └── input.css         # Tailwind CSS input
+│   ├── app.ts             # Main application entry point
+│   ├── mark-controller.ts # Interactive annotation workspace
+│   ├── models.ts          # Core data models and app state
+│   └── input.css          # Tailwind CSS input
 ├── tests/
 │   └── basic.spec.ts     # Playwright browser tests
 ├── dist/                 # Built JavaScript and CSS
@@ -221,56 +211,43 @@ chaya/
 - `npm run test:ui` - Run tests with Playwright's test runner UI
 
 ### Implementation Status
-- ✅ **Two-slot upload/download interface** with dynamic mode switching
+- ✅ **Two-slot upload/download interface** with automatic upload/download toggling
 - ✅ **Complete .chaya file format** with ZIP packaging and manifest
 - ✅ **Advanced AI annotation** with multi-page processing and dual APIs
 - ✅ **Interactive annotation tools** with 8-handle resize and drag
 - ✅ **Bidirectional highlighting system** between PDF and sidebar
 - ✅ **Production-ready features** including error handling and loading states
-- ✅ **Event-driven tab communication** with centralized state management
 - ✅ **Word-level OCR integration** for precise bounding box generation
 
 ### Code Organization
 
 #### Core Modules
-1. **App** (`src/app.ts`): 
+1. **App** (`src/app.ts`):
    - Centralized application state management
    - Two-slot upload/download interface
-   - Tab switching and data coordination
+   - Document loading, progressive rendering, and annotation persistence
    - .chaya file packaging and extraction
    - Progress tracking and error handling
 
-2. **Annotator** (`src/modes/annotator.ts`): 
+2. **Mark Controller** (`src/mark-controller.ts`):
    - Interactive PDF annotation creation
    - 8-handle resize and drag functionality
    - Bidirectional highlighting system
    - AI-assisted annotation integration
    - Auto-selection and visual feedback
 
-3. **Viewer** (`src/modes/viewer.ts`): 
-   - Cropped region extraction and display
-   - Navigation with hover highlighting
-   - Annotation summary interface
+3. **AI Orchestrator** (`src/ai-orchestrator.ts`):
+   - Browser coordination layer for AI-assisted annotations
+   - Handles prompts, user credentials, and batching
+   - Normalizes AI responses into `MarkedRegion` objects
 
-4. **AI Engine** (`src/ai-engine.ts`): 
+4. **AI Engine** (`src/ai-engine.ts`):
    - Headless AI annotation service
    - Pluggable engine architecture
    - JSON response parsing with fallbacks
    - Multi-round annotation processing
 
-5. **AI Orchestrator** (`src/ai-orchestrator.ts`): 
-   - Multi-page processing coordination
-   - Dual API integration (Gemini + Google Vision)
-   - Word-level OCR data transformation
-   - Few-shot example generation
-   - Precise bounding box calculation
-
-6. **PDF Utils** (`src/pdf-utils.ts`): 
-   - PDF.js initialization and worker setup
-   - Annotation parsing with enhanced features
-   - Shared type definitions and utilities
-
-#### Key Systems
+  #### Key Systems
 - **PDF Rendering**: Canvas-based rendering with annotation overlay layers
 - **Coordinate System**: Fractional coordinates (0.0-1.0) for resolution independence
 - **Interactive Editing**: Resize handles, drag functionality, selection management
