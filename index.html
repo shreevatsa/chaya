@@ -10,7 +10,7 @@
 
 <body class="bg-gray-100">
     <div class="container mx-auto p-4">
-        <!-- App header (Upload/Download, and tabs) -->
+        <!-- App header (Upload/Download) -->
         <header class="mb-6">
             <h1 class="text-lg font-bold mb-4">Chaya</h1>
 
@@ -73,24 +73,9 @@
                 <div id="app-loading-details" class="text-xs text-gray-500 mt-2">Preparing to load PDF...</div>
             </div>
 
-            <!-- Tabs: Mark / Edit / Read -->
-            <nav class="flex gap-3 bg-white rounded-lg p-2 shadow-sm">
-                <button id="mark-tab-btn" class="tab-btn active px-4 py-2 rounded-md font-medium transition-colors">
-                    📝 Mark
-                </button>
-                <button id="edit-tab-btn" class="tab-btn px-4 py-2 rounded-md font-medium transition-colors opacity-50 cursor-not-allowed">
-                    ✏️ Edit
-                </button>
-                <button id="read-tab-btn" class="tab-btn px-4 py-2 rounded-md font-medium transition-colors">
-                    📖 Read
-                </button>
-            </nav>
         </header>
 
-        <!-- Tab Content Areas -->
-
-        <!-- Mark Tab: Mark regions on PDF -->
-        <div id="mark-tab" class="tab-content">
+        <main>
             <div class="flex gap-4" style="height: 90vh;">
                 <!-- Main PDF Container -->
                 <div class="flex-1">
@@ -112,50 +97,7 @@
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Edit Tab: ProseMirror editor (placeholder for now) -->
-        <div id="edit-tab" class="tab-content hidden">
-            <div class="bg-white border border-gray-300 rounded-lg shadow-sm p-8 text-center">
-                <div class="max-w-lg">
-                    <div class="text-4xl mb-4">✏️</div>
-                    <h2 class="text-lg font-bold text-gray-900 mb-4">Rich Text Editor</h2>
-                    <p class="text-gray-600 mb-6">
-                        The Edit tab will feature a powerful ProseMirror editor where you can:
-                    </p>
-                    <ul class="text-left text-gray-600 mb-6">
-                        <li class="mb-2">• Organize content with headings and structure</li>
-                        <li class="mb-2">• Edit and proofread content</li>
-                        <li class="mb-2">• Add rich formatting (bold, italic, links)</li>
-                        <li class="mb-2">• …all while maintaining links to original PDF regions</li>
-                    </ul>
-                    <div class="bg-blue-100 border border-gray-300 rounded-lg p-4">
-                        <p class="text-blue-800 text-sm">
-                            <strong>Coming Soon:</strong> This feature is in development and will be available in a later update.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Read Tab: Presentation view -->
-        <div id="read-tab" class="tab-content hidden">
-            <!-- Annotation Summary -->
-            <div class="bg-white border border-gray-300 rounded-lg shadow-sm p-4 mb-4">
-                <h2 class="text-lg font-bold mb-2 text-gray-900">Annotations</h2>
-                <div id="read-annotation-list" class="flex flex-wrap gap-3">
-                    <!-- Annotation navigation items will be added here -->
-                </div>
-            </div>
-
-            <!-- Annotated Regions Container -->
-            <div id="read-pdf-container">
-                <div id="read-loading-message" class="p-8 text-center text-gray-500">
-                    <div class="text-4xl mb-4">📖</div>
-                    <p>Load a PDF file (or .chaya file) and mark regions, to view them here.</p>
-                </div>
-            </div>
-        </div>
+        </main>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
