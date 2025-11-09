@@ -22,7 +22,7 @@ All coordinates are stored as fractions (numbers between 0.0 and 1.0) of the PDF
   - Upload a `.chaya` file, to continue or edit an existing project.
   - Upload a `.chaya` file and download the `.pdf` file from it.
 
-### Mark tab
+### Mark workspace
 
 - Interactively draw bounding boxes by clicking and dragging on PDF pages. 
   - Double click on a bounding box to give it a name (label).
@@ -38,13 +38,10 @@ All coordinates are stored as fractions (numbers between 0.0 and 1.0) of the PDF
   - Few-shot learning from previously marked pages.
   - Can also get types and OCR text here (TODO #29).
 
-### ✏️ Edit tab (coming soon)
-- Structuring and ordering these marked regions.
-- OCR and text correction.
-
-### 📖 Read tab
-- Displays only the marked regions from PDFs
-- Nice HTML document with each region toggle-able between text and source image.
+### Future work
+- Rich text editing to structure and order marked regions.
+- OCR and text correction workflows integrated with the saved regions.
+- Presentation-oriented views for reading the annotated document.
 
 -------
 
@@ -107,8 +104,8 @@ All coordinates are stored as fractions (numbers between 0.0 and 1.0) of the PDF
 ### Complete Workflow
 1. Open `index.html` in your browser
 2. Upload a PDF file or .chaya package
-3. Use the Mark tab to mark regions manually or with AI assistance
-4. **Review**: Use Read tab to view extracted regions and navigate between annotations
+3. Use the Mark workspace to mark regions manually or with AI assistance
+4. **Review**: Reopen the saved `.chaya` package at any time to continue marking or export data
 5. **Download**: Use the two-slot interface to download complete `.chaya` packages or original PDFs
 
 ### Annotation List Features
@@ -138,7 +135,7 @@ All coordinates are stored as fractions (numbers between 0.0 and 1.0) of the PDF
 - **Google Vision API**: Precise OCR and word-level text detection
 
 **Key Features**:
-- **Event-Driven Architecture**: Custom events coordinate between tabs
+- **Event-Driven Architecture**: Custom events coordinate annotation updates within the workspace
 - **Centralized State Management**: `ChayaApp` class manages application state
 - **Progressive Loading**: Detailed progress indicators with status updates
 - **Error Recovery**: Comprehensive error handling throughout the application

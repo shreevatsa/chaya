@@ -85,10 +85,7 @@ test.describe('Chaya Functionality Tests', () => {
   });
 
   test.describe('Chaya File Upload and Rendering', () => {
-    test('can upload a .chaya file and MarkedRegions render correctly in Mark tab', async ({ page }) => {
-      // For this test, just verify the Mark tab basic functionality with a PDF upload
-      // (Creating and loading .chaya files in tests is complex due to file dependencies)
-
+    test('displays the mark workspace after loading a PDF', async ({ page }) => {
       const fileChooserPromise = page.waitForEvent('filechooser');
       await page.click('#pdf-slot');
       const fileChooser = await fileChooserPromise;
@@ -104,20 +101,14 @@ test.describe('Chaya Functionality Tests', () => {
         return loadingDiv && loadingDiv.classList.contains('hidden');
       }, { timeout: 15000 });
 
-      // Verify we loaded successfully and are on Mark tab
-      expect(await page.locator('#mark-tab').isVisible()).toBe(true);
-
-      // Verify that Mark tab structure is correct for annotation functionality
-      const annotationList = page.locator('#annotation-list');
-      expect(await annotationList.isVisible()).toBe(true);
-
-      // Verify annotation layer exists for drawing
-      const annotationLayer = page.locator('.annotation-layer').first();
-      expect(await annotationLayer.count()).toBeGreaterThan(0);
+      await expect(page.locator('#mark-view')).toBeVisible();
+      await expect(page.locator('#annotation-list')).toBeVisible();
+      await expect(page.locator('.annotation-layer').first()).toBeVisible();
     });
 
-    test('can upload a .chaya file and MarkedRegions render correctly in Read tab', async ({ page }) => {
+    test('reloads annotations from a saved .chaya package in the mark workspace', async ({ page }) => {
       // First, create a .chaya file by running the workflow
+      const downloadPath = path.join(__dirname, 'simplified-workflow.chaya');
       await test.step('Create .chaya file', async () => {
         const fileChooserPromise = page.waitForEvent('filechooser');
         await page.click('#pdf-slot');
@@ -140,9 +131,9 @@ test.describe('Chaya Functionality Tests', () => {
           if (dialog.type() === 'prompt') {
             promptCount++;
             if (promptCount === 1) {
-              await dialog.accept('Read Tab Test Annotation 1');
+              await dialog.accept('Simplified Workflow Annotation 1');
             } else if (promptCount === 2) {
-              await dialog.accept('Read Tab Test Annotation 2');
+              await dialog.accept('Simplified Workflow Annotation 2');
             }
           }
         };
@@ -174,8 +165,8 @@ test.describe('Chaya Functionality Tests', () => {
         await page.click('#chaya-slot');
         const download = await downloadPromise;
 
-        const downloadPath = path.join(__dirname, 'read-tab-test.chaya');
         await download.saveAs(downloadPath);
+        page.off('dialog', dialogHandler);
       });
 
       // Reload the page to start fresh
@@ -187,8 +178,7 @@ test.describe('Chaya Functionality Tests', () => {
       await page.click('#chaya-slot');
       const fileChooser = await fileChooserPromise;
 
-      const chayaPath = path.join(__dirname, 'read-tab-test.chaya');
-      await fileChooser.setFiles(chayaPath);
+      await fileChooser.setFiles(downloadPath);
 
       // Wait for .chaya file to load
       await page.waitForSelector('#pdf-container canvas', { timeout: 10000 });
@@ -199,86 +189,14 @@ test.describe('Chaya Functionality Tests', () => {
         return loadingDiv && loadingDiv.classList.contains('hidden');
       }, { timeout: 15000 });
 
-      // Step 2: Switch to Read tab
-      await page.click('#read-tab-btn');
-      await page.waitForSelector('#read-tab:not(.hidden)', { timeout: 5000 });
-
-      // Verify we're on Read tab
-      expect(await page.locator('#read-tab').isVisible()).toBe(true);
-      expect(await page.locator('#mark-tab').isVisible()).toBe(false);
-
-      // Step 3: Verify Read tab structure and basic functionality
-      // Verify we're on Read tab and basic elements exist
-      expect(await page.locator('#read-tab').isVisible()).toBe(true);
-
-      // Verify Read tab structure
-      const readContainer = page.locator('#read-pdf-container');
-      expect(await readContainer.isVisible()).toBe(true);
-
-      const navButtons = page.locator('#read-annotation-list');
-      expect(await navButtons.isVisible()).toBe(true);
-    });
-  });
-
-  test.describe('Tab Navigation and State Persistence', () => {
-    test('annotation state persists when switching between tabs', async ({ page }) => {
-      // Upload PDF and create annotation
-      const fileChooserPromise = page.waitForEvent('filechooser');
-      await page.click('#pdf-slot');
-      const fileChooser = await fileChooserPromise;
-
-      const testPdfPath = path.join(__dirname, '..', 'test.pdf');
-      await fileChooser.setFiles(testPdfPath);
-
-      await page.waitForSelector('#pdf-container canvas', { timeout: 10000 });
-
-      // Wait for loading to complete
-      await page.waitForFunction(() => {
-        const loadingDiv = document.querySelector('#app-loading');
-        return loadingDiv && loadingDiv.classList.contains('hidden');
-      }, { timeout: 15000 });
-
-      // Set up a one-time handler for the dialog BEFORE the action that triggers it.
-      // This is more robust than a persistent listener with a flag.
-      page.once('dialog', async dialog => {
-        expect(dialog.message()).toContain('Enter label for this region');
-        await dialog.accept('Persistent Annotation');
-      });
-
-
-      // Create annotation in Mark tab
-      // This is the recommended, more reliable way to simulate drawing.
-      const annotationLayer = page.locator('.annotation-layer').first();
-      await annotationLayer.dragTo(annotationLayer, {
-        // Start drawing at position (100, 100) within the layer
-        sourcePosition: { x: 100, y: 100 },
-        // End drawing at position (200, 150) within the layer
-        targetPosition: { x: 200, y: 150 },
-      });
-
-      // Verify annotation in Mark tab
-      const annotationBox = page.locator('.annotation-box');
-      await expect(annotationBox).toBeVisible();
-      await expect(annotationBox).toHaveCount(1);
-
-      // Switch to Read tab
-      await page.click('#read-tab-btn');
-      await page.waitForSelector('#read-tab:not(.hidden)', { timeout: 5000 });
-
-      // Verify we're on Read tab and basic structure exists
-      expect(await page.locator('#read-tab').isVisible()).toBe(true);
-      expect(await page.locator('#mark-tab').isVisible()).toBe(false);
-
-      // Switch back to Mark tab
-      await page.click('#mark-tab-btn');
-      await expect(page.locator('#mark-tab')).toBeVisible();
-
-      // Verify we're back on Mark tab and annotation still exists
-      expect(await page.locator('#mark-tab').isVisible()).toBe(true);
-      expect(await page.locator('#read-tab').isVisible()).toBe(false);
-      await expect(annotationBox).toBeVisible();
-      expect(await page.locator('.annotation-box').count()).toBe(1);
-      await expect(annotationBox).toBeVisible();
+      // Verify annotations render within the mark workspace
+      const annotationBoxes = page.locator('.annotation-box');
+      await expect(annotationBoxes).toHaveCount(2);
+      await expect(page.locator('#annotation-list')).toContainText([
+        'Simplified Workflow Annotation 1',
+        'Simplified Workflow Annotation 2',
+      ]);
+      await expect(page.locator('#mark-view')).toBeVisible();
     });
   });
 
@@ -286,8 +204,7 @@ test.describe('Chaya Functionality Tests', () => {
   test.afterAll(async () => {
     const testFiles = [
       'test-output.chaya',
-      'mark-tab-test.chaya',
-      'read-tab-test.chaya'
+      'simplified-workflow.chaya'
     ];
 
     for (const file of testFiles) {

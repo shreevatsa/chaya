@@ -1,6 +1,5 @@
 import { MarkedRegion, appState, ChayaDocument } from './models.js';
 import { MarkController, initializeMarkTab } from './mark-controller.js';
-import { ViewerController, initializeViewer } from './read-controller.js';
 import { documentGetElementById, updateLoadingProgress } from './actions.js';
 
 // JSZip is loaded globally via script tag in the HTML
@@ -35,7 +34,6 @@ function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
 
 class ChayaApp {
     private markController: MarkController;
-    private viewerController: ViewerController;
 
     constructor() {
         // Set up file input listeners
@@ -75,35 +73,7 @@ class ChayaApp {
                 }
             };
         }
-        // Set up tab switching event listeners: clicking on Mark/Edit/Read should call `switchToTab('mark')` etc.
-        {
-            documentGetElementById<HTMLButtonElement>('mark-tab-btn').addEventListener('click', () => this.switchToTab('mark'));
-            documentGetElementById<HTMLButtonElement>('edit-tab-btn').addEventListener('click', () => this.switchToTab('edit'));
-            documentGetElementById<HTMLButtonElement>('read-tab-btn').addEventListener('click', () => this.switchToTab('read'));
-        }
         this.markController = initializeMarkTab();
-        this.viewerController = initializeViewer();
-        this.switchToTab('mark');
-    }
-
-    private switchToTab(tab: 'mark' | 'edit' | 'read'): void {
-        // Hide all tab content
-        document.querySelectorAll('.tab-content').forEach(el => {
-            el.classList.add('hidden');
-        });
-        // Remove active class from all buttons
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.remove('active');
-            btn.classList.remove('bg-blue-100', 'text-blue-700');
-            btn.classList.add('text-gray-600', 'hover:text-gray-800');
-        });
-
-        // Show target tab
-        documentGetElementById(`${tab}-tab`).classList.remove('hidden');
-        // Activate target button
-        const targetBtn = documentGetElementById(`${tab}-tab-btn`);
-        targetBtn.classList.add('active', 'bg-blue-100', 'text-blue-700');
-        targetBtn.classList.remove('text-gray-600', 'hover:text-gray-800');
     }
 
     private async postLoading(pdfArrayBuffer: ArrayBuffer) {
@@ -113,7 +83,6 @@ class ChayaApp {
         appState.pdfDocument = await pdfjs.getDocument(new Uint8Array(pdfArrayBuffer)).promise;
 
         this.markController.prepareForDocument();
-        this.viewerController.prepareForDocument();
 
         updateLoadingProgress(5, 'Rendering pages...', 'Processing PDF pages for display');
 
@@ -168,7 +137,6 @@ class ChayaApp {
 
             // Notify controllers that a new page is ready to be displayed.
             this.markController.renderPage(pageNum);
-            await this.viewerController.renderRegionsForPage(pageNum);
         }
 
         console.log('All pages rendered.');
@@ -360,27 +328,3 @@ class ChayaApp {
 document.addEventListener('DOMContentLoaded', () => {
     new ChayaApp();
 });
-
-// CSS for tab styling
-const style = document.createElement('style');
-style.textContent = `
-    .tab-btn.active {
-        background-color: rgb(219 234 254);
-        color: rgb(29 78 216);
-    }
-    
-    .tab-btn:not(.active) {
-        color: rgb(75 85 99);
-    }
-    
-    .tab-btn:not(.active):hover {
-        color: rgb(31 41 55);
-        background-color: rgb(249 250 251);
-    }
-    
-    .tab-btn.opacity-50 {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-`;
-document.head.appendChild(style);
