@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chāyā: Bookchop experiments</title>
+    <style>
+        body {
+            max-width: 48rem;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+            font-family: system-ui, sans-serif;
+            line-height: 1.6;
+            color: #243047;
+            background: #f7f8fa;
+        }
+        h1, h2 { line-height: 1.2; }
+        h2 { margin-top: 2rem; }
+        a { color: #174f9d; text-underline-offset: 0.15em; }
+        a:hover { color: #0b326b; }
+        a:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+        ul { padding: 0; list-style: none; }
+        li {
+            margin: 1rem 0;
+            padding: 1rem;
+            border: 1px solid #d8dee8;
+            border-radius: 0.5rem;
+            background: white;
+        }
+        li p { margin: 0.5rem 0 0; }
+        code { overflow-wrap: anywhere; }
+    </style>
+</head>
+<body>
+    <header>
+        <nav aria-label="Chāyā"><a href="../">Chāyā OCR app</a></nav>
+        <h1>Bookchop experiments</h1>
+        <p>Standalone experiments for labeling regions of a PDF and viewing the selected snippets.</p>
+    </header>
+    <main>
+        <h2>Try the workflow</h2>
+        <p>Open the latest annotator, select a PDF, draw and label regions, then export the
+            annotations as JSON. Open the snippet viewer with the same PDF and the exported JSON.</p>
+        <ul>
+            <li>
+                <a href="../retry-v2-pdfcoord-v3.html"><strong>Latest annotator: fit to width</strong></a>
+                <p>Fits pages to the available width and exports regions in PDF coordinates.</p>
+                <p><code>retry-v2-pdfcoord-v3.html</code></p>
+            </li>
+            <li>
+                <a href="../retry-reader.html"><strong>Snippet viewer</strong></a>
+                <p>Displays labeled snippets from a PDF and annotations saved in PDF coordinates.</p>
+                <p><code>retry-reader.html</code></p>
+            </li>
+        </ul>
+
+        <h2>Earlier annotators</h2>
+        <ul>
+            <li>
+                <a href="../retry-v2-pdfcoord-v2.html"><strong>PDF coordinates, second revision</strong></a>
+                <p>Uses a fixed render scale, with a fix for resetting the viewport cache.</p>
+                <p><code>retry-v2-pdfcoord-v2.html</code></p>
+            </li>
+            <li>
+                <a href="../retry-v2-pdfcoord.html"><strong>PDF coordinates, first revision</strong></a>
+                <p>Historical snapshot with a viewport-cache reset bug; use a later revision to annotate.</p>
+                <p><code>retry-v2-pdfcoord.html</code></p>
+            </li>
+            <li>
+                <a href="../retry.html"><strong>Original annotator: canvas coordinates</strong></a>
+                <p>Exports canvas pixel coordinates. Its JSON format cannot be used with the snippet viewer.</p>
+                <p><code>retry.html</code></p>
+            </li>
+        </ul>
+        <p>These are experimental snapshots. The annotators and viewer load PDF.js and Tailwind from CDNs
+            and need an internet connection.</p>
+    </main>
+</body>
+</html>

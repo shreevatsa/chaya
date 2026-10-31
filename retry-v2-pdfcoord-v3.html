@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Region Annotator (Fit-to-Width)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script>
+        // Set worker source
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+    </script>
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #pdf-container {
+            position: relative;
+            border: 1px solid #ccc;
+            overflow-y: auto; /* Vertical scroll for pages */
+            overflow-x: hidden; /* Prevent horizontal scroll */
+            margin: 0 auto;
+            width: 100%; /* Ensure container tries to fill its column */
+        }
+        #pdf-container canvas {
+            display: block;
+            margin: 10px auto; /* Center pages vertically */
+            border: 1px solid #eee;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            /* Width will be set dynamically by scale, max-width prevents overflow */
+            max-width: 100%;
+        }
+        /* Style for page rendering errors */
+        .page-error {
+             margin: 10px auto;
+             padding: 10px;
+             background-color: #fee2e2;
+             border: 1px solid #f87171;
+             color: #b91c1c;
+             font-size: 0.9em;
+             text-align: center;
+        }
+        #drawing-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%; /* Will be resized dynamically */
+            height: 100%; /* Will be resized dynamically */
+            cursor: crosshair;
+            z-index: 10;
+        }
+        .selection-box {
+            position: absolute;
+            border: 2px dashed red;
+            background-color: rgba(255, 0, 0, 0.2);
+            pointer-events: none;
+            z-index: 5;
+        }
+        .annotation-box {
+            position: absolute;
+            border: 1px solid darkcyan;
+            background-color: rgba(0, 139, 139, 0.1);
+            pointer-events: none;
+            z-index: 5;
+            color: darkcyan;
+            font-size: 10px;
+            padding: 1px 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 md:p-8">
+
+    <div class="max-w-full mx-auto bg-white p-6 rounded-lg shadow-lg"> <h1 class="text-2xl font-bold mb-6 text-center text-gray-700">PDF Region Annotator (Fit-to-Width)</h1>
+
+        <div class="mb-4">
+            <label for="pdf-upload" class="block text-sm font-medium text-gray-700 mb-1">Upload PDF:</label>
+            <input type="file" id="pdf-upload" accept="application/pdf" class="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0
+                file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700
+                hover:file:bg-blue-100 cursor-pointer
+            "/>
+        </div>
+
+        <div id="status" class="text-sm text-gray-600 mb-4 text-center min-h-[1.25rem]">Select a PDF file to start.</div>
+
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-6"> <div class="md:col-span-4 border border-gray-300 rounded-md p-2 bg-gray-50" style="max-height: 80vh; overflow-y: auto;">
+                <div id="pdf-container">
+                    <div id="drawing-overlay" style="display: none;"></div>
+                    <div id="selection-box-visual" class="selection-box" style="display: none;"></div>
+                 </div>
+            </div>
+
+            <div class="md:col-span-1">
+                <h2 class="text-lg font-semibold mb-2 text-gray-700">Annotations</h2>
+                <div id="annotations-list" class="space-y-2 mb-4 border border-gray-200 rounded-md p-3 bg-gray-50" style="max-height: 60vh; overflow-y: auto;">
+                    <p class="text-xs text-gray-500">No annotations yet.</p>
+                </div>
+                <button id="export-json" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Export Annotations (JSON)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Global Variables ---
+        const pdfUpload = document.getElementById('pdf-upload');
+        const pdfContainer = document.getElementById('pdf-container');
+        const drawingOverlay = document.getElementById('drawing-overlay');
+        const selectionBoxVisual = document.getElementById('selection-box-visual');
+        const annotationsList = document.getElementById('annotations-list');
+        const exportButton = document.getElementById('export-json');
+        const statusDiv = document.getElementById('status');
+
+        let pdfDoc = null;
+        let annotations = [];
+        let isDrawing = false;
+        let startCoords = { x: 0, y: 0 };
+        let currentSelection = { page: 0 };
+        // RENDER_SCALE is removed - will be calculated dynamically
+        let nextAnnotationId = 0;
+        let viewportCache = {}; // Cache viewports per page
+        let resizeTimeout = null; // For debouncing resize events
+
+        // --- Event Listeners ---
+        pdfUpload.addEventListener('change', handleFileSelect);
+        drawingOverlay.addEventListener('mousedown', handleMouseDown);
+        drawingOverlay.addEventListener('mousemove', handleMouseMove);
+        drawingOverlay.addEventListener('mouseup', handleMouseUp);
+        drawingOverlay.addEventListener('mouseleave', handleMouseLeave);
+        exportButton.addEventListener('click', exportAnnotations);
+        // Debounced resize handler
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(handleResize, 250); // Debounce by 250ms
+        });
+
+        // --- Helper: Get Viewport (Dynamic Scale & Cached) ---
+        /**
+         * Gets the viewport for a given page number, calculating scale to fit width.
+         * Uses cache if available and container width hasn't changed significantly.
+         * @param {number} pageNum - The page number.
+         * @returns {Promise<PDFPageViewport>} A promise resolving to the viewport.
+         */
+        async function getViewport(pageNum) {
+            if (!pdfDoc) throw new Error("PDF not loaded");
+
+            const containerWidth = pdfContainer.clientWidth;
+            // Use cache only if container width is the same as when cached
+            if (viewportCache[pageNum] && viewportCache[pageNum].containerWidth === containerWidth) {
+                return viewportCache[pageNum].viewport;
+            }
+
+            try {
+                const page = await pdfDoc.getPage(pageNum);
+                // Get viewport at scale 1 to determine native width
+                const nativeViewport = page.getViewport({ scale: 1.0 });
+                // Calculate scale to fit container width (minus small padding if desired)
+                const scale = (containerWidth - 5) / nativeViewport.width; // Subtract a few pixels for padding
+                // Get final viewport using calculated scale
+                const viewport = page.getViewport({ scale: scale });
+
+                // Store viewport and the width used to calculate it
+                viewportCache[pageNum] = { viewport: viewport, containerWidth: containerWidth };
+                return viewport;
+            } catch (error) {
+                console.error(`Failed to get viewport for page ${pageNum}:`, error);
+                throw error;
+            }
+        }
+
+        // --- Core Functions ---
+
+        /**
+         * Handles the PDF file selection.
+         */
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file || file.type !== 'application/pdf') {
+                updateStatus('Please select a valid PDF file.', 'error');
+                return;
+            }
+            resetState();
+            updateStatus('Loading PDF...', 'loading');
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                pdfDoc = await loadingTask.promise;
+                updateStatus(`PDF loaded (${pdfDoc.numPages} pages). Rendering...`, 'loading');
+                await renderAllPages(); // Initial render
+                const pageErrors = pdfContainer.querySelectorAll('.page-error').length;
+                 if (pdfDoc && pageErrors === pdfDoc.numPages) {
+                    updateStatus(`Failed to render any pages. Please check console.`, 'error');
+                 } else if (pageErrors > 0) {
+                     updateStatus(`PDF rendered with ${pageErrors} page errors. Ready to annotate.`, 'warning');
+                 } else {
+                    updateStatus(`PDF rendered. Ready to annotate.`, 'success');
+                 }
+                drawingOverlay.style.display = 'block';
+            } catch (error) {
+                console.error('Error loading PDF:', error);
+                updateStatus(`Error loading PDF: ${error.message}. Check console.`, 'error');
+                pdfDoc = null;
+            }
+        }
+
+        /**
+         * Renders all pages of the loaded PDF document using dynamic scale.
+         */
+        async function renderAllPages() {
+            // Clear previous content but preserve overlay elements
+            pdfContainer.querySelectorAll('canvas, .annotation-box, .page-error').forEach(el => el.remove());
+            // Viewport cache is NOT cleared here, getViewport handles width changes
+
+            if (!pdfDoc) {
+                console.error("renderAllPages called but pdfDoc is not loaded.");
+                return; // Exit if pdfDoc is not available
+            }
+            if (pdfContainer.clientWidth <= 0) {
+                console.warn("PDF container has no width yet, delaying render slightly.");
+                // Wait a moment for layout to potentially settle if width is 0
+                await new Promise(resolve => setTimeout(resolve, 100));
+                if (pdfContainer.clientWidth <= 0) {
+                     console.error("PDF container width is still 0. Cannot calculate scale.");
+                     updateStatus("Error: PDF container has no width.", "error");
+                     return;
+                }
+            }
+
+
+            const fragment = document.createDocumentFragment();
+            let renderPromises = [];
+
+            for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+                 const renderPromise = (async () => {
+                    let pageViewport = null;
+                    try {
+                        // getViewport now calculates scale dynamically
+                        pageViewport = await getViewport(pageNum);
+                        const canvas = document.createElement('canvas');
+                        canvas.height = Math.ceil(pageViewport.height); // Use ceil for dimensions
+                        canvas.width = Math.ceil(pageViewport.width);
+                        canvas.dataset.pageNum = pageNum;
+                        const context = canvas.getContext('2d');
+                        const page = await pdfDoc.getPage(pageNum);
+                        const renderContext = { canvasContext: context, viewport: pageViewport };
+                        await page.render(renderContext).promise;
+                        fragment.appendChild(canvas);
+                    } catch (pageError) {
+                        console.error(`Error rendering page ${pageNum}:`, pageError);
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'page-error';
+                        // Try to use viewport dimensions for sizing if available
+                        errorDiv.style.width = pageViewport ? `${Math.ceil(pageViewport.width)}px` : '95%';
+                        errorDiv.style.height = pageViewport ? `${Math.ceil(pageViewport.height)}px` : '100px';
+                        errorDiv.textContent = `Error rendering page ${pageNum}. Check console.`;
+                        fragment.appendChild(errorDiv);
+                    }
+                 })();
+                 renderPromises.push(renderPromise);
+            }
+
+            await Promise.all(renderPromises);
+            pdfContainer.appendChild(fragment);
+            adjustOverlaySize(); // Adjust overlay after rendering
+            await redrawAllAnnotationBoxes(); // Redraw annotations based on new scale
+        }
+
+        /**
+         * Adjusts the drawing overlay size to match the container's scroll dimensions.
+         */
+        function adjustOverlaySize() {
+             // Make overlay cover the entire scrollable area of the container
+             if (pdfContainer.offsetParent !== null) {
+                 // Use maximum of scrollHeight/Width and clientHeight/Width to cover everything
+                 const overlayWidth = Math.max(pdfContainer.scrollWidth, pdfContainer.clientWidth);
+                 const overlayHeight = Math.max(pdfContainer.scrollHeight, pdfContainer.clientHeight);
+                 drawingOverlay.style.width = `${overlayWidth}px`;
+                 drawingOverlay.style.height = `${overlayHeight}px`;
+            } else {
+                drawingOverlay.style.width = '100%';
+                drawingOverlay.style.height = '100%';
+            }
+        }
+
+        /**
+         * Handles window resize events (debounced).
+         */
+        async function handleResize() {
+            if (!pdfDoc) return; // Only resize if a PDF is loaded
+            console.log("Handling resize...");
+            updateStatus("Resizing PDF to fit width...", "loading");
+            // Clear cache because container width changed
+            viewportCache = {};
+            // Re-render all pages with the new scale
+            await renderAllPages();
+            // Update status after rendering completes (renderAllPages handles final status)
+             const pageErrors = pdfContainer.querySelectorAll('.page-error').length;
+             if (pdfDoc && pageErrors === pdfDoc.numPages) {
+                updateStatus(`Failed to render any pages after resize.`, 'error');
+             } else if (pageErrors > 0) {
+                 updateStatus(`PDF resized with ${pageErrors} page errors. Ready to annotate.`, 'warning');
+             } else {
+                updateStatus(`PDF resized. Ready to annotate.`, 'success');
+             }
+        }
+
+
+        /**
+         * Handles mouse down to start drawing.
+         */
+        function handleMouseDown(event) {
+            // (Function remains the same)
+             if (!pdfDoc || isDrawing) return;
+            const rect = pdfContainer.getBoundingClientRect();
+            startCoords.x = event.clientX - rect.left + pdfContainer.scrollLeft;
+            startCoords.y = event.clientY - rect.top + pdfContainer.scrollTop;
+            const targetCanvas = findCanvasAtCoords(startCoords.x, startCoords.y);
+            if (!targetCanvas) return;
+            isDrawing = true;
+            currentSelection.page = parseInt(targetCanvas.dataset.pageNum);
+            selectionBoxVisual.style.left = `${startCoords.x}px`;
+            selectionBoxVisual.style.top = `${startCoords.y}px`;
+            selectionBoxVisual.style.width = '0px';
+            selectionBoxVisual.style.height = '0px';
+            selectionBoxVisual.style.display = 'block';
+            event.preventDefault();
+        }
+
+        /**
+         * Handles mouse move to resize drawing.
+         */
+        function handleMouseMove(event) {
+            // (Function remains the same)
+              if (!isDrawing) return;
+            const rect = pdfContainer.getBoundingClientRect();
+            const currentX = event.clientX - rect.left + pdfContainer.scrollLeft;
+            const currentY = event.clientY - rect.top + pdfContainer.scrollTop;
+            const width = Math.abs(currentX - startCoords.x);
+            const height = Math.abs(currentY - startCoords.y);
+            const left = Math.min(currentX, startCoords.x);
+            const top = Math.min(currentY, startCoords.y);
+            selectionBoxVisual.style.left = `${left}px`;
+            selectionBoxVisual.style.top = `${top}px`;
+            selectionBoxVisual.style.width = `${width}px`;
+            selectionBoxVisual.style.height = `${height}px`;
+        }
+
+        /**
+         * Handles mouse up to finalize selection and store PDF coordinates.
+         */
+        async function handleMouseUp(event) {
+            // (Function remains the same - uses getViewport which is now dynamic)
+             if (!isDrawing) return;
+            isDrawing = false;
+            selectionBoxVisual.style.display = 'none';
+
+            const rect = pdfContainer.getBoundingClientRect();
+            const endX = event.clientX - rect.left + pdfContainer.scrollLeft;
+            const endY = event.clientY - rect.top + pdfContainer.scrollTop;
+
+            const boxX = Math.min(startCoords.x, endX);
+            const boxY = Math.min(startCoords.y, endY);
+            const boxWidth = Math.abs(endX - startCoords.x);
+            const boxHeight = Math.abs(endY - startCoords.y);
+
+            if (boxWidth < 5 || boxHeight < 5) {
+                console.log("Selection too small, ignoring.");
+                return;
+            }
+
+            const targetCanvas = pdfContainer.querySelector(`canvas[data-page-num="${currentSelection.page}"]`);
+            if (!targetCanvas) {
+                 if (!pdfContainer.querySelector(`.page-error[data-page-num="${currentSelection.page}"]`)) {
+                    console.error(`Could not find canvas for page ${currentSelection.page} during mouseup.`);
+                    updateStatus(`Error: Could not find canvas for page ${currentSelection.page}.`, 'error');
+                 }
+                 return;
+            }
+
+            try {
+                // getViewport retrieves viewport based on current container width
+                const viewport = await getViewport(currentSelection.page);
+
+                const canvasOffsetX = targetCanvas.offsetLeft;
+                const canvasOffsetY = targetCanvas.offsetTop;
+                const relativeX = boxX - canvasOffsetX;
+                const relativeY = boxY - canvasOffsetY;
+
+                const topLeftCanvas = [relativeX, relativeY];
+                const bottomRightCanvas = [relativeX + boxWidth, relativeY + boxHeight];
+
+                // Convert using the dynamically scaled viewport
+                const topLeftPdf = viewport.convertToPdfPoint(...topLeftCanvas);
+                const bottomRightPdf = viewport.convertToPdfPoint(...bottomRightCanvas);
+
+                const pdfX = Math.min(topLeftPdf[0], bottomRightPdf[0]);
+                const pdfY = Math.min(topLeftPdf[1], bottomRightPdf[1]);
+                const pdfWidth = Math.abs(topLeftPdf[0] - bottomRightPdf[0]);
+                const pdfHeight = Math.abs(topLeftPdf[1] - bottomRightPdf[1]);
+
+                let label = '';
+                try {
+                    label = prompt(`Enter label for selection on Page ${currentSelection.page}:`);
+                } catch (promptError) {
+                    console.error("Prompt failed:", promptError);
+                    updateStatus("Could not display label prompt (maybe blocked?). Annotation cancelled.", "error");
+                    return;
+                }
+
+                 if (label === null) {
+                    updateStatus('Annotation cancelled.', 'info');
+                    return;
+                }
+                 if (label.trim() === '') {
+                     updateStatus('Annotation cancelled (empty label).', 'info');
+                     return;
+                 }
+
+                const annotation = {
+                    id: nextAnnotationId++,
+                    page: currentSelection.page,
+                    label: label.trim(),
+                    pdfX: pdfX,
+                    pdfY: pdfY,
+                    pdfWidth: pdfWidth,
+                    pdfHeight: pdfHeight
+                };
+                annotations.push(annotation);
+
+                renderAnnotationsList();
+                // drawAnnotationBox uses getViewport, so it uses dynamic scale too
+                await drawAnnotationBox(annotation);
+                updateStatus(`Annotation "${label}" added for page ${currentSelection.page}.`, 'success');
+                exportButton.disabled = false;
+
+            } catch (error) {
+                console.error("Error converting coordinates or processing annotation:", error);
+                updateStatus(`Error processing annotation: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * Handles mouse leave to cancel drawing.
+         */
+        function handleMouseLeave() {
+            // (Function remains the same)
+             if (isDrawing) {
+                isDrawing = false;
+                selectionBoxVisual.style.display = 'none';
+                updateStatus('Drawing cancelled (mouse left area).', 'info');
+            }
+        }
+
+        /**
+         * Finds canvas at given container coordinates.
+         */
+        function findCanvasAtCoords(x, y) {
+            // (Function remains the same)
+              const canvases = pdfContainer.querySelectorAll('canvas');
+            for (const canvas of canvases) {
+                const canvasTop = canvas.offsetTop;
+                const canvasLeft = canvas.offsetLeft;
+                const canvasBottom = canvasTop + canvas.offsetHeight;
+                const canvasRight = canvasLeft + canvas.offsetWidth;
+                if (x >= canvasLeft && x <= canvasRight && y >= canvasTop && y <= canvasBottom) {
+                    return canvas;
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Draws a single annotation box, converting PDF points to canvas pixels using dynamic scale.
+         */
+        async function drawAnnotationBox(annotation) {
+            // (Function remains the same - uses getViewport which is now dynamic)
+              const targetCanvas = pdfContainer.querySelector(`canvas[data-page-num="${annotation.page}"]`);
+            if (!targetCanvas) {
+                if (!pdfContainer.querySelector(`.page-error[data-page-num="${annotation.page}"]`)) {
+                     console.warn(`Canvas not found for page ${annotation.page} when drawing box.`);
+                }
+                return;
+            }
+
+            try {
+                // getViewport retrieves viewport based on current container width
+                const viewport = await getViewport(annotation.page);
+
+                const topLeftPdf = [annotation.pdfX, annotation.pdfY];
+                const bottomRightPdf = [annotation.pdfX + annotation.pdfWidth, annotation.pdfY + annotation.pdfHeight];
+
+                const topLeftCanvas = viewport.convertToViewportPoint(...topLeftPdf);
+                const bottomRightCanvas = viewport.convertToViewportPoint(...bottomRightPdf);
+
+                const canvasX = Math.min(topLeftCanvas[0], bottomRightCanvas[0]);
+                const canvasY = Math.min(topLeftCanvas[1], bottomRightCanvas[1]);
+                const canvasWidth = Math.abs(topLeftCanvas[0] - bottomRightCanvas[0]);
+                const canvasHeight = Math.abs(topLeftCanvas[1] - bottomRightCanvas[1]);
+
+                const canvasTopOffset = targetCanvas.offsetTop;
+                const canvasLeftOffset = targetCanvas.offsetLeft;
+
+                const box = document.createElement('div');
+                box.className = 'annotation-box';
+                box.dataset.annotationId = annotation.id;
+                box.style.left = `${canvasLeftOffset + canvasX}px`;
+                box.style.top = `${canvasTopOffset + canvasY}px`;
+                box.style.width = `${canvasWidth}px`;
+                box.style.height = `${canvasHeight}px`;
+                box.title = `Page ${annotation.page}: ${annotation.label} (PDF Coords)`;
+                box.textContent = annotation.label;
+
+                pdfContainer.appendChild(box);
+            } catch (error) {
+                console.error(`Error drawing annotation box for ID ${annotation.id}:`, error);
+            }
+        }
+
+        /**
+         * Redraws all annotation boxes using current dynamic scales.
+         */
+        async function redrawAllAnnotationBoxes() {
+            pdfContainer.querySelectorAll('.annotation-box').forEach(box => box.remove());
+            let validAnnotations = annotations.filter(anno =>
+                pdfContainer.querySelector(`canvas[data-page-num="${anno.page}"]`)
+            );
+            // Use Promise.all to wait for all async draw calls
+            await Promise.all(validAnnotations.map(anno => drawAnnotationBox(anno)));
+        }
+
+
+        /**
+         * Renders the list of annotations, showing PDF coordinates.
+         */
+        function renderAnnotationsList() {
+            // (Function remains the same)
+              if (annotations.length === 0) {
+                annotationsList.innerHTML = '<p class="text-xs text-gray-500">No annotations yet.</p>';
+                return;
+            }
+
+            annotationsList.innerHTML = '';
+            annotations.sort((a, b) => {
+                if (a.page !== b.page) return a.page - b.page;
+                return a.label.localeCompare(b.label);
+            });
+
+            annotations.forEach((anno) => {
+                const listItem = document.createElement('div');
+                listItem.className = 'p-2 border-b border-gray-100 text-sm';
+                listItem.innerHTML = `
+                    <span class="font-medium text-cyan-700">Pg ${anno.page}: ${anno.label}</span>
+                    <span class="text-xs text-gray-500 block">
+                        (x: ${anno.pdfX.toFixed(1)}, y: ${anno.pdfY.toFixed(1)}, w: ${anno.pdfWidth.toFixed(1)}, h: ${anno.pdfHeight.toFixed(1)}) [PDF pts]
+                    </span>
+                    <button data-id="${anno.id}" class="text-red-500 hover:text-red-700 text-xs float-right font-semibold" onclick="deleteAnnotation(this)">Delete</button>
+                `;
+                annotationsList.appendChild(listItem);
+            });
+        }
+
+         /**
+         * Deletes an annotation by its unique ID.
+         */
+         function deleteAnnotation(button) {
+            // (Function remains the same)
+              const idToDelete = parseInt(button.dataset.id);
+            if (isNaN(idToDelete)) return;
+            const indexToDelete = annotations.findIndex(anno => anno.id === idToDelete);
+            if (indexToDelete === -1) return;
+            const deletedAnnotation = annotations.splice(indexToDelete, 1)[0];
+            const boxToRemove = pdfContainer.querySelector(`.annotation-box[data-annotation-id="${idToDelete}"]`);
+            if (boxToRemove) boxToRemove.remove();
+            renderAnnotationsList();
+            updateStatus(`Annotation "${deletedAnnotation.label}" deleted.`, 'info');
+            if (annotations.length === 0) exportButton.disabled = true;
+         }
+
+
+        /**
+         * Exports the annotations array (PDF coords) as JSON.
+         */
+        function exportAnnotations() {
+            // (Function remains the same)
+              if (annotations.length === 0) {
+                updateStatus('No annotations to export.', 'info');
+                return;
+            }
+            const jsonString = JSON.stringify(annotations, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const originalFileName = pdfUpload.files[0]?.name.replace(/\.pdf$/i, '') || 'annotations';
+            a.download = `${originalFileName}_pdf_coords_annotations.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            updateStatus('Annotations exported.', 'success');
+        }
+
+        /**
+         * Updates the status message area.
+         */
+        function updateStatus(message, type = 'info') {
+            // (Function remains the same)
+              statusDiv.textContent = message;
+            statusDiv.className = 'text-sm mb-4 text-center min-h-[1.25rem] '; // Reset classes
+            switch (type) {
+                case 'success': statusDiv.classList.add('text-green-600'); break;
+                case 'error': statusDiv.classList.add('text-red-600', 'font-semibold'); break;
+                case 'warning': statusDiv.classList.add('text-yellow-600'); break;
+                case 'loading': statusDiv.classList.add('text-blue-600'); break;
+                default: statusDiv.classList.add('text-gray-600'); break; // info
+            }
+        }
+
+        /**
+         * Resets the application state.
+         */
+        function resetState() {
+            // (Function remains the same)
+              pdfDoc = null;
+            annotations = [];
+            nextAnnotationId = 0;
+            viewportCache = {};
+            pdfContainer.querySelectorAll('canvas, .annotation-box, .page-error').forEach(el => el.remove());
+            if (!pdfContainer.contains(drawingOverlay)) pdfContainer.appendChild(drawingOverlay);
+            if (!pdfContainer.contains(selectionBoxVisual)) pdfContainer.appendChild(selectionBoxVisual);
+            drawingOverlay.style.display = 'none';
+            selectionBoxVisual.style.display = 'none';
+            renderAnnotationsList();
+            exportButton.disabled = true;
+            updateStatus('Select a PDF file to start.');
+        }
+
+    </script>
+
+</body>
+</html>

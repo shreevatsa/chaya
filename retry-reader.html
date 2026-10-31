@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Annotation Snippet Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script>
+        // Set worker source
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .snippet-container {
+            border: 1px solid #ccc;
+            margin-bottom: 1.5rem; /* Increased spacing */
+            padding: 0.75rem; /* Added padding */
+            background-color: #f9fafb; /* Light gray background */
+            border-radius: 0.375rem; /* Rounded corners */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .snippet-label {
+            font-weight: 600; /* Semibold */
+            margin-bottom: 0.5rem;
+            color: #1f2937; /* Darker gray text */
+        }
+        .snippet-canvas {
+            border: 1px solid #e5e7eb; /* Lighter border for canvas */
+            display: block; /* Ensure canvas is block level */
+            max-width: 100%; /* Prevent overflow */
+            height: auto; /* Maintain aspect ratio */
+            background-color: #ffffff; /* White background for canvas */
+        }
+        /* Style for loading/error placeholders within snippet container */
+        .snippet-placeholder {
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6b7280; /* Medium gray text */
+            font-size: 0.9em;
+            background-color: #f3f4f6; /* Slightly darker gray */
+            border-radius: 0.25rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl font-bold mb-6 text-center text-gray-700">PDF Annotation Snippet Viewer</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label for="pdf-upload" class="block text-sm font-medium text-gray-700 mb-1">1. Upload PDF:</label>
+                <input type="file" id="pdf-upload" accept="application/pdf" class="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0
+                    file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700
+                    hover:file:bg-blue-100 cursor-pointer"/>
+            </div>
+            <div>
+                <label for="json-upload" class="block text-sm font-medium text-gray-700 mb-1">2. Upload Annotations JSON:</label>
+                <input type="file" id="json-upload" accept="application/json,.json" class="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0
+                    file:text-sm file:font-semibold file:bg-green-50 file:text-green-700
+                    hover:file:bg-green-100 cursor-pointer"/>
+            </div>
+        </div>
+
+        <div class="mb-4 text-center">
+            <button id="process-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-md transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                View Snippets
+            </button>
+        </div>
+
+        <div id="status" class="text-sm text-gray-600 mb-6 text-center min-h-[1.25rem]"></div>
+
+        <div id="output-area" class="mt-6">
+            </div>
+    </div>
+
+    <script>
+        // --- Global Variables ---
+        const pdfUploadInput = document.getElementById('pdf-upload');
+        const jsonUploadInput = document.getElementById('json-upload');
+        const processButton = document.getElementById('process-button');
+        const statusDiv = document.getElementById('status');
+        const outputArea = document.getElementById('output-area');
+
+        let pdfFile = null;
+        let annotations = null;
+        let pdfDoc = null; // To store the loaded PDF document object
+
+        const SNIPPET_DISPLAY_SCALE = 1.5; // Scale for rendering snippets
+
+        // --- Event Listeners ---
+        pdfUploadInput.addEventListener('change', (e) => {
+            pdfFile = e.target.files[0];
+            checkFilesReady();
+        });
+        jsonUploadInput.addEventListener('change', handleJsonUpload);
+        processButton.addEventListener('click', processFiles);
+
+        // --- Functions ---
+
+        /**
+         * Reads and parses the selected JSON file.
+         */
+        async function handleJsonUpload(event) {
+            const file = event.target.files[0];
+            if (!file || file.type !== 'application/json') {
+                updateStatus('Please select a valid JSON annotation file.', 'error');
+                annotations = null;
+                checkFilesReady();
+                return;
+            }
+            try {
+                const jsonText = await file.text();
+                annotations = JSON.parse(jsonText);
+                // Basic validation of annotation structure
+                if (!Array.isArray(annotations) || annotations.length === 0 || !annotations[0].hasOwnProperty('pdfX')) {
+                     updateStatus('Invalid JSON format. Expected array of annotations with pdfX property.', 'error');
+                     annotations = null;
+                } else {
+                    updateStatus(`Loaded ${annotations.length} annotations.`, 'info');
+                }
+            } catch (error) {
+                console.error("Error reading or parsing JSON:", error);
+                updateStatus(`Error reading JSON: ${error.message}`, 'error');
+                annotations = null;
+            }
+            checkFilesReady();
+        }
+
+        /**
+         * Checks if both files are selected and enables/disables the process button.
+         */
+        function checkFilesReady() {
+            if (pdfFile && annotations) {
+                processButton.disabled = false;
+                updateStatus(`Ready to process ${annotations.length} annotations from PDF.`, 'info');
+            } else {
+                processButton.disabled = true;
+                // Optionally update status if only one file is present
+            }
+        }
+
+        /**
+         * Main function to load PDF and render snippets based on annotations.
+         */
+        async function processFiles() {
+            if (!pdfFile || !annotations) {
+                updateStatus('Please select both a PDF and a JSON file.', 'error');
+                return;
+            }
+
+            processButton.disabled = true;
+            outputArea.innerHTML = ''; // Clear previous output
+            updateStatus('Loading PDF...', 'loading');
+            pdfDoc = null; // Reset pdfDoc
+
+            try {
+                const arrayBuffer = await pdfFile.arrayBuffer();
+                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                pdfDoc = await loadingTask.promise;
+                updateStatus(`Processing ${annotations.length} annotations...`, 'loading');
+
+                // Sort annotations by page, then Y coordinate (top to bottom approx)
+                annotations.sort((a, b) => {
+                    if (a.page !== b.page) return a.page - b.page;
+                    // Higher Y value means lower on the page in PDF coords
+                    return b.pdfY - a.pdfY;
+                });
+
+                 // Create placeholder containers first
+                annotations.forEach((anno, index) => {
+                    createSnippetPlaceholder(anno, index);
+                });
+
+                // Render snippets asynchronously
+                let renderPromises = annotations.map((anno, index) => renderSnippet(anno, index));
+                await Promise.all(renderPromises);
+
+                updateStatus(`Finished processing ${annotations.length} snippets.`, 'success');
+
+            } catch (error) {
+                console.error("Error processing files:", error);
+                updateStatus(`Error: ${error.message}. Check console.`, 'error');
+            } finally {
+                // Re-enable button even if errors occurred during snippet rendering
+                processButton.disabled = false;
+            }
+        }
+
+        /**
+         * Creates a placeholder div for a snippet while it's rendering.
+         */
+        function createSnippetPlaceholder(annotation, index) {
+            const containerId = `snippet-container-${index}`;
+            const container = document.createElement('div');
+            container.id = containerId;
+            container.className = 'snippet-container';
+
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'snippet-label';
+            labelDiv.textContent = `Page ${annotation.page}: ${annotation.label}`;
+            container.appendChild(labelDiv);
+
+            const placeholderDiv = document.createElement('div');
+            placeholderDiv.id = `snippet-placeholder-${index}`;
+            placeholderDiv.className = 'snippet-placeholder';
+            placeholderDiv.textContent = 'Loading snippet...';
+            container.appendChild(placeholderDiv);
+
+            outputArea.appendChild(container);
+        }
+
+
+        /**
+         * Renders a single annotation snippet onto a dedicated canvas.
+         * @param {object} annotation - The annotation object { page, label, pdfX, pdfY, pdfWidth, pdfHeight }
+         * @param {number} index - The index of the annotation for targeting the placeholder.
+         */
+        async function renderSnippet(annotation, index) {
+            const placeholderId = `snippet-placeholder-${index}`;
+            const placeholderDiv = document.getElementById(placeholderId);
+            if (!placeholderDiv) return; // Should not happen
+
+            try {
+                const page = await pdfDoc.getPage(annotation.page);
+                // Get viewport at the desired *display* scale
+                const viewport = page.getViewport({ scale: SNIPPET_DISPLAY_SCALE });
+
+                // Calculate target canvas dimensions based on PDF dimensions and display scale
+                const canvasWidth = Math.ceil(annotation.pdfWidth * SNIPPET_DISPLAY_SCALE);
+                const canvasHeight = Math.ceil(annotation.pdfHeight * SNIPPET_DISPLAY_SCALE);
+
+                 // Prevent excessively large canvases (e.g., if annotation is huge)
+                if (canvasWidth <= 0 || canvasHeight <= 0 || canvasWidth > 4000 || canvasHeight > 4000) {
+                    throw new Error(`Invalid snippet dimensions (${canvasWidth}x${canvasHeight})`);
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = canvasWidth;
+                canvas.height = canvasHeight;
+                canvas.className = 'snippet-canvas'; // Add class for styling
+                const ctx = canvas.getContext('2d');
+
+                // Calculate the top-left corner of the annotation in PDF coordinates
+                // PDF Y-origin is bottom-left, so top is pdfY + pdfHeight
+                const pdfTopLeft = [annotation.pdfX, annotation.pdfY + annotation.pdfHeight];
+
+                // Convert this PDF point to viewport coordinates (pixels on the scaled page)
+                const viewportTopLeft = viewport.convertToViewportPoint(...pdfTopLeft);
+
+                // Translate the canvas context so the viewport's top-left pixel
+                // corresponding to the annotation's top-left PDF point becomes the canvas (0,0)
+                ctx.translate(-viewportTopLeft[0], -viewportTopLeft[1]);
+
+                // Render the page onto the translated canvas
+                // Because the canvas is clipped to its small size, only the desired region is drawn
+                const renderContext = {
+                    canvasContext: ctx,
+                    viewport: viewport
+                };
+                await page.render(renderContext).promise;
+
+                // Replace placeholder with rendered canvas
+                placeholderDiv.replaceWith(canvas);
+
+            } catch (error) {
+                console.error(`Error rendering snippet for annotation ${index} (Page ${annotation.page}, Label "${annotation.label}"):`, error);
+                // Update placeholder with error message
+                placeholderDiv.textContent = `Error rendering snippet: ${error.message}`;
+                placeholderDiv.style.backgroundColor = '#fee2e2'; // Light red background
+                placeholderDiv.style.color = '#b91c1c'; // Dark red text
+            }
+        }
+
+        /**
+         * Updates the status message area.
+         */
+        function updateStatus(message, type = 'info') {
+            statusDiv.textContent = message;
+            statusDiv.className = 'text-sm mb-6 text-center min-h-[1.25rem] '; // Reset classes
+            switch (type) {
+                case 'success': statusDiv.classList.add('text-green-600'); break;
+                case 'error': statusDiv.classList.add('text-red-600', 'font-semibold'); break;
+                case 'warning': statusDiv.classList.add('text-yellow-600'); break;
+                case 'loading': statusDiv.classList.add('text-blue-600'); break;
+                default: statusDiv.classList.add('text-gray-600'); break; // info
+            }
+        }
+
+        /**
+         * Resets the state when a new file is selected.
+         */
+        function resetState() {
+             pdfFile = null;
+             annotations = null;
+             pdfDoc = null;
+             outputArea.innerHTML = ''; // Clear output
+             processButton.disabled = true;
+             updateStatus(''); // Clear status
+             // Reset file input values visually (optional)
+             // pdfUploadInput.value = '';
+             // jsonUploadInput.value = '';
+        }
+
+    </script>
+
+</body>
+</html>
