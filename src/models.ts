@@ -48,25 +48,3 @@ export class ChayaDocument {
         return doc;
     }
 }
-
-// Application state.
-interface AppState {
-    // These two bools are actually three states and could be an enum: NOT_LOADED, LOADED_NO_UNSAVED_CHANGES, LOADED_WITH_UNSAVED_CHANGES
-    documentLoaded: boolean;  // Whether the document (PDF or Chaya) has been loaded yet
-    hasUnsavedChanges: boolean;
-    pdfFile: File | null;
-    chayaDocument: ChayaDocument,
-    loadedChayaFileName: string | null;
-    pdfDocument: any | null; // Actually it is of type `PDFDocumentProxy`
-    pageCanvasCache: Map<number, HTMLCanvasElement>;
-}
-
-export const appState: AppState = {
-    documentLoaded: false,
-    hasUnsavedChanges: false,
-    pdfFile: null,
-    chayaDocument: new ChayaDocument(),
-    loadedChayaFileName: null,
-    pdfDocument: null,
-    pageCanvasCache: new Map(),
-};

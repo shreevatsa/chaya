@@ -4,7 +4,12 @@
   "description": "`bookchop` is a client-side web tool for annotating regions in PDF documents and viewing them.",
   "main": "index.js",
   "scripts": {
-    "build": "tsc && ./node_modules/.bin/postcss ./src/input.css -o ./dist/output.css",
+    "build:js": "esbuild src/app.ts --bundle --outfile=dist/app.js --minify",
+    "build:css": "postcss ./src/input.css -o ./dist/output.css",
+    "build": "npm-run-all build:js build:css",
+    "watch:css": "postcss ./src/input.css -o ./dist/output.css --watch",
+    "serve": "esbuild src/app.ts --bundle --outfile=dist/app.js --servedir=.",
+    "dev": "npm-run-all --parallel watch:css serve",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
@@ -15,6 +20,7 @@
   "devDependencies": {
     "@playwright/test": "^1.53.1",
     "autoprefixer": "^10.4.21",
+    "npm-run-all": "^4.1.5",
     "playwright": "^1.53.1",
     "postcss": "^8.5.6",
     "postcss-cli": "^11.0.1",
@@ -22,5 +28,7 @@
     "typescript": "^5.8.3"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
-  "dependencies": {}
+  "dependencies": {
+    "@vue/reactivity": "^3.5.18"
+  }
 }

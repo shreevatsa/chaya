@@ -1,7 +1,9 @@
-import { MarkedRegion, appState, ChayaDocument } from './models.js';
+import { MarkedRegion, ChayaDocument } from './models.js';
 import { MarkController, initializeMarkTab } from './mark-controller.js';
 import { ViewerController, initializeViewer } from './read-controller.js';
 import { documentGetElementById, updateLoadingProgress } from './actions.js';
+import { $appState, loadPdf, addAnnotationsForPage, pdfDocument, setPdfDocumentInstance, addPageCanvas, setUnsavedChanges } from './store.js';
+
 
 // JSZip is loaded globally via script tag in the HTML
 declare const JSZip: any;
@@ -59,7 +61,7 @@ class ChayaApp {
         // Set up slot event listeners: either upload or download
         {
             documentGetElementById<HTMLDivElement>('chaya-slot').onclick = () => {
-                if (!appState.documentLoaded) {
+                if (!$appState.documentLoaded) {
                     const chayaUpload = documentGetElementById<HTMLInputElement>('chaya-upload');
                     chayaUpload.click();
                 } else {
@@ -67,7 +69,7 @@ class ChayaApp {
                 }
             };
             documentGetElementById<HTMLDivElement>('pdf-slot').onclick = () => {
-                if (!appState.documentLoaded) {
+                if (!$appState.documentLoaded) {
                     const pdfUpload = documentGetElementById<HTMLInputElement>('pdf-upload');
                     pdfUpload.click();
                 } else {
@@ -106,25 +108,30 @@ class ChayaApp {
         targetBtn.classList.remove('text-gray-600', 'hover:text-gray-800');
     }
 
-    private async postLoading(pdfArrayBuffer: ArrayBuffer) {
+    private async postLoading(pdfArrayBuffer: ArrayBuffer, chayaDocument: ChayaDocument, pdfFile: File) {
         updateLoadingProgress(5, 'Processing PDF...', 'Initializing PDF.js and document...');
 
         const pdfjs = await waitForPdfjs();
-        appState.pdfDocument = await pdfjs.getDocument(new Uint8Array(pdfArrayBuffer)).promise;
+        // appState.pdfDocument = await pdfjs.getDocument(new Uint8Array(pdfArrayBuffer)).promise;
+        const pdfDoc = await pdfjs.getDocument(new Uint8Array(pdfArrayBuffer)).promise;
+        // setDocument(pdfDoc, pdfFile, chayaDocument);
+        setPdfDocumentInstance(pdfDoc);
+        loadPdf(pdfFile);
 
         this.markController.prepareForDocument();
         this.viewerController.prepareForDocument();
 
         updateLoadingProgress(5, 'Rendering pages...', 'Processing PDF pages for display');
 
-        // Mark as loaded
-        appState.documentLoaded = true;
-        appState.hasUnsavedChanges = false;
+        // // Mark as loaded
+        // appState.documentLoaded = true;
+        // appState.hasUnsavedChanges = false;
 
         // Update slot UI to download mode
         {
             const documentFilename = documentGetElementById<HTMLDivElement>('document-filename');
-            documentFilename.textContent = `Document: ${appState.pdfFile?.name || 'document'}`;
+            // documentFilename.textContent = `Document: ${appState.pdfFile?.name || 'document'}`;
+            documentFilename.textContent = `Document: ${pdfFile.name}`;
             documentFilename.classList.remove('hidden');
             const chayaSlot = documentGetElementById<HTMLDivElement>('chaya-slot');
             chayaSlot.querySelector('.upload-slot')?.classList.add('hidden');
@@ -134,13 +141,14 @@ class ChayaApp {
             pdfSlot.querySelector('.download-slot')?.classList.remove('hidden');
         }
 
-        this._progressivelyRenderPages();
+        await this._progressivelyRenderPages(chayaDocument);
     }
 
-    private async _progressivelyRenderPages(): Promise<void> {
-        const pdf = appState.pdfDocument;
-        const totalPages = pdf.numPages;
-        appState.pageCanvasCache.clear();
+    private async _progressivelyRenderPages(chayaDocument: ChayaDocument): Promise<void> {
+        // const pdf = appState.pdfDocument;
+        // appState.pageCanvasCache.clear();
+        if (!pdfDocument) return;
+        const totalPages = pdfDocument.numPages;
 
         console.log(`Starting progressive render of ${totalPages} pages...`);
         const containerWidth = documentGetElementById('pdf-container').offsetWidth;
@@ -149,7 +157,7 @@ class ChayaApp {
             const progress = 10 + (85 * pageNum / totalPages); // Leave final 5% for cleanup
             updateLoadingProgress(progress, `Rendering page ${pageNum} of ${totalPages}...`, `Processing page ${pageNum}`);
 
-            const page = await pdf.getPage(pageNum);
+            const page = await pdfDocument.getPage(pageNum);
             // Calculate the correct scale for this page.
             const baseViewport = page.getViewport({ scale: 1.0 });
             const maxWidth = 1200;
@@ -163,12 +171,17 @@ class ChayaApp {
             const context = canvas.getContext('2d')!;
             await page.render({ canvasContext: context, viewport }).promise;
 
-            appState.pageCanvasCache.set(pageNum, canvas);
+            // appState.pageCanvasCache.set(pageNum, canvas);
+            addPageCanvas(pageNum, canvas);
             canvas.style.width = `${targetWidth}px`;
 
             // Notify controllers that a new page is ready to be displayed.
             this.markController.renderPage(pageNum);
-            await this.viewerController.renderRegionsForPage(pageNum);
+            // await this.viewerController.renderRegionsForPage(pageNum);
+            const regionsForPage = chayaDocument.markedRegions.get(pageNum);
+            if (regionsForPage && regionsForPage.length > 0) {
+                addAnnotationsForPage(pageNum, regionsForPage);
+            }
         }
 
         console.log('All pages rendered.');
@@ -181,11 +194,12 @@ class ChayaApp {
     // Writes to `appState.pdfFile`.
     // Calls `updateLoadingProgress`, `this.postLoading`
     private async loadPdfFile(pdfFile: File): Promise<void> {
-        appState.pdfFile = pdfFile;
+        // appState.pdfFile = pdfFile;
         try {
             updateLoadingProgress(0, 'Loading PDF...', 'Reading PDF file...');
             const pdfArrayBuffer = await readFileAsArrayBuffer(pdfFile);
-            this.postLoading(pdfArrayBuffer);
+            // this.postLoading(pdfArrayBuffer);
+            await this.postLoading(pdfArrayBuffer, new ChayaDocument(), pdfFile);
         } catch (error) {
             console.error('Error loading files:', error);
             updateLoadingProgress(0, 'Error loading files', `Failed: ${error}`);
@@ -223,9 +237,7 @@ class ChayaApp {
             // Extract PDF data
             const pdfArrayBuffer = await zipContent.file('document.pdf')!.async('arraybuffer');
             const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
-            const pdfFile = new File([pdfBlob], manifest.originalFilename || 'document.pdf', {
-                type: 'application/pdf'
-            });
+            const pdfFile = new File([pdfBlob], manifest.originalFilename || 'document.pdf', { type: 'application/pdf' });
 
             updateLoadingProgress(5, 'Loading annotations...', 'Parsing annotation data...');
 
@@ -233,15 +245,18 @@ class ChayaApp {
             const annotationsText = await zipContent.file('annotations.json')!.async('string');
             const annotationsData = JSON.parse(annotationsText);
             const regions = MarkedRegion.parseFromJson(annotationsData);
+            const chayaDocument = ChayaDocument.fromRegions(regions);
+
 
             updateLoadingProgress(5, 'Initializing document...', 'Setting up PDF viewer...');
 
             // Update state
-            appState.pdfFile = pdfFile;
-            appState.chayaDocument = ChayaDocument.fromRegions(regions);
-            appState.loadedChayaFileName = file.name;
+            // appState.pdfFile = pdfFile;
+            // appState.chayaDocument = ChayaDocument.fromRegions(regions);
+            // appState.loadedChayaFileName = file.name;
 
-            this.postLoading(pdfArrayBuffer);
+            // this.postLoading(pdfArrayBuffer);
+            await this.postLoading(pdfArrayBuffer, chayaDocument, pdfFile);
             console.log('Successfully loaded .chaya file');
         } catch (error) {
             console.error('Error loading .chaya file:', error);
@@ -253,7 +268,7 @@ class ChayaApp {
     }
 
     private async downloadChayaFile(): Promise<void> {
-        if (!appState.pdfDocument || !appState.pdfFile) {
+        if (!$appState.documentLoaded) {
             alert('No document loaded to create .chaya file');
             return;
         }
@@ -267,7 +282,7 @@ class ChayaApp {
             const manifest = {
                 version: "1.0",
                 created: new Date().toISOString(),
-                originalFilename: appState.pdfFile.name,
+                originalFilename: $appState.pdfFile!.name,
                 chayaFormatVersion: "1.0",
                 application: {
                     name: "Chaya",
@@ -277,7 +292,7 @@ class ChayaApp {
             zip.file("manifest.json", JSON.stringify(manifest, null, 2));
 
             // Add original PDF
-            const pdfArrayBuffer = await readFileAsArrayBuffer(appState.pdfFile);
+            const pdfArrayBuffer = await readFileAsArrayBuffer($appState.pdfFile!);
             zip.file("document.pdf", pdfArrayBuffer);
 
             // Add annotations.json
@@ -297,7 +312,7 @@ class ChayaApp {
             const chayaBlob = new Blob([zipBlob], { type: 'application/zip' });
 
             // Download the .chaya file
-            const fileName = appState.pdfFile.name.replace(/\.pdf$/i, '.chaya');
+            const fileName = $appState.pdfFile!.name.replace(/\.pdf$/i, '.chaya');
             const url = URL.createObjectURL(chayaBlob);
             const a = document.createElement('a');
             a.href = url;
@@ -308,7 +323,7 @@ class ChayaApp {
             URL.revokeObjectURL(url);
 
             // Mark as saved since we just exported everything
-            appState.hasUnsavedChanges = false;
+            setUnsavedChanges(false);
 
             console.log('Successfully created .chaya file:', fileName);
 
@@ -322,7 +337,7 @@ class ChayaApp {
     private createAnnotationsJSON(): any {
         const annotationsByPage: Record<string, any[]> = {};
         // Convert the Map to the plain object required by JSON.stringify
-        appState.chayaDocument.markedRegions.forEach((regions, pageNumber) => {
+        $appState.chayaDocument.markedRegions.forEach((regions, pageNumber) => {
             annotationsByPage[String(pageNumber)] = regions.map(ann => ({
                 id: ann.id,
                 x: ann.x, y: ann.y,
@@ -333,7 +348,7 @@ class ChayaApp {
 
         return {
             metadata: {
-                sourcePdf: appState.pdfFile?.name || 'unknown.pdf',
+                sourcePdf: $appState.pdfFile?.name || 'unknown.pdf',
                 annotationVersion: "1.1",
                 annotatedAt: new Date().toISOString()
             },
@@ -342,13 +357,13 @@ class ChayaApp {
     }
 
     private async downloadPdfFile(): Promise<void> {
-        if (!appState.pdfFile) return;
+        if (!$appState.pdfFile) return;
 
         // Download the original PDF file
-        const url = URL.createObjectURL(appState.pdfFile);
+        const url = URL.createObjectURL($appState.pdfFile);
         const a = document.createElement('a');
         a.href = url;
-        a.download = appState.pdfFile.name;
+        a.download = $appState.pdfFile.name;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

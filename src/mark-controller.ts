@@ -1,4 +1,5 @@
-import { MarkedRegion, appState, ChayaDocument } from './models.js';
+import { MarkedRegion } from './models.js';
+import { $appState, subscribe, addAnnotation, deleteAnnotation, updateAnnotationLabel, updateAnnotationRect, pageCanvasCache } from './store.js';
 import { runAIAssistedAnnotation } from './ai-orchestrator.js';
 
 export class MarkController {
@@ -31,6 +32,7 @@ export class MarkController {
         this.pdfContainer = pdfContainer;
         this.annotationList = annotationList;
         this._setupGlobalListeners();
+        subscribe(() => this.render());
     }
 
     public prepareForDocument(): void {
@@ -38,16 +40,117 @@ export class MarkController {
         this.annotationList.innerHTML = '';
     }
 
-    // Renders a single page and its annotations as they become available.
+    // This method only renders the STATIC parts of a page.
     public renderPage(pageNumber: number): void {
+        const cachedCanvas = pageCanvasCache.get(pageNumber);
+        if (!cachedCanvas) return;
+        // This only creates the static container and canvas
         this._renderPageCanvas(pageNumber);
-        this._renderAnnotationsForPage(pageNumber);
-        this._updateAnnotationListForPage(pageNumber);
     }
+
+    // private render(): void {
+    //     // Clear all previously rendered dynamic content
+    //     this.pdfContainer.querySelectorAll('.annotation-layer').forEach(layer => layer.innerHTML = '');
+    //     this.annotationList.innerHTML = '';
+
+    //     if (!$appState.documentLoaded) return;
+
+    //     // Re-render all annotations and the sidebar from the current state
+    //     for (const pageNumber of pageCanvasCache.keys()) {
+    //         this._renderAnnotationsForPage(pageNumber);
+    //         this._updateAnnotationListForPage(pageNumber);
+    //     }
+    // }
+
+    private render(): void {
+        const state = $appState;
+        if (!state.documentLoaded || !state.chayaDocument) return;
+
+
+        // --- Smart Sidebar Rendering ---
+
+        const allRegions = Array.from(state.chayaDocument.markedRegions.entries())
+            .sort(([a], [b]) => a - b) // Sort by page number
+            .flatMap(([, regions]) => regions); // Flatten into a single list
+
+        const regionIdsInState = new Set(allRegions.map(r => r.id));
+        const pageNumbersInState = new Set(allRegions.map(r => r.pageNumber));
+
+        // 1. REMOVAL PASS: Remove DOM elements that are no longer in the state
+        this.annotationList.querySelectorAll('[data-annotation-id]').forEach(node => {
+            const nodeId = (node as HTMLElement).dataset.annotationId;
+            if (!regionIdsInState.has(nodeId!)) {
+                node.remove();
+            }
+        });
+        this.annotationList.querySelectorAll('[data-page-header]').forEach(node => {
+            const pageNum = parseInt((node as HTMLElement).dataset.pageHeader!, 10);
+            if (!pageNumbersInState.has(pageNum)) {
+                node.remove();
+            }
+        });
+
+        // 2. ADD/UPDATE PASS: Ensure every region in the state has a corresponding DOM element
+        let lastPageNum = 0;
+        allRegions.forEach(annotation => {
+            // Ensure page header exists
+            if (annotation.pageNumber !== lastPageNum) {
+                let header = this.annotationList.querySelector(`[data-page-header="${annotation.pageNumber}"]`);
+                if (!header) {
+                    header = document.createElement('div');
+                    header.className = 'text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 mt-2 first:mt-0';
+                    header.textContent = `Page ${annotation.pageNumber}`;
+                    header.setAttribute('data-page-header', String(annotation.pageNumber));
+                    this.annotationList.appendChild(header); // Order will be fixed by subsequent items
+                }
+                lastPageNum = annotation.pageNumber;
+            }
+
+            // Find or create the annotation list item
+            let listItem = this.annotationList.querySelector<HTMLDivElement>(`[data-annotation-id="${annotation.id}"]`);
+            if (!listItem) {
+                // It doesn't exist, so create and append it to the end of the list
+                listItem = this._createAnnotationListItem(annotation);
+                this.annotationList.appendChild(listItem);
+            }
+
+            // Update its content in case the label changed
+            const labelDiv = listItem.querySelector<HTMLDivElement>('.truncate');
+            if (labelDiv && labelDiv.textContent !== annotation.label) {
+                labelDiv.textContent = annotation.label;
+            }
+        });
+
+        // --- Smart Annotation Box Rendering on PDF ---
+        this.pdfContainer.querySelectorAll('.annotation-layer').forEach(layer => {
+            const pageNum = parseInt((layer.parentElement as HTMLElement).dataset.pageNumber!, 10);
+            const regionsForPage = state.chayaDocument.markedRegions.get(pageNum) || [];
+            const regionIdsForPage = new Set(regionsForPage.map(r => r.id));
+
+            // Remove old boxes
+            layer.querySelectorAll('.annotation-box').forEach(box => {
+                if (!regionIdsForPage.has((box as HTMLElement).dataset.annotationId!)) {
+                    box.remove();
+                }
+            });
+
+            // Add/Update boxes
+            regionsForPage.forEach(annotation => {
+                let box = layer.querySelector<HTMLDivElement>(`.annotation-box[data-annotation-id="${annotation.id}"]`);
+                const pageDiv = layer.parentElement as HTMLDivElement;
+                if (!box) {
+                    this._createAnnotationBox(layer as HTMLDivElement, pageDiv, annotation);
+                }
+                // Note: A full implementation would also update the position/label here if needed,
+                // but the current interaction model handles that separately. This prevents flickering on create/delete.
+            });
+        });
+    }
+
 
     // --- Private Methods (Rendering) ---
     private _renderPageCanvas(pageNumber: number): void {
-        const cachedCanvas = appState.pageCanvasCache.get(pageNumber);
+        const cachedCanvas = pageCanvasCache.get(pageNumber);
         if (!cachedCanvas) {
             console.error(`Canvas for page ${pageNumber} not found in cache.`);
             return;
@@ -88,7 +191,7 @@ export class MarkController {
     }
 
     private _renderAnnotationsForPage(pageNumber: number): void {
-        const regions = appState.chayaDocument.markedRegions.get(pageNumber);
+        const regions = $appState.chayaDocument.markedRegions.get(pageNumber);
         if (!regions) return;
 
         const pageDiv = this.pdfContainer.querySelector<HTMLDivElement>(`[data-page-number="${pageNumber}"]`);
@@ -99,7 +202,7 @@ export class MarkController {
     }
 
     private _updateAnnotationListForPage(pageNumber: number): void {
-        const regions = appState.chayaDocument.markedRegions.get(pageNumber) || [];
+        const regions = $appState.chayaDocument.markedRegions.get(pageNumber) || [];
         // Remove existing DOM elements for this page.
         this.annotationList.querySelector(`[data-page-header="${pageNumber}"]`)?.remove();
         this.annotationList.querySelectorAll(`[data-annotation-id][data-page-number="${pageNumber}"]`).forEach(el => el.remove());
@@ -216,32 +319,37 @@ export class MarkController {
 
         button.addEventListener('click', async () => {
             // Flatten the map values into a list for the AI orchestrator.
-            const allCurrentAnnotations = Array.from(appState.chayaDocument.markedRegions.values()).flat();
+            const allCurrentAnnotations = Array.from($appState.chayaDocument.markedRegions.values()).flat();
             const newAnnotations = await runAIAssistedAnnotation(pageDiv, pageNumber, allCurrentAnnotations, this._getCanvasForPage.bind(this));
 
-            if (newAnnotations && newAnnotations.length > 0) {
-                newAnnotations.forEach(annotation => {
-                    const pageNum = annotation.pageNumber;
-                    if (!appState.chayaDocument.markedRegions.has(pageNum)) {
-                        appState.chayaDocument.markedRegions.set(pageNum, []);
-                    }
-                    appState.chayaDocument.markedRegions.get(pageNum)!.push(annotation);
-                });
-                appState.hasUnsavedChanges = true;
-
-                newAnnotations.forEach(annotation => {
-                    const targetPageDiv = this.pdfContainer.querySelector<HTMLDivElement>(`[data-page-number="${annotation.pageNumber}"]`);
-                    if (targetPageDiv) {
-                        const layer = targetPageDiv.querySelector<HTMLDivElement>('.annotation-layer');
-                        if (layer) {
-                            this._createAnnotationBox(layer, targetPageDiv, annotation);
-                        }
-                    }
-                    this._updateAnnotationListForPage(annotation.pageNumber);
-                });
-
+            if (newAnnotations) {
+                newAnnotations.forEach(addAnnotation);
                 console.log(`Added ${newAnnotations.length} AI-generated marked regions.`);
             }
+
+            // if (newAnnotations && newAnnotations.length > 0) {
+            //     newAnnotations.forEach(annotation => {
+            //         const pageNum = annotation.pageNumber;
+            //         if (!appState.chayaDocument.markedRegions.has(pageNum)) {
+            //             appState.chayaDocument.markedRegions.set(pageNum, []);
+            //         }
+            //         appState.chayaDocument.markedRegions.get(pageNum)!.push(annotation);
+            //     });
+            //     appState.hasUnsavedChanges = true;
+
+            //     newAnnotations.forEach(annotation => {
+            //         const targetPageDiv = this.pdfContainer.querySelector<HTMLDivElement>(`[data-page-number="${annotation.pageNumber}"]`);
+            //         if (targetPageDiv) {
+            //             const layer = targetPageDiv.querySelector<HTMLDivElement>('.annotation-layer');
+            //             if (layer) {
+            //                 this._createAnnotationBox(layer, targetPageDiv, annotation);
+            //             }
+            //         }
+            //         this._updateAnnotationListForPage(annotation.pageNumber);
+            //     });
+
+            //     console.log(`Added ${newAnnotations.length} AI-generated marked regions.`);
+            // }
         });
         return button;
     }
@@ -320,14 +428,15 @@ export class MarkController {
             pageNumber,
         };
 
-        if (!appState.chayaDocument.markedRegions.has(pageNumber)) {
-            appState.chayaDocument.markedRegions.set(pageNumber, []);
-        }
-        appState.chayaDocument.markedRegions.get(pageNumber)!.push(newAnnotation);
-        appState.hasUnsavedChanges = true;
+        // if (!appState.chayaDocument.markedRegions.has(pageNumber)) {
+        //     appState.chayaDocument.markedRegions.set(pageNumber, []);
+        // }
+        // appState.chayaDocument.markedRegions.get(pageNumber)!.push(newAnnotation);
+        // appState.hasUnsavedChanges = true;
 
-        this._createAnnotationBox(pageDiv.querySelector('.annotation-layer')!, pageDiv, newAnnotation);
-        this._updateAnnotationListForPage(newAnnotation.pageNumber);
+        // this._createAnnotationBox(pageDiv.querySelector('.annotation-layer')!, pageDiv, newAnnotation);
+        // this._updateAnnotationListForPage(newAnnotation.pageNumber);
+        addAnnotation(newAnnotation);
         this._selectAnnotation(newAnnotation.id);
     }
 
@@ -363,6 +472,13 @@ export class MarkController {
         };
 
         const onInteractionEnd = () => {
+            const finalRect = {
+                x: parseFloat(box.style.left) / pageDiv.offsetWidth,
+                y: parseFloat(box.style.top) / pageDiv.offsetHeight,
+                width: parseFloat(box.style.width) / pageDiv.offsetWidth,
+                height: parseFloat(box.style.height) / pageDiv.offsetHeight,
+            };
+            updateAnnotationRect(annotation.id, finalRect);
             this.isResizing = false;
             this.isDragging = false;
             document.removeEventListener('mousemove', onInteractionMove);
@@ -393,12 +509,11 @@ export class MarkController {
         box.style.width = `${newWidth}px`;
         box.style.height = `${newHeight}px`;
 
-        annotation.x = newLeft / pageDiv.offsetWidth;
-        annotation.y = newTop / pageDiv.offsetHeight;
-        annotation.width = newWidth / pageDiv.offsetWidth;
-        annotation.height = newHeight / pageDiv.offsetHeight;
-
-        appState.hasUnsavedChanges = true;
+        // annotation.x = newLeft / pageDiv.offsetWidth;
+        // annotation.y = newTop / pageDiv.offsetHeight;
+        // annotation.width = newWidth / pageDiv.offsetWidth;
+        // annotation.height = newHeight / pageDiv.offsetHeight;
+        // setUnsavedChanges(true);
     }
 
     private _onDrag(e: MouseEvent, box: HTMLDivElement, annotation: MarkedRegion, pageDiv: HTMLDivElement): void {
@@ -412,20 +527,22 @@ export class MarkController {
         box.style.left = `${clampedLeft}px`;
         box.style.top = `${clampedTop}px`;
 
-        annotation.x = clampedLeft / pageDiv.offsetWidth;
-        annotation.y = clampedTop / pageDiv.offsetHeight;
+        // annotation.x = clampedLeft / pageDiv.offsetWidth;
+        // annotation.y = clampedTop / pageDiv.offsetHeight;
 
-        appState.hasUnsavedChanges = true;
+        // // appState.hasUnsavedChanges = true;
+        // setUnsavedChanges(true);
     }
 
     private _onBoxDoubleClick(e: MouseEvent, box: HTMLDivElement, annotation: MarkedRegion) {
         e.preventDefault();
         const newLabel = prompt('Edit label:', annotation.label);
         if (newLabel !== null && newLabel.trim()) {
-            annotation.label = newLabel.trim();
-            box.title = newLabel.trim();
-            appState.hasUnsavedChanges = true;
-            this._updateAnnotationListForPage(annotation.pageNumber);
+            updateAnnotationLabel(annotation.id, newLabel.trim());
+            // annotation.label = newLabel.trim();
+            // box.title = newLabel.trim();
+            // appState.hasUnsavedChanges = true;
+            // this._updateAnnotationListForPage(annotation.pageNumber);
         }
     }
 
@@ -453,37 +570,38 @@ export class MarkController {
     }
 
     private _deleteAnnotation(annotationId: string): void {
-        let foundPageNumber: number | null = null;
-        const annotationsMap = appState.chayaDocument.markedRegions;
+        // let foundPageNumber: number | null = null;
+        // const annotationsMap = appState.chayaDocument.markedRegions;
 
-        // Find and remove the region from the state
-        for (const [pageNumber, regions] of annotationsMap.entries()) {
-            const index = regions.findIndex(a => a.id === annotationId);
-            if (index !== -1) {
-                regions.splice(index, 1);
-                foundPageNumber = pageNumber;
-                break;
-            }
-        }
+        // // Find and remove the region from the state
+        // for (const [pageNumber, regions] of annotationsMap.entries()) {
+        //     const index = regions.findIndex(a => a.id === annotationId);
+        //     if (index !== -1) {
+        //         regions.splice(index, 1);
+        //         foundPageNumber = pageNumber;
+        //         break;
+        //     }
+        // }
 
-        if (foundPageNumber !== null) {
-            appState.hasUnsavedChanges = true;
-            // Remove the annotation box from the PDF view
-            this.pdfContainer.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`)?.remove();
-            // Remove the corresponding item from the sidebar list
-            this.annotationList.querySelector(`[data-annotation-id="${annotationId}"]`)?.remove();
-            // Check if this was the last region for that page
-            const regionsLeft = annotationsMap.get(foundPageNumber);
-            if (!regionsLeft || regionsLeft.length === 0) {
-                // If so, remove the "Page X" header as well
-                this.annotationList.querySelector(`[data-page-header="${foundPageNumber}"]`)?.remove();
-                // And remove the page from the map to keep the state clean
-                annotationsMap.delete(foundPageNumber);
-            }
-            if (this.selectedAnnotationId === annotationId) {
-                this.selectedAnnotationId = null;
-            }
-        }
+        // if (foundPageNumber !== null) {
+        //     appState.hasUnsavedChanges = true;
+        //     // Remove the annotation box from the PDF view
+        //     this.pdfContainer.querySelector(`.annotation-box[data-annotation-id="${annotationId}"]`)?.remove();
+        //     // Remove the corresponding item from the sidebar list
+        //     this.annotationList.querySelector(`[data-annotation-id="${annotationId}"]`)?.remove();
+        //     // Check if this was the last region for that page
+        //     const regionsLeft = annotationsMap.get(foundPageNumber);
+        //     if (!regionsLeft || regionsLeft.length === 0) {
+        //         // If so, remove the "Page X" header as well
+        //         this.annotationList.querySelector(`[data-page-header="${foundPageNumber}"]`)?.remove();
+        //         // And remove the page from the map to keep the state clean
+        //         annotationsMap.delete(foundPageNumber);
+        //     }
+        //     if (this.selectedAnnotationId === annotationId) {
+        //         this.selectedAnnotationId = null;
+        //     }
+        // }
+        deleteAnnotation(annotationId);
     }
 
     private _highlightAnnotationBox(id: string, highlight: boolean): void {
@@ -513,7 +631,7 @@ export class MarkController {
         });
 
         window.addEventListener('beforeunload', (e) => {
-            if (appState.hasUnsavedChanges) {
+            if ($appState.hasUnsavedChanges) {
                 e.preventDefault();
                 e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
                 return e.returnValue;

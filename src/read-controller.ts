@@ -1,6 +1,7 @@
 // Read tab functionality - presentation view of annotated documents
 
-import { ChayaDocument, MarkedRegion, appState } from './models.js';
+import { $appState, pageCanvasCache, subscribe } from './store.js';
+import type { MarkedRegion } from './models.js';
 
 export class ViewerController {
     private pdfContainer: HTMLDivElement;
@@ -12,6 +13,7 @@ export class ViewerController {
     ) {
         this.pdfContainer = pdfContainer;
         this.annotationList = annotationList;
+        subscribe(() => this.render());
     }
 
     public prepareForDocument(): void {
@@ -19,27 +21,22 @@ export class ViewerController {
         this.annotationList.innerHTML = '';
     }
 
-    public async renderRegionsForPage(pageNumber: number): Promise<void> {
-        const regions = appState.chayaDocument.markedRegions.get(pageNumber);
-        if (!regions || regions.length === 0) {
-            // If there are no regions on this page, there's nothing to do.
-            return;
-        }
+    public async render(): Promise<void> {
+        this.prepareForDocument();
+        if (!$appState.documentLoaded || !$appState.chayaDocument) return;
 
-        const regionDivs: HTMLDivElement[] = [];
-        for (const annotation of regions) {
-            // Await the extraction before pushing to the array.
-            const regionDiv = await this.extractAnnotationRegion(annotation);
-            regionDivs.push(regionDiv);
-        }
+        const allRegions = Array.from($appState.chayaDocument.markedRegions.values()).flat();
+        if (allRegions.length === 0) return;
 
-        // Append all divs for this page to the container at once.
+        // TODO: Think about whether this needs to await each annotation one by one, to preserve the order.
+        const regionPromises = allRegions.map(annotation => this.extractAnnotationRegion(annotation));
+        const regionDivs = await Promise.all(regionPromises);
+
         this.pdfContainer.append(...regionDivs);
-
-        this._updateAnnotationListForPage(regions);
+        this._updateAnnotationList(allRegions);
     }
 
-    private _updateAnnotationListForPage(regions: MarkedRegion[]): void {
+    private _updateAnnotationList(regions: MarkedRegion[]): void {
         regions.forEach(annotation => {
             const navButton = document.createElement('button');
             navButton.className = 'px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-full transition-colors cursor-pointer';
@@ -80,7 +77,7 @@ export class ViewerController {
 
     // Extract a cropped region from a page canvas for a specific annotation
     private async extractAnnotationRegion(annotation: MarkedRegion): Promise<HTMLDivElement> {
-        const sourceCanvas = appState.pageCanvasCache.get(annotation.pageNumber);
+        const sourceCanvas = pageCanvasCache.get(annotation.pageNumber);
         if (!sourceCanvas) {
             console.error(`Canvas for page ${annotation.pageNumber} not found in cache.`);
             const errorDiv = document.createElement('div');
