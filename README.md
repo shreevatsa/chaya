@@ -2,13 +2,19 @@ Scan companion.
 
 Serving at https://chaya.shreevatsa.net/
 
-PDF region annotation and snippet-viewing experiments are listed at
-[bookchop/index.html](bookchop/index.html). Start with the fit-to-width annotator,
-export its annotations as JSON, then open the snippet viewer with the same PDF
-and JSON. The original `retry.html` exports a different, canvas-coordinate format
-that the viewer does not accept.
+`make` builds the original OCR application at `/` and both Bookchop applications
+listed at [bookchop/index.html](bookchop/index.html):
 
-The experiments are standalone HTML files, separate from the OCR app generated
-by `make`. Serve the repository with `python3 -m http.server` and open
-http://localhost:8000/bookchop/ to browse them. The prototype pages require an
-internet connection for their CDN dependencies.
+- `/bookchop/full/`: region marking and a reading view, from the `bookchop` branch.
+- `/bookchop/markonly/`: a single marking workspace, from `bookchop-markonly`.
+
+See [bookchop/README.md](bookchop/README.md) for development details. The same
+listing retains the early standalone `retry*.html` prototypes at their original
+paths.
+
+After building, serve the repository with `python3 -m http.server` and open
+http://localhost:8000/bookchop/. The Bookchop pages require an internet connection
+for PDF.js, JSZip, and optional AI services.
+
+The original OCR application before this integration is preserved on branch
+`v2024.04`, alongside the earlier stable versions listed at `/versions/`.

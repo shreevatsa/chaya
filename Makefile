@@ -1,12 +1,22 @@
 # Suggestion:
 #     ls main.ts ocr.htm | entr make
-all:
+.PHONY: all ocr bookchop snapshot
+
+all: ocr bookchop
+
+ocr:
 	date
 	npx esbuild main.ts --outfile=main.js --metafile=meta.json --bundle --format=esm --minify --sourcemap
 	python3 build-inline.py
 	date
 
-snapshot: all
+bookchop:
+	yarn --cwd bookchop/full install --frozen-lockfile --non-interactive
+	yarn --cwd bookchop/full build
+	yarn --cwd bookchop/markonly install --frozen-lockfile --non-interactive
+	yarn --cwd bookchop/markonly build
+
+snapshot: ocr
 	echo "VERSION='2024.??'" "(Get from SCHEMA_VERSION in main.ts)"
 	echo "git switch -c v${VERSION}"
 	echo "git push --set-upstream origin "v${VERSION}"

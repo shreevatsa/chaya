@@ -4,7 +4,7 @@
   "description": "`bookchop` is a client-side web tool for annotating regions in PDF documents and viewing them.",
   "main": "index.js",
   "scripts": {
-    "build": "tsc && ./node_modules/.bin/postcss ./src/input.css -o ./dist/output.css",
+    "build": "tsc --noEmit && esbuild src/app.ts --bundle --outfile=dist/app.js --minify && postcss ./src/input.css -o ./dist/output.css",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "esbuild": "0.20.2",
     "@playwright/test": "^1.53.1",
     "autoprefixer": "^10.4.21",
     "playwright": "^1.53.1",

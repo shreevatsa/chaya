@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Chāyā: Bookchop experiments</title>
+    <title>Chāyā: Bookchop</title>
     <style>
         body {
             max-width: 48rem;
@@ -34,11 +34,25 @@
 <body>
     <header>
         <nav aria-label="Chāyā"><a href="../">Chāyā OCR app</a></nav>
-        <h1>Bookchop experiments</h1>
-        <p>Standalone experiments for labeling regions of a PDF and viewing the selected snippets.</p>
+        <h1>Bookchop</h1>
+        <p>Mark and label regions of a PDF, optionally with AI assistance, and save the PDF and regions together.</p>
     </header>
     <main>
-        <h2>Try the workflow</h2>
+        <h2>Applications</h2>
+        <ul>
+            <li>
+                <a href="./full/"><strong>Mark and read</strong></a>
+                <p>Draw, move, resize, and label regions, then switch to Read to view the selected snippets.</p>
+            </li>
+            <li>
+                <a href="./markonly/"><strong>Marking workspace</strong></a>
+                <p>A simplified interface focused on marking regions, with the same PDF package format.</p>
+            </li>
+        </ul>
+        <p>Both applications save <code>.chaya</code> ZIP packages containing the PDF and annotations.
+            These differ from the JSON files saved by the original <a href="../">Chāyā OCR app</a>.</p>
+
+        <h2>Early prototypes</h2>
         <p>Open the latest annotator, select a PDF, draw and label regions, then export the
             annotations as JSON. Open the snippet viewer with the same PDF and the exported JSON.</p>
         <ul>

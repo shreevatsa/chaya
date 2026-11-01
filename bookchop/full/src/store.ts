@@ -46,6 +46,7 @@ export function loadPdf(pdfFile: File) {
     $appState.pdfFile = pdfFile;
     $appState.documentLoaded = true;
     $appState.chayaDocument = new ChayaDocument(); // Start with empty annotations
+    $appState.hasUnsavedChanges = false;
     pageCanvasCache.clear();
 }
 
@@ -59,9 +60,6 @@ export function setPdfDocumentInstance(doc: any) {
 // }
 export function addAnnotationsForPage(pageNum: number, regions: MarkedRegion[]) {
     $appState.chayaDocument.markedRegions.set(pageNum, regions);
-    // We set this to true here, assuming loading a doc with annotations counts as a starting point with "unsaved" work.
-    // ^ TODO: This is not true?
-    $appState.hasUnsavedChanges = true;
 }
 
 export function addPageCanvas(pageNum: number, canvas: HTMLCanvasElement) {

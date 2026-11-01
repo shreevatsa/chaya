@@ -140,9 +140,10 @@ export class MarkController {
                 const pageDiv = layer.parentElement as HTMLDivElement;
                 if (!box) {
                     this._createAnnotationBox(layer as HTMLDivElement, pageDiv, annotation);
+                } else {
+                    box.title = annotation.label;
                 }
-                // Note: A full implementation would also update the position/label here if needed,
-                // but the current interaction model handles that separately. This prevents flickering on create/delete.
+                // Pointer interactions update geometry; retaining boxes avoids flicker.
             });
         });
     }

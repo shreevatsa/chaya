@@ -6,6 +6,7 @@ import type { MarkedRegion } from './models.js';
 export class ViewerController {
     private pdfContainer: HTMLDivElement;
     private annotationList: HTMLDivElement;
+    private renderRevision = 0;
 
     constructor(
         pdfContainer: HTMLDivElement,
@@ -17,12 +18,14 @@ export class ViewerController {
     }
 
     public prepareForDocument(): void {
+        ++this.renderRevision;
         this.pdfContainer.innerHTML = '';
         this.annotationList.innerHTML = '';
     }
 
     public async render(): Promise<void> {
         this.prepareForDocument();
+        const revision = this.renderRevision;
         if (!$appState.documentLoaded || !$appState.chayaDocument) return;
 
         const allRegions = Array.from($appState.chayaDocument.markedRegions.values()).flat();
@@ -31,6 +34,9 @@ export class ViewerController {
         // TODO: Think about whether this needs to await each annotation one by one, to preserve the order.
         const regionPromises = allRegions.map(annotation => this.extractAnnotationRegion(annotation));
         const regionDivs = await Promise.all(regionPromises);
+
+        // A newer state change may have started another render while we waited.
+        if (revision !== this.renderRevision) return;
 
         this.pdfContainer.append(...regionDivs);
         this._updateAnnotationList(allRegions);

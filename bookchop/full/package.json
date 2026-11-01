@@ -6,11 +6,12 @@
   "scripts": {
     "build:js": "esbuild src/app.ts --bundle --outfile=dist/app.js --minify",
     "build:css": "postcss ./src/input.css -o ./dist/output.css",
-    "build": "npm-run-all build:js build:css",
+    "build": "tsc --noEmit && npm-run-all build:js build:css",
     "watch:css": "postcss ./src/input.css -o ./dist/output.css --watch",
     "serve": "esbuild src/app.ts --bundle --outfile=dist/app.js --servedir=.",
     "dev": "npm-run-all --parallel watch:css serve",
     "test": "playwright test",
+    "test:integration": "playwright test --config playwright.integration.config.ts",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
   },
@@ -18,6 +19,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "esbuild": "0.20.2",
     "@playwright/test": "^1.53.1",
     "autoprefixer": "^10.4.21",
     "npm-run-all": "^4.1.5",
