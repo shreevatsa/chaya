@@ -2,18 +2,16 @@ Scan companion.
 
 Serving at https://chaya.shreevatsa.net/
 
-`make` builds the original OCR application at `/` and both Bookchop applications
-listed at [bookchop/index.html](bookchop/index.html):
+`make` builds the original OCR application at `/`, the archived split-chunk
+experiment, and both Bookchop interfaces. All snapshots and experiments are
+listed at [versions/index.html](versions/index.html).
 
-- `/bookchop/full/`: region marking and a reading view, from the `bookchop` branch.
-- `/bookchop/markonly/`: a single marking workspace, from `bookchop-markonly`.
-
-See [bookchop/README.md](bookchop/README.md) for development details. The same
-listing retains the early standalone `retry*.html` prototypes at their original
-paths.
+See [versions/README.md](versions/README.md) for the application paths, file
+formats, build instructions, and browser checks. The former `/bookchop/` listing
+and root-level prototypes have moved under `/versions/`.
 
 After building, serve the repository with `python3 -m http.server` and open
-http://localhost:8000/bookchop/. The Bookchop pages require an internet connection
+http://localhost:8000/versions/. The Bookchop pages require an internet connection
 for PDF.js, JSZip, and optional AI services.
 
 The original OCR application before this integration is preserved on branch

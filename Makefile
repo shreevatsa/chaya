@@ -1,8 +1,8 @@
 # Suggestion:
 #     ls main.ts ocr.htm | entr make
-.PHONY: all ocr bookchop snapshot
+.PHONY: all ocr bookchop splitchunk snapshot
 
-all: ocr bookchop
+all: ocr bookchop splitchunk
 
 ocr:
 	date
@@ -11,10 +11,14 @@ ocr:
 	date
 
 bookchop:
-	yarn --cwd bookchop/full install --frozen-lockfile --non-interactive
-	yarn --cwd bookchop/full build
-	yarn --cwd bookchop/markonly install --frozen-lockfile --non-interactive
-	yarn --cwd bookchop/markonly build
+	yarn --cwd versions/bookchop install --frozen-lockfile --non-interactive
+	yarn --cwd versions/bookchop build
+	yarn --cwd versions/bookchop-markonly install --frozen-lockfile --non-interactive
+	yarn --cwd versions/bookchop-markonly build
+
+splitchunk:
+	npx esbuild versions/splitchunk/main.ts --outfile=versions/splitchunk/main.js --metafile=versions/splitchunk/meta.json --bundle --format=esm --minify --sourcemap
+	cd versions/splitchunk && python3 ../../build-inline.py
 
 snapshot: ocr
 	echo "VERSION='2024.??'" "(Get from SCHEMA_VERSION in main.ts)"
